@@ -88,22 +88,34 @@ points already spent in that discipline; ability slots 2–4 live in the
 tree. Training at the camp applies to your live expedition character on
 the spot, and a respec costs 200 salvage.
 
-### THE SHATTERED REACH — one persistent continent
-The headline mode. Instead of an arena, deploy onto a six-territory open
-continent — **600 × 400 units of walkable world**, each territory a
-200 × 200 region (Tide Wreckage, Glacier Hollow, Verdant Cloister, Ember
-Core, Stormspire, Null Sanctum) with **fixed danger ratings I–IV** — the
-world doesn't scale to you; you grow into it. Hostiles are **territorial**:
-they idle and wander around their nests until you come close enough to be
-noticed (or wound one), chase while you're in their hunting range, and
-walk home when you slip away — pulling a pack is a choice, not a default.
-There are no waves and no timer:
+### THE SHATTERED REACH — a zone-streamed world
+The headline mode. The Reach is built the way the classic MMOs build
+their worlds: **each territory is its own huge map** (500 × 500 — Tide
+Wreckage, Glacier Hollow, Verdant Cloister, Ember Core, Stormspire, Null
+Sanctum), linked by **travel gates** you simply walk through. Only one
+zone is ever loaded, so each can be as big and dense as it likes — and
+because every map is generated in-memory, crossing a gate is a blink of
+black, **never a loading screen**. Territories carry **fixed danger
+ratings I–IV** — the world doesn't scale to you; you grow into it.
+
+Every territory also hides a **dungeon gate**: a violet maw leading down
+into that territory's DEPTHS — a separate dark map one danger rank
+hotter, garrisoned by guardian packs, holding the territory's **sealed
+vault** mid-depth and its **corrupt-frame lair** at the far end. Beat the
+lair boss down there to claim the shell and its artifact; the exit gate
+walks you back to the surface.
+
+Hostiles are **territorial**: they idle and wander around their nests
+until you come close enough to be noticed (or wound one), chase while
+you're in their hunting range, and walk home when you slip away — pulling
+a pack is a choice, not a default. There are no waves and no timer:
 
 - **Husk Nests** (28 of them) spawn enemies endlessly until you crack their
   cores — and a broken nest **stays broken forever**, across sessions. The
   title screen counts your scars.
-- **Corrupt-frame lairs** — one per territory. Walk into one and its boss
-  wakes; defeating it unlocks that shell *and* drops a **named artifact**.
+- **Corrupt-frame lairs** — one per territory, waiting at the bottom of
+  its dungeon. Walk into the lair and its boss wakes; defeating it
+  unlocks that shell *and* drops a **named artifact**.
 - **Siege relays** — hold ground through three spawn bursts to claim a relay
   permanently for banked salvage and a gem.
 - **The survivor camp** is a real place you walk around: bank salvage at the
@@ -152,8 +164,8 @@ The continent shifts once a real day, the same way for everyone:
   SPOREBLOOM (kills shed extra sparks), ASHFALL (burning cinders rain on
   telegraphs), STORM SURGE (the sky hunts you), NULL WIND (drifting eddies
   ground your weapons).
-- **Hidden vaults** — one sealed door per territory, tucked in a far
-  corner. Breaching one means passing a 3-step field trial while its
+- **Hidden vaults** — one sealed door per territory, guarded inside its
+  dungeon. Breaching one means passing a 3-step field trial while its
   guardians wake; a breached vault stays open forever and pays banked
   salvage, a gem, and a cache.
 

@@ -549,6 +549,32 @@ GH.models = (function () {
     return g;
   };
 
+  // travel gate: a standing ring you walk through to change zones.
+  // kinds: 'travel' (territory link, blue), 'dungeon' (violet maw),
+  // 'exit' (back to the surface, warm gold)
+  M.buildGate = function (kind) {
+    var g = new THREE.Group();
+    var glow = kind === 'dungeon' ? 0xc050ff : kind === 'exit' ? 0xffd050 : 0x60c8ff;
+    var stone = kind === 'dungeon' ? 0x241f2c : 0x3a4450;
+    var jambL = box(1.0, 5.4, 1.0, stone); jambL.position.set(-2.6, 2.7, 0);
+    var jambR = box(1.0, 5.4, 1.0, stone); jambR.position.set(2.6, 2.7, 0);
+    var lintel = box(6.6, 1.0, 1.1, stone); lintel.position.y = 5.6;
+    g.add(jambL, jambR, lintel);
+    var veil = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 4.6),
+      GH.assets.basic(glow, { transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false }));
+    veil.position.y = 2.8;
+    g.add(veil);
+    g.userData.veil = veil;
+    var lampL = new THREE.Mesh(new THREE.OctahedronGeometry(0.3),
+      GH.assets.basic(glow, { transparent: true, opacity: 0.95 }));
+    lampL.position.set(-2.6, 5.9, 0);
+    var lampR = lampL.clone();
+    lampR.position.x = 2.6;
+    g.add(lampL, lampR);
+    blobShadow(g, 5);
+    return g;
+  };
+
   // sealed treasure vault: a squat stone door with a glowing seam;
   // breached vaults stand open and dark
   M.buildVault = function (open) {

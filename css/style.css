@@ -707,6 +707,17 @@ html, body {
   animation: announce-pop 0.3s ease-out;
 }
 
+/* ---------------- zone travel fade ---------------- */
+
+#zone-fade {
+  position: absolute; inset: 0;
+  background: #000;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s ease-in-out;
+  z-index: 40;
+}
+#zone-fade.on { opacity: 1; transition: opacity 0.05s; }
+
 /* ---------------- target combat + abilities ---------------- */
 
 .energy-frame { width: 190px; height: 8px; margin-top: 3px; }
