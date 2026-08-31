@@ -508,6 +508,101 @@ html, body {
   #touch-special { right: auto; left: calc(4vw + 230px); }
 }
 
+/* ---------------- progression screens ---------------- */
+
+.title-row { display: flex; gap: 8px; z-index: 1; flex-wrap: wrap; justify-content: center; }
+.profile-btn { border-color: #7a9ac8; color: #c8e0ff; }
+#title-memorial {
+  font-size: 11px; color: #b06868; z-index: 1;
+  font-family: "Courier New", monospace;
+}
+
+#broker-screen, #collection-screen, #trials-screen {
+  background:
+    linear-gradient(rgba(20,30,120,0.25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20,30,120,0.25) 1px, transparent 1px),
+    radial-gradient(ellipse at center, rgba(6,10,40,0.94), rgba(0,0,4,0.97));
+  background-size: 34px 34px, 34px 34px, cover;
+}
+
+#broker-status, #log-head {
+  font-family: "Times New Roman", serif; font-size: 15px;
+  color: #c0c8e0;
+}
+#broker-status b, #log-head b { color: #f0d888; }
+
+#broker-contract {
+  background: linear-gradient(#101838, #060a1c);
+  border: 2px solid #c8b060;
+  box-shadow: 0 0 0 2px #000, inset 0 0 20px rgba(0,0,0,0.7);
+  padding: 14px 24px;
+  text-align: center;
+  min-width: 340px;
+}
+.bk-label { font-size: 11px; letter-spacing: 3px; color: #8898c8; margin-bottom: 6px; }
+.bk-task {
+  font-family: "Times New Roman", serif; font-weight: bold;
+  font-size: 20px; color: #f0e0b0; margin-bottom: 4px;
+}
+.bk-progress { font-size: 13px; color: #90f0a0; margin-bottom: 10px; }
+
+#broker-shop { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 980px; }
+#broker-shop .devotion-card { width: 170px; }
+
+#log-body {
+  max-height: 56vh; overflow-y: auto;
+  max-width: 900px; width: 90%;
+  padding: 0 10px;
+}
+.log-section {
+  font-family: "Times New Roman", serif; font-weight: bold;
+  font-size: 16px; letter-spacing: 4px; color: #f0d888;
+  margin: 14px 0 6px;
+  border-bottom: 1px solid #3a4468;
+}
+.log-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.log-cell {
+  width: 104px; padding: 6px 4px;
+  background: #0a0e20;
+  border: 1px solid #2a3454;
+  text-align: center;
+  filter: grayscale(80%) brightness(0.6);
+}
+.log-cell.seen { filter: none; border-color: #6a78a8; background: #101838; }
+.lc-glyph { font-size: 18px; }
+.lc-name { font-size: 10.5px; color: #c8d0e8; }
+.lc-count { font-size: 11px; color: #90f0a0; font-family: "Times New Roman", serif; font-weight: bold; }
+
+#trials-body {
+  max-height: 62vh; overflow-y: auto;
+  max-width: 980px; width: 92%;
+}
+.trial-stage {
+  background: linear-gradient(#101838, #060a1c);
+  border: 1px solid #3a4468;
+  padding: 8px 14px;
+  margin-bottom: 8px;
+}
+.trial-stage.locked { filter: grayscale(80%) brightness(0.55); }
+.ts-name {
+  font-family: "Times New Roman", serif; font-weight: bold;
+  font-size: 16px; color: #f0e0b0;
+}
+.ts-tier { color: #90f0a0; font-size: 12px; letter-spacing: 2px; margin-left: 8px; }
+.ts-row { font-size: 11.5px; color: #a8b0c8; margin: 3px 0; display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; }
+.ts-tiername { color: #8898c8; letter-spacing: 2px; font-size: 10px; min-width: 52px; }
+.ts-task.done { color: #90f0a0; }
+.ts-perk { margin-left: auto; font-size: 10.5px; color: #5a6890; font-style: italic; }
+.ts-perk.on { color: #f0d888; }
+
+.sc-trial { color: #90f0a0; font-size: 10px; letter-spacing: 1px; }
+
+#contract-line {
+  margin-top: 2px;
+  font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px;
+  color: #90f0a0; text-shadow: 1px 1px 0 #000;
+}
+
 #mute-btn {
   position: absolute; right: 10px; bottom: 8px;
   width: 30px; height: 30px; line-height: 28px;

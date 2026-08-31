@@ -29,6 +29,7 @@
         </div>
         <div id="coin-row"><span class="coin-icon">S</span><span id="coin-count">×0</span></div>
         <div id="buff-line"></div>
+        <div id="contract-line"></div>
       </div>
       <div id="hud-center">
         <div id="wave-label">Wave 1/20</div>
@@ -59,8 +60,15 @@
     <button id="btn-start" class="menu-btn">CLASSIC</button>
     <button id="btn-arena" class="menu-btn small">ARENA — ENDLESS</button>
     <button id="btn-weekly" class="menu-btn small">WEEKLY CHALLENGE</button>
-    <button id="btn-hangar" class="menu-btn small">HANGAR · DEVOTIONS</button>
+    <div class="title-row">
+      <button id="btn-hangar" class="menu-btn tiny">DEVOTIONS</button>
+      <button id="btn-broker" class="menu-btn tiny">BROKER</button>
+      <button id="btn-collection" class="menu-btn tiny">COLLECTION LOG</button>
+      <button id="btn-trials" class="menu-btn tiny">STAGE TRIALS</button>
+    </div>
+    <button id="btn-profile" class="menu-btn tiny profile-btn">PILOT: STANDARD</button>
     <div id="title-salvage"></div>
+    <div id="title-memorial"></div>
     <div class="title-foot">WASD move &nbsp;·&nbsp; mouse aim &nbsp;·&nbsp; SPACE boost &nbsp;·&nbsp; SHIFT / RMB special &nbsp;·&nbsp; F scanlines &nbsp;·&nbsp; weapons fire automatically</div>
   </div>
 
@@ -111,6 +119,30 @@
     <button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
+  <!-- ===================== BROKER ===================== -->
+  <div id="broker-screen" class="screen hidden">
+    <h2 class="select-title">THE&nbsp;BROKER</h2>
+    <div id="broker-status"></div>
+    <div id="broker-contract"></div>
+    <div id="broker-shop"></div>
+    <button id="btn-broker-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== COLLECTION LOG ===================== -->
+  <div id="collection-screen" class="screen hidden">
+    <h2 class="select-title">COLLECTION&nbsp;LOG</h2>
+    <div id="log-head"></div>
+    <div id="log-body"></div>
+    <button id="btn-collection-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== STAGE TRIALS ===================== -->
+  <div id="trials-screen" class="screen hidden">
+    <h2 class="select-title">STAGE&nbsp;TRIALS</h2>
+    <div id="trials-body"></div>
+    <button id="btn-trials-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
   <!-- ===================== WAVE REWARD ===================== -->
   <div id="reward-screen" class="screen hidden">
     <h2 class="reward-title">WAVE&nbsp;REWARD</h2>
@@ -155,6 +187,7 @@
 <script src="js/meta.js"></script>
 <script src="js/upgrades.js"></script>
 <script src="js/enemies.js"></script>
+<script src="js/progress.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/music.js"></script>
 <script src="js/game.js"></script>

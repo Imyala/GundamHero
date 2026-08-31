@@ -240,7 +240,8 @@
 
   // ----------------------------------------------------------------
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
-    'weekly-screen', 'preset-screen', 'reward-screen', 'pause-screen', 'end-screen'];
+    'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
+    'trials-screen', 'reward-screen', 'pause-screen', 'end-screen'];
 
   function show(id) {
     SCREENS.forEach(function (s) {
@@ -249,10 +250,33 @@
   }
 
   function refreshTitle() {
+    var comp = GH.progress.completion();
     document.getElementById('title-salvage').textContent =
       'SALVAGE BANK: ' + GH.meta.data.salvage + '  ·  SHELLS: ' +
       Object.keys(GH.meta.data.shells).length + '/' + GH.mechs.length +
+      '  ·  LOG: ' + comp.pct + '%' +
       (GH.meta.data.bestArena ? '  ·  ARENA BEST: WAVE ' + GH.meta.data.bestArena : '');
+    var prof = GH.meta.PROFILES[GH.meta.profile];
+    document.getElementById('btn-profile').textContent = 'PILOT: ' + prof.name;
+    var memEl = document.getElementById('title-memorial');
+    var mem = GH.meta.memorial();
+    if (GH.meta.isHardcore() && mem.length) {
+      memEl.textContent = 'MEMORIAL: ' + mem.slice(0, 3).map(function (m) {
+        return m.frame + ' — ' + m.stage + ' w' + m.wave;
+      }).join('  ·  ');
+    } else {
+      memEl.textContent = '';
+    }
+  }
+
+  var PROFILE_ORDER = ['standard', 'iron', 'hardcore'];
+  function cycleProfile() {
+    var i = PROFILE_ORDER.indexOf(GH.meta.profile);
+    var next = PROFILE_ORDER[(i + 1) % PROFILE_ORDER.length];
+    GH.meta.load(next);
+    GH.meta.applyDevParams(location.search);
+    GH.audio.card();
+    refreshTitle();
   }
 
   function enterSelect(mode) {
@@ -306,6 +330,8 @@
       var best = GH.meta.data.bestWave[st.id] || 0;
       var won = GH.meta.data.victories[st.id];
       var reward = GH.mechById(st.unlocks);
+      var tier = GH.progress.trialTier(st.id);
+      var tierBadge = tier ? '<span class="sc-trial">TRIAL ' + ['I', 'II', 'III', 'IV'][tier - 1] + '</span>' : '';
       div.innerHTML =
         '<div class="sc-band" style="background:linear-gradient(' +
         st.sky[0] + ',' + st.sky[1] + ')"></div>' +
@@ -317,7 +343,7 @@
             (GH.meta.data.shells[st.unlocks] ? '' : '<br>— defeat to unlock the frame'))
           : 'Clear the previous stage<br>to unlock') + '</div>' +
         '<div class="sc-best">' + (won ? '★ CLEARED · ' : '') +
-        (best ? 'best wave ' + best : '') + '</div>';
+        (best ? 'best wave ' + best : '') + ' ' + tierBadge + '</div>';
       if (unlocked) {
         div.onclick = function () {
           chosenStage = i;
@@ -349,6 +375,11 @@
   ];
 
   function openPresetPicker(stageIdx) {
+    if (GH.meta.isIron()) {
+      // Iron rules: no loadout kits — straight into the arena
+      launch(stageIdx, PRESETS[0]);
+      return;
+    }
     GH.game.state = 'stageselect';
     var wrap = document.getElementById('preset-list');
     wrap.innerHTML = '';
@@ -467,6 +498,163 @@
   }
 
   // ----------------------------------------------------------------
+  // BROKER — hunt contracts
+  function openBroker() {
+    GH.audio.card();
+    GH.game.state = 'hangar';
+    renderBroker();
+    show('broker-screen');
+  }
+
+  function renderBroker() {
+    var b = GH.meta.data.broker;
+    document.getElementById('broker-status').innerHTML =
+      'BROKER POINTS: <b>' + b.points + '</b> · CONTRACTS FILLED: <b>' + b.completed +
+      '</b> · SALVAGE: <b>' + GH.meta.data.salvage + '</b>';
+    var wrap = document.getElementById('broker-contract');
+    if (b.active) {
+      var c = b.active;
+      wrap.innerHTML =
+        '<div class="bk-label">ACTIVE CONTRACT</div>' +
+        '<div class="bk-task">' + GH.progress.contractLabel(c) + '</div>' +
+        '<div class="bk-progress">' + c.have + ' / ' + c.need +
+        '  —  pays ' + c.salvage + ' salvage + ' + c.pts + ' pts</div>' +
+        '<button class="dv-buy" id="bk-reroll">REROLL · ' + GH.progress.rerollCost() + '</button> ' +
+        '<button class="dv-buy" id="bk-abandon">ABANDON</button>';
+      document.getElementById('bk-reroll').onclick = function () {
+        var cost = GH.progress.rerollCost();
+        if (GH.meta.data.salvage < cost) return;
+        GH.meta.data.salvage -= cost;
+        GH.meta.data.broker.active = GH.progress.generateContract();
+        GH.meta.save();
+        GH.audio.card();
+        renderBroker();
+      };
+      document.getElementById('bk-abandon').onclick = function () {
+        GH.meta.data.broker.active = null;
+        GH.meta.save();
+        GH.audio.hit();
+        renderBroker();
+      };
+    } else {
+      wrap.innerHTML =
+        '<div class="bk-label">NO ACTIVE CONTRACT</div>' +
+        '<button class="menu-btn small" id="bk-accept">TAKE A CONTRACT</button>';
+      document.getElementById('bk-accept').onclick = function () {
+        GH.meta.data.broker.active = GH.progress.generateContract();
+        GH.meta.save();
+        GH.audio.wave();
+        renderBroker();
+      };
+    }
+    // unlock shop
+    var shop = document.getElementById('broker-shop');
+    shop.innerHTML = '';
+    GH.progress.brokerUnlocks.forEach(function (u) {
+      var owned = !!b.unlocks[u.id];
+      var gated = u.requires && !b.unlocks[u.requires];
+      var div = document.createElement('div');
+      div.className = 'devotion-card' + (owned ? ' active' : '');
+      div.innerHTML =
+        '<div class="dv-name">' + u.name + '</div>' +
+        '<div class="dv-desc">' + u.desc + '</div>' +
+        '<button class="dv-buy" ' + (owned || gated || b.points < u.cost ? 'disabled' : '') + '>' +
+        (owned ? 'OWNED' : (gated ? 'LOCKED' : u.cost + ' PTS')) + '</button>';
+      div.querySelector('.dv-buy').onclick = function () {
+        if (owned || gated || b.points < u.cost) return;
+        b.points -= u.cost;
+        b.unlocks[u.id] = true;
+        GH.meta.save();
+        GH.audio.levelup();
+        renderBroker();
+      };
+      shop.appendChild(div);
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // COLLECTION LOG
+  function openCollection() {
+    GH.audio.card();
+    GH.game.state = 'hangar';
+    var c = GH.meta.data.collection;
+    var comp = GH.progress.completion();
+    document.getElementById('log-head').innerHTML =
+      'COMPLETION: <b>' + comp.pct + '%</b> (' + comp.have + '/' + comp.total + ')' +
+      ' · RUNS: <b>' + c.totalRuns + '</b> · WINS: <b>' + c.totalWins +
+      '</b> · TOTAL KILLS: <b>' + c.totalKills + '</b>';
+    var body = document.getElementById('log-body');
+    var html = '<div class="log-section">HOSTILES</div><div class="log-grid">';
+    Object.keys(GH.enemyDefs).forEach(function (id) {
+      var n = c.kills[id] || 0;
+      html += '<div class="log-cell' + (n ? ' seen' : '') + '">' +
+        '<div class="lc-name">' + (n ? GH.enemyDefs[id].name : '???') + '</div>' +
+        '<div class="lc-count">' + (n ? '×' + n : '—') + '</div></div>';
+    });
+    html += '</div><div class="log-section">WEAPONS</div><div class="log-grid">';
+    GH.upgrades.forEach(function (u) {
+      if (u.kind !== 'weapon') return;
+      var got = !!c.weapons[u.id];
+      html += '<div class="log-cell' + (got ? ' seen' : '') + '">' +
+        '<div class="lc-glyph">' + u.glyph + '</div>' +
+        '<div class="lc-name">' + (got ? u.name : '???') + '</div></div>';
+    });
+    html += '</div><div class="log-section">RESONANCES</div><div class="log-grid">';
+    var resNames = Object.keys(c.resonances);
+    ['SANCTITY', 'IMMOLATE', 'FRAGMENT', 'SPOREBLOOM', 'DETONATE', 'PRISM'].forEach(function (r) {
+      var got = false;
+      for (var i = 0; i < resNames.length; i++) {
+        if (resNames[i].indexOf(r) === 0 && resNames[i].indexOf('+') === -1) got = true;
+      }
+      html += '<div class="log-cell' + (got ? ' seen' : '') + '">' +
+        '<div class="lc-name">' + (got ? r : '???') + '</div></div>';
+    });
+    html += '</div><div class="log-section">GEMS SOCKETED</div><div class="log-grid">';
+    GH.gems.typeIds.forEach(function (t) {
+      var n = c.gems[t] || 0;
+      html += '<div class="log-cell' + (n ? ' seen' : '') + '">' +
+        '<div class="lc-glyph">' + GH.gems.types[t].glyph + '</div>' +
+        '<div class="lc-name">' + GH.gems.types[t].name + '</div>' +
+        '<div class="lc-count">' + (n ? '×' + n : '—') + '</div></div>';
+    });
+    html += '</div>';
+    body.innerHTML = html;
+    show('collection-screen');
+  }
+
+  // ----------------------------------------------------------------
+  // STAGE TRIALS
+  function openTrials() {
+    GH.audio.card();
+    GH.game.state = 'hangar';
+    var body = document.getElementById('trials-body');
+    var html = '';
+    GH.stages.forEach(function (st, si) {
+      var unlocked = (si + 1) <= GH.meta.data.stages;
+      var tier = GH.progress.trialTier(st.id);
+      html += '<div class="trial-stage' + (unlocked ? '' : ' locked') + '">' +
+        '<div class="ts-name">' + st.name +
+        ' <span class="ts-tier">' + (tier ? 'TIER ' + ['I', 'II', 'III', 'IV'][tier - 1] : '') + '</span></div>';
+      if (unlocked) {
+        GH.progress.trialTiers.forEach(function (tr, ti) {
+          html += '<div class="ts-row"><span class="ts-tiername">' + tr.name + '</span>';
+          tr.tasks.forEach(function (task) {
+            var done = GH.progress.trialDone(st.id, task.id);
+            html += '<span class="ts-task' + (done ? ' done' : '') + '">' +
+              (done ? '☑ ' : '☐ ') + task.desc + '</span>';
+          });
+          html += '<span class="ts-perk' + (tier > ti ? ' on' : '') + '">' + tr.perk + '</span></div>';
+        });
+      } else {
+        html += '<div class="ts-row">Reach this stage to open its trials.</div>';
+      }
+      html += '</div>';
+    });
+    body.innerHTML = html;
+    show('trials-screen');
+  }
+
+  // ----------------------------------------------------------------
   function openHangar() {
     GH.audio.card();
     GH.game.state = 'hangar';
@@ -484,7 +672,8 @@
 
   function renderHangar() {
     document.getElementById('hangar-salvage').innerHTML =
-      'SALVAGE: <span style="color:#fff">' + GH.meta.data.salvage + '</span>';
+      'SALVAGE: <span style="color:#fff">' + GH.meta.data.salvage + '</span>' +
+      (GH.meta.isIron() ? ' — <span style="color:#ff8080">IRON RULES: DEVOTIONS SEALED</span>' : '');
     var wrap = document.getElementById('devotion-list');
     wrap.innerHTML = '';
     DEVOTIONS.forEach(function (d) {
@@ -540,6 +729,13 @@
     document.getElementById('btn-arena').onclick = function () { enterSelect('arena'); };
     document.getElementById('btn-weekly').onclick = openWeekly;
     document.getElementById('btn-hangar').onclick = openHangar;
+    document.getElementById('btn-broker').onclick = openBroker;
+    document.getElementById('btn-collection').onclick = openCollection;
+    document.getElementById('btn-trials').onclick = openTrials;
+    document.getElementById('btn-profile').onclick = cycleProfile;
+    document.getElementById('btn-broker-back').onclick = toTitle;
+    document.getElementById('btn-collection-back').onclick = toTitle;
+    document.getElementById('btn-trials-back').onclick = toTitle;
     document.getElementById('btn-weekly-back').onclick = toTitle;
     document.getElementById('btn-preset-back').onclick = function () {
       GH.game.state = 'stageselect';

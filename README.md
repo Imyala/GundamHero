@@ -87,6 +87,35 @@ Reactor, Thorn Plating, Emergency Vents), or gems to socket.
 Burn (stacking DoT), Shock (chance to stun), Frost (slow) — boosted by
 elemental-damage traits and HEXEN's passive.
 
+### The Broker (hunt contracts)
+A hangar contact assigns directed missions — "destroy 32 Shardlings in Glacier
+Hollow" — that persist across runs, tick up live on the HUD, and pay salvage
+plus broker points on completion. Points buy permanent perks: Field Bounty
+(+damage vs your contract target), Deep Pockets (+25% contract salvage),
+Broker's Favor (free rerolls), and the Boss Ledger (midboss hunt contracts
+with bigger payouts). Contracts scale up as you fill more of them.
+
+### Collection Log
+A hangar codex tracking everything you've ever destroyed or discovered:
+per-enemy kill counts (entries stay ??? until first blood), every secondary
+weapon found, every pure Resonance completed, gems socketed by affinity, and
+lifetime run/win/kill totals — with an overall completion percentage on the
+title screen.
+
+### Stage Trials
+Each stage carries four tiers of two tasks (reach wave 5, gather 40 sparks in
+a run, kill the Warden, complete a Resonance, slay the corrupt frame before it
+goes UNBOUND, …). Completing a tier pays a **permanent stage-scoped perk**:
++15% salvage there, +10% spark XP, +5% damage, and finally double gem drops
+from that stage's bosses. Progress shows as TRIAL badges on the stage cards.
+
+### Pilot profiles — Iron Frame & Iron Core
+Cycle PILOT on the title screen between three fully separate save profiles:
+**STANDARD** (everything available), **IRON FRAME** (devotions sealed and no
+arena loadout kits — self-reliant progression), and **IRON CORE** (iron rules,
+and a single death *erases the profile* — the fallen pilot is engraved on a
+memorial shown on the title screen).
+
 ### Devotions (meta progression)
 Salvage banked from runs is spent in the **HANGAR** on five permanent paths
 matching the gem affinities; the *active* path also grows a little on every
@@ -138,7 +167,8 @@ js/gems.js        gem affinities, sockets, resonance rules
 js/stages.js      six stage defs + wave plans
 js/models.js      low-poly mesh builders (mechs, enemies, pickups, props)
 js/mechs.js       eight frame definitions
-js/meta.js        persistence: unlocks, salvage, devotions, records
+js/meta.js        persistence: pilot profiles, unlocks, salvage, devotions
+js/progress.js    hunt contracts, stage trials, collection log
 js/upgrades.js    reward card pool (weapons/traits/protocols/gems)
 js/enemies.js     enemy + midboss + corrupted boss definitions
 js/audio.js       WebAudio procedural SFX

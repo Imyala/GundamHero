@@ -1,45 +1,107 @@
 // HERO FRAME — persistent meta progression (localStorage)
-// Salvage bank, shell unlocks, stage unlocks, devotion ranks, records.
+// Pilot profiles (Standard / Iron Frame / Iron Core), salvage bank, shell &
+// stage unlocks, devotions, contracts, collection log, stage trials, records.
 GH.meta = (function () {
   var M = {};
-  var KEY = 'hf_meta_v2';
+
+  M.PROFILES = {
+    standard: { key: 'hf_meta_v2', name: 'STANDARD', desc: 'Full hangar support.' },
+    iron: { key: 'hf_meta_iron_v1', name: 'IRON FRAME', desc: 'No devotions, no loadout kits. Self-reliant.' },
+    hardcore: { key: 'hf_meta_hc_v1', name: 'IRON CORE', desc: 'Iron rules — and one death wipes the profile.' }
+  };
+  M.profile = 'standard';
 
   var defaults = function () {
     return {
       salvage: 0,
-      shells: { aegis: true, vulcan: true },   // stage bosses unlock the rest
-      stages: 1,                                // highest unlocked stage (1-based)
+      shells: { aegis: true, vulcan: true },
+      stages: 1,
       devotion: { sol: 0, pyre: 0, keen: 0, verd: 0, ruin: 0 },
       activeDevotion: 'sol',
-      bestWave: {},                             // per stage id
+      bestWave: {},
       bestArena: 0,
-      victories: {}
+      victories: {},
+      weekly: null,
+      // hunt contracts
+      broker: { active: null, points: 0, completed: 0, unlocks: {} },
+      // collection log
+      collection: {
+        kills: {},          // enemy id -> count
+        weapons: {},        // upgrade card id -> true
+        resonances: {},     // resonance label -> true
+        gems: {},           // gem type -> sockets made
+        totalRuns: 0, totalKills: 0, totalWins: 0
+      },
+      // stage trials: stageId -> { taskId: true }
+      trials: {}
     };
   };
 
   M.data = defaults();
 
-  M.load = function () {
+  function storageKey() { return M.PROFILES[M.profile].key; }
+
+  M.load = function (profile) {
+    if (profile && M.PROFILES[profile]) M.profile = profile;
+    else {
+      try { M.profile = localStorage.getItem('hf_profile') || 'standard'; } catch (e) { M.profile = 'standard'; }
+      if (!M.PROFILES[M.profile]) M.profile = 'standard';
+    }
+    M.data = defaults();
     try {
-      var raw = localStorage.getItem(KEY);
+      localStorage.setItem('hf_profile', M.profile);
+      var raw = localStorage.getItem(storageKey());
       if (raw) {
         var d = JSON.parse(raw);
-        var base = defaults();
-        for (var k in base) if (d[k] !== undefined) base[k] = d[k];
-        M.data = base;
+        var base = M.data;
+        for (var k in base) {
+          if (d[k] === undefined) continue;
+          // merge one level deep so new sub-fields keep defaults
+          if (base[k] && typeof base[k] === 'object' && !Array.isArray(base[k]) &&
+            d[k] && typeof d[k] === 'object') {
+            for (var k2 in d[k]) base[k][k2] = d[k][k2];
+          } else {
+            base[k] = d[k];
+          }
+        }
       }
-      // migrate v1 coin bank
-      var old = parseInt(localStorage.getItem('hf_coins') || '0', 10);
-      if (old > 0) {
-        M.data.salvage += old;
-        localStorage.removeItem('hf_coins');
-        M.save();
+      // migrate the pre-meta coin bank into the standard profile
+      if (M.profile === 'standard') {
+        var old = parseInt(localStorage.getItem('hf_coins') || '0', 10);
+        if (old > 0) {
+          M.data.salvage += old;
+          localStorage.removeItem('hf_coins');
+          M.save();
+        }
       }
     } catch (e) { /* storage unavailable — session-only meta */ }
   };
 
   M.save = function () {
-    try { localStorage.setItem(KEY, JSON.stringify(M.data)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(storageKey(), JSON.stringify(M.data)); } catch (e) { /* ignore */ }
+  };
+
+  M.isIron = function () { return M.profile === 'iron' || M.profile === 'hardcore'; };
+  M.isHardcore = function () { return M.profile === 'hardcore'; };
+
+  // Iron Core death: wipe the profile, engrave the fallen pilot
+  M.hardcoreWipe = function (frameName, stageName, wave) {
+    var entry = {
+      frame: frameName, stage: stageName, wave: wave,
+      when: new Date().toISOString().slice(0, 10)
+    };
+    try {
+      var mem = JSON.parse(localStorage.getItem('hf_memorial') || '[]');
+      mem.unshift(entry);
+      localStorage.setItem('hf_memorial', JSON.stringify(mem.slice(0, 12)));
+    } catch (e) { /* ignore */ }
+    M.data = defaults();
+    M.save();
+    return entry;
+  };
+
+  M.memorial = function () {
+    try { return JSON.parse(localStorage.getItem('hf_memorial') || '[]'); } catch (e) { return []; }
   };
 
   M.unlockShell = function (id) {
@@ -60,6 +122,7 @@ GH.meta = (function () {
   };
 
   M.buyDevotion = function (path) {
+    if (M.isIron()) return false;
     var cost = M.devotionCost(path);
     if (M.data.devotion[path] >= 5 || M.data.salvage < cost) return false;
     M.data.salvage -= cost;
@@ -68,8 +131,10 @@ GH.meta = (function () {
     return true;
   };
 
-  // permanent stat bonuses granted by devotion ranks
   M.devotionBonus = function () {
+    if (M.isIron()) {
+      return { maxHP: 0, regen: 0, damageMult: 0, atkSpdMult: 0, crit: 0, magnet: 0, xpGain: 0, critMult: 0, boostRegen: 0 };
+    }
     var d = M.data.devotion;
     return {
       maxHP: d.sol * 8,
@@ -77,14 +142,14 @@ GH.meta = (function () {
       damageMult: d.pyre * 0.03,
       atkSpdMult: d.keen * 0.02,
       crit: d.keen * 1,
-      magnet: d.verd * 0.08,       // multiplier add
+      magnet: d.verd * 0.08,
       xpGain: d.verd * 0.04,
       critMult: d.ruin * 0.06,
       boostRegen: d.ruin >= 3 ? 0.15 : 0
     };
   };
 
-  // dev override: ?unlock=all
+  // dev overrides: ?unlock=all etc.
   M.applyDevParams = function (search) {
     try {
       var p = new URLSearchParams(search);

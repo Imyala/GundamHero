@@ -15,13 +15,29 @@ GH.game = (function () {
   var orbitGroup = null, droneMesh = null, droneAngle = 0;
   var waveNum = 0, waveTimer = 0, wavePlan = null, spawnAcc = 0, bossRef = null;
   var kills = 0, coinsRun = 0, runTime = 0, hitCount = 0;
+  var sparksRun = 0;
   var announceTimer = 0, shake = 0, hitStopT = 0;
+  var announceQueue = [];
   var selMechIndex = 0, selPreview = null, selSpin = 0;
   var weekly = null;   // active weekly-challenge modifiers
   var mate = null;     // co-op wingmate (player 2)
   G.coop = false;
 
   G.hitStop = function (t) { hitStopT = Math.max(hitStopT, t); };
+
+  // award a stage-trial task; announces the task and any newly-finished tier
+  function awardTrial(taskId) {
+    if (!stage) return;
+    var before = GH.progress.trialTier(stage.id);
+    if (!GH.progress.trialAward(stage.id, taskId)) return;
+    queueAnnounce('TRIAL — ' + GH.progress.taskDesc(taskId).toUpperCase(), 20);
+    GH.audio.levelup();
+    var after = GH.progress.trialTier(stage.id);
+    if (after > before) {
+      queueAnnounce('STAGE TRIAL ' + GH.progress.trialTiers[after - 1].name +
+        ' — ' + GH.progress.trialTiers[after - 1].perk.toUpperCase(), 20);
+    }
+  }
 
   var raycaster = new THREE.Raycaster();
   var groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -371,6 +387,7 @@ GH.game = (function () {
         crit = true;
       }
     }
+    dmg *= GH.progress.contractDamageBonus(e.id);
     dmg = Math.max(1, Math.round(dmg));
     hitCount++;
     e.hp -= dmg;
@@ -408,6 +425,17 @@ GH.game = (function () {
     if (e.def.boss) G.hitStop(0.14);
     else if (e.def.mass >= 3) G.hitStop(0.06);
     scene.remove(e.mesh);
+
+    // progression hooks: collection log, contracts, stage trials
+    GH.progress.logKill(e.id);
+    var cdone = GH.progress.contractKill(e.id, stage.id);
+    if (cdone) {
+      queueAnnounce('CONTRACT COMPLETE — +' + cdone.salvage + ' SALVAGE, +' + cdone.pts + ' PTS', 22);
+      GH.audio.win();
+    }
+    if (e.id === 'warden') awardTrial('warden');
+    if (e.id === 'carapace') awardTrial('carapace');
+    if (e.def.corrupt && !e.phase2) awardTrial('nobound');
     spawnBurst(e.x, 1, e.z, e.def.boss ? 0xffd060 : 0xc0c0c0, e.def.boss ? 26 : 8);
     // sparks (XP)
     var xp = e.def.xp;
@@ -426,7 +454,10 @@ GH.game = (function () {
       for (var c = 0; c < (e.def.corrupt ? 24 : 12); c++) {
         spawnPickup('coin', e.x + GH.rand(-2, 2), e.z + GH.rand(-2, 2));
       }
-      spawnPickup('gem:' + GH.pick(GH.gems.typeIds), e.x, e.z);
+      var gemDrops = GH.progress.trialTier(stage.id) >= 4 ? 2 : 1;
+      for (var gd = 0; gd < gemDrops; gd++) {
+        spawnPickup('gem:' + GH.pick(GH.gems.typeIds), e.x + gd, e.z);
+      }
       hideBossBar();
       if (bossRef === e) { bossRef = null; GH.music.setBoss(false); }
       GH.audio.explode();
@@ -1371,6 +1402,8 @@ GH.game = (function () {
 
   function sparkGain(v, silent) {
     gainXP(v);
+    sparksRun += v;
+    if (sparksRun >= 40) awardTrial('sparks40');
     if (!silent) GH.audio.gem();
     // Spark Reactor protocol
     if (player.protocols.reactor && Math.random() < player.protocols.reactor) {
@@ -1525,6 +1558,8 @@ GH.game = (function () {
     }
     waveTimer = wavePlan.duration;
     spawnAcc = 0;
+    if (n >= 5) awardTrial('wave5');
+    if (n >= 10) awardTrial('wave10');
     if (mate && mate.down) reviveWingmate(0.5);
     if (wavePlan.overrun) {
       announce('OVERRUN', 44);
@@ -1638,6 +1673,7 @@ GH.game = (function () {
       var lvl = player.weaponLevels[card.id] || 0;
       if (lvl === 0) {
         player.weapons.push(makeWeaponInst(card.id, card.weapon));
+        if (GH.progress.logWeapon(card.id)) GH.meta.save();
       } else {
         for (var i = 0; i < player.weapons.length; i++) {
           if (player.weapons[i].id === card.id) {
@@ -1709,10 +1745,14 @@ GH.game = (function () {
   function socketGem(inst, gemType) {
     inst.sockets.push(gemType);
     GH.gems.applySocketBonuses(inst);
+    GH.progress.logGem(gemType);
     GH.audio.levelup();
     if (inst.sockets.length === 4 && inst.resonance) {
       announce(GH.gems.resonanceLabel(inst.resonance) + ' RESONANCE', 26);
+      GH.progress.logResonance(GH.gems.resonanceLabel(inst.resonance));
+      awardTrial('resonance');
     }
+    GH.meta.save();
     G._socketChoices = null;
     nextRewardStep();
   }
@@ -2275,6 +2315,18 @@ GH.game = (function () {
       announceTimer -= 1 / 60;
       if (announceTimer <= 0) el['announce'].classList.add('hidden');
     }
+    pumpAnnounceQueue();
+    // active contract progress
+    var contractEl = document.getElementById('contract-line');
+    var ac = GH.meta.data.broker.active;
+    if (ac && (!ac.stage || ac.stage === stage.id)) {
+      contractEl.textContent = 'CONTRACT: ' + GH.enemyDefs[ac.target].name +
+        ' ' + ac.have + '/' + ac.need;
+    } else if (ac) {
+      contractEl.textContent = 'CONTRACT: ' + GH.progress.stageName(ac.stage) + ' only';
+    } else {
+      contractEl.textContent = '';
+    }
   }
 
   function announce(text, size) {
@@ -2285,6 +2337,17 @@ GH.game = (function () {
     void el['announce'].offsetWidth;
     el['announce'].style.animation = '';
     announceTimer = 1.4;
+  }
+
+  // queued announcements wait for the current one to fade
+  function queueAnnounce(text, size) {
+    announceQueue.push([text, size]);
+  }
+  function pumpAnnounceQueue() {
+    if (announceTimer <= 0 && announceQueue.length) {
+      var a = announceQueue.shift();
+      announce(a[0], a[1]);
+    }
   }
 
   function showBossBar(name) {
@@ -2333,8 +2396,13 @@ GH.game = (function () {
       var p2Idx = (opts.p2Mech !== undefined && opts.p2Mech >= 0) ? opts.p2Mech : mechIndex;
       spawnWingmate(p2Idx);
     }
-    if (opts.preset) applyPreset(opts.preset);
-    kills = 0; coinsRun = 0; runTime = 0; hitCount = 0;
+    if (opts.preset && !GH.meta.isIron()) applyPreset(opts.preset);
+    // stage-trial perks (permanent, stage-scoped)
+    var trialTier = GH.progress.trialTier(stage.id);
+    if (trialTier >= 2) player.stats.xpGain += 0.10;
+    if (trialTier >= 3) player.stats.damageMult += 0.05;
+    kills = 0; coinsRun = 0; runTime = 0; hitCount = 0; sparksRun = 0;
+    announceQueue.length = 0;
     G.state = 'play';
     GH.music.play(stage.id);
     GH.music.setBoss(false);
@@ -2411,8 +2479,26 @@ GH.game = (function () {
 
     var meta = GH.meta;
     var banked = weekly ? Math.round(coinsRun * weekly.mods.salvage) : coinsRun;
-    meta.data.salvage += banked;
+    if (GH.progress.trialTier(stage.id) >= 1) banked = Math.round(banked * 1.15);
     var unlockMsg = '';
+
+    // IRON CORE: a death erases the profile and engraves the pilot
+    if (!won && meta.isHardcore()) {
+      var mem = meta.hardcoreWipe(player.def.name, stage.name, waveNum);
+      document.getElementById('end-title').innerHTML = 'CORE&nbsp;EXTINGUISHED';
+      document.getElementById('end-stats').innerHTML =
+        '<b>IRON CORE — progression erased.</b>\n' +
+        mem.frame + ' fell on ' + mem.stage + ', wave ' + mem.wave + '.\n' +
+        'The pilot is engraved on the memorial.';
+      document.getElementById('hud').classList.add('hidden');
+      document.getElementById('end-screen').classList.remove('hidden');
+      return;
+    }
+
+    meta.data.salvage += banked;
+    meta.data.collection.totalRuns++;
+    if (won) meta.data.collection.totalWins++;
+    if (won && G.mode === 'classic') awardTrial('clear');
     if (G.mode === 'weekly') {
       var wk = meta.data.weekly || {};
       if (wk.week !== weekly.week || waveNum > (wk.best || 0)) {
@@ -2585,6 +2671,14 @@ GH.game = (function () {
       shells: Object.keys(GH.meta.data.shells).length,
       music: GH.music.mode(),
       weekly: weekly ? weekly.week : null,
+      profile: GH.meta.profile,
+      broker: GH.meta.data.broker.active
+        ? GH.meta.data.broker.active.target + ' ' + GH.meta.data.broker.active.have + '/' + GH.meta.data.broker.active.need
+        : 'none',
+      brokerPts: GH.meta.data.broker.points,
+      trialTier: stage ? GH.progress.trialTier(stage.id) : 0,
+      collection: GH.progress.completion(),
+      sparksRun: sparksRun,
       mate: mate ? { hp: Math.round(mate.hp), down: mate.down, x: Math.round(mate.x * 10) / 10, z: Math.round(mate.z * 10) / 10 } : null
     };
   };
