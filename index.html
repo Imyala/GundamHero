@@ -9,6 +9,7 @@
 <body>
 <div id="game-root">
   <canvas id="game-canvas"></canvas>
+  <div id="crt-overlay"></div>
 
   <!-- ===================== HUD (during play) ===================== -->
   <div id="hud" class="hidden">
@@ -21,7 +22,9 @@
         <div class="bar-frame boost-frame">
           <div id="boost-fill" class="bar-fill boost-fill"></div>
         </div>
+        <div id="reload-line"></div>
         <div id="coin-row"><span class="coin-icon">S</span><span id="coin-count">×0</span></div>
+        <div id="buff-line"></div>
       </div>
       <div id="hud-center">
         <div id="wave-label">Wave 1/20</div>
@@ -49,8 +52,11 @@
     <div class="title-grid"></div>
     <h1 class="game-title">HERO&nbsp;FRAME</h1>
     <div class="title-sub">A MECH ARENA SURVIVOR</div>
-    <button id="btn-start" class="menu-btn">PRESS START</button>
-    <div class="title-foot">WASD move &nbsp;·&nbsp; mouse aim &nbsp;·&nbsp; SPACE boost &nbsp;·&nbsp; SHIFT / RMB special &nbsp;·&nbsp; weapons fire automatically</div>
+    <button id="btn-start" class="menu-btn">CLASSIC</button>
+    <button id="btn-arena" class="menu-btn small">ARENA — ENDLESS</button>
+    <button id="btn-hangar" class="menu-btn small">HANGAR · DEVOTIONS</button>
+    <div id="title-salvage"></div>
+    <div class="title-foot">WASD move &nbsp;·&nbsp; mouse aim &nbsp;·&nbsp; SPACE boost &nbsp;·&nbsp; SHIFT / RMB special &nbsp;·&nbsp; F scanlines &nbsp;·&nbsp; weapons fire automatically</div>
   </div>
 
   <!-- ===================== PLAYER SELECT ===================== -->
@@ -58,11 +64,29 @@
     <h2 class="select-title">PLAYER&nbsp;&nbsp;SELECT</h2>
     <div id="select-panel">
       <div id="select-name">FRAME</div>
+      <div id="select-role"></div>
       <div id="select-desc"></div>
       <div id="select-stats"></div>
     </div>
     <div id="select-icons"></div>
-    <button id="btn-launch" class="menu-btn">LAUNCH</button>
+    <button id="btn-launch" class="menu-btn">SELECT STAGE</button>
+    <button id="btn-select-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== STAGE SELECT ===================== -->
+  <div id="stage-screen" class="screen hidden">
+    <h2 class="select-title">STAGE&nbsp;&nbsp;SELECT</h2>
+    <div id="stage-list"></div>
+    <button id="btn-stage-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== HANGAR / DEVOTIONS ===================== -->
+  <div id="hangar-screen" class="screen hidden">
+    <h2 class="select-title">DEVOTIONS</h2>
+    <div id="hangar-salvage"></div>
+    <div id="hangar-note">Spend salvage on permanent paths. The ACTIVE path also grows every level-up in a run.</div>
+    <div id="devotion-list"></div>
+    <button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== WAVE REWARD ===================== -->
@@ -94,8 +118,11 @@
 <script src="lib/three.min.js"></script>
 <script src="js/util.js"></script>
 <script src="js/assets.js"></script>
+<script src="js/gems.js"></script>
+<script src="js/stages.js"></script>
 <script src="js/models.js"></script>
 <script src="js/mechs.js"></script>
+<script src="js/meta.js"></script>
 <script src="js/upgrades.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/audio.js"></script>
