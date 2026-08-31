@@ -7,6 +7,7 @@
     mouseNDC: new THREE.Vector2(0, 0),
     special: false,
     boostPressed: false,
+    boostHeld: false,
     specialPressed: false,
     p2x: 0, p2y: 0, p2Boost: false,
     p2Special: false, p2SpecialPressed: false,
@@ -136,6 +137,7 @@
       if (e.code === 'Space' && GH.game.state === 'play') {
         input.boostPressed = true; e.preventDefault();
       }
+      if (e.code === 'Space') input.boostHeld = true; // skimmer drift hold
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         input.special = true;
         if (GH.game.state === 'play') input.specialPressed = true;
@@ -183,6 +185,7 @@
       if (pk) p2keys[pk] = false;
       if (e.code === 'KeyU') { p2keys.sp = false; input.p2Special = false; }
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.special = false;
+      if (e.code === 'Space') input.boostHeld = false;
     });
     window.addEventListener('mousemove', function (e) {
       input.mouseNDC.set(

@@ -658,6 +658,116 @@ GH.models = (function () {
     return g;
   };
 
+  // ---- the cipher-hall puzzle kit ----
+  // beam emitter: a lensed pylon, always live
+  M.buildEmitter = function () {
+    var g = new THREE.Group();
+    var base = box(1.6, 0.6, 1.6, 0x3a4450); base.position.y = 0.3;
+    var stem = box(0.7, 2.2, 0.7, 0x2a3038); stem.position.y = 1.7;
+    var head = box(1.2, 1.0, 1.2, 0x3a4450); head.position.y = 3.0;
+    g.add(base, stem, head);
+    var lens = new THREE.Mesh(new THREE.OctahedronGeometry(0.55),
+      GH.assets.basic(0x60e0ff, { transparent: true, opacity: 0.95 }));
+    lens.position.y = 3.0;
+    g.add(lens);
+    g.userData.lens = lens;
+    blobShadow(g, 2.4);
+    return g;
+  };
+
+  // beam receptor: a cradle whose eye lights when the beam arrives
+  M.buildReceptor = function () {
+    var g = new THREE.Group();
+    var base = box(1.8, 0.5, 1.8, 0x3a4450); base.position.y = 0.25;
+    var prongL = box(0.4, 2.6, 0.4, 0x2a3038); prongL.position.set(-0.7, 1.5, 0);
+    var prongR = box(0.4, 2.6, 0.4, 0x2a3038); prongR.position.set(0.7, 1.5, 0);
+    g.add(base, prongL, prongR);
+    var eye = new THREE.Mesh(new THREE.OctahedronGeometry(0.5),
+      GH.assets.basic(0x60e0ff, { transparent: true, opacity: 0.25 }));
+    eye.position.y = 2.4;
+    g.add(eye);
+    g.userData.eye = eye;
+    blobShadow(g, 2.4);
+    return g;
+  };
+
+  // carryable beam relay: a tripod holding a floating prism
+  M.buildRelay = function () {
+    var g = new THREE.Group();
+    for (var i = 0; i < 3; i++) {
+      var a = (i / 3) * Math.PI * 2;
+      var leg = box(0.22, 1.4, 0.22, 0x2a3038);
+      leg.position.set(Math.cos(a) * 0.5, 0.6, Math.sin(a) * 0.5);
+      leg.rotation.z = Math.cos(a) * 0.35;
+      leg.rotation.x = -Math.sin(a) * 0.35;
+      g.add(leg);
+    }
+    var prism = new THREE.Mesh(new THREE.OctahedronGeometry(0.45),
+      GH.assets.basic(0x8ae8ff, { transparent: true, opacity: 0.9 }));
+    prism.position.y = 1.6;
+    g.add(prism);
+    g.userData.prism = prism;
+    blobShadow(g, 1.6);
+    return g;
+  };
+
+  // carryable signal jammer: a squat dish that seizes one seal
+  M.buildJammer = function () {
+    var g = new THREE.Group();
+    var base = box(1.0, 0.5, 1.0, 0x3a3040); base.position.y = 0.25;
+    var neck = box(0.3, 0.8, 0.3, 0x2a2430); neck.position.y = 0.8;
+    g.add(base, neck);
+    var dish = new THREE.Mesh(new THREE.ConeGeometry(0.7, 0.5, 8, 1, true),
+      mat(0xc06adf));
+    dish.rotation.x = Math.PI / 2;
+    dish.position.set(0, 1.3, 0.2);
+    g.add(dish);
+    var tip = new THREE.Mesh(new THREE.OctahedronGeometry(0.2),
+      GH.assets.basic(0xe080ff, { transparent: true, opacity: 0.95 }));
+    tip.position.set(0, 1.3, 0.5);
+    g.add(tip);
+    g.userData.tip = tip;
+    g.userData.dish = dish;
+    blobShadow(g, 1.5);
+    return g;
+  };
+
+  // timed switch: a floor lever with a countdown lamp
+  M.buildSwitchLever = function () {
+    var g = new THREE.Group();
+    var slab = box(1.6, 0.4, 1.2, 0x3a4450); slab.position.y = 0.2;
+    var arm = box(0.25, 1.6, 0.25, 0xd8b040);
+    arm.position.set(0, 1.0, 0);
+    arm.rotation.z = 0.5;
+    g.add(slab, arm);
+    var lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.3),
+      GH.assets.basic(0xffd050, { transparent: true, opacity: 0.5 }));
+    lamp.position.set(0, 1.9, 0);
+    g.add(lamp);
+    g.userData.arm = arm;
+    g.userData.lamp = lamp;
+    blobShadow(g, 1.8);
+    return g;
+  };
+
+  // raceway start gantry: a crossbar of three countdown lamps
+  M.buildStartGantry = function () {
+    var g = new THREE.Group();
+    var postL = box(0.6, 7.5, 0.6, 0x3a4450); postL.position.set(-7, 3.75, 0);
+    var postR = box(0.6, 7.5, 0.6, 0x3a4450); postR.position.set(7, 3.75, 0);
+    var bar = box(15.2, 0.8, 0.8, 0x2a3038); bar.position.y = 7.4;
+    g.add(postL, postR, bar);
+    g.userData.lamps = [];
+    for (var i = -1; i <= 1; i++) {
+      var lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.55),
+        GH.assets.basic(0x552222, { transparent: true, opacity: 0.9 }));
+      lamp.position.set(i * 2.4, 6.5, 0);
+      g.add(lamp);
+      g.userData.lamps.push(lamp);
+    }
+    return g;
+  };
+
   // sealed treasure vault: a squat stone door with a glowing seam;
   // breached vaults stand open and dark
   M.buildVault = function (open) {

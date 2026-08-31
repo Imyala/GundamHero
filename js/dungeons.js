@@ -31,8 +31,8 @@ GH.dungeons = (function () {
     labyrinth: { name: 'LABYRINTH', desc: 'find the heart of the maze', size: 230 },
     gauntlet: { name: 'GAUNTLET', desc: 'a timed rush — ride the checkpoints', size: 260 },
     fluxways: { name: 'FLUXWAYS', desc: 'the floor shifts — cross on the safe lanes', size: 200 },
-    raceway: { name: 'RACEWAY', desc: 'a combat race — three laps, live fire', size: 300 },
-    halls: { name: 'CIPHER HALLS', desc: 'plates, cores, barriers — think your way through', size: 200 },
+    raceway: { name: 'RACEWAY', desc: 'a combat race — drift, nitro, three laps of live fire', size: 300 },
+    halls: { name: 'CIPHER HALLS', desc: 'beams, plates, the jammer — think your way through', size: 200 },
     convoy: { name: 'CONVOY', desc: 'ESCORT the hauler through the ambush line', size: 260 },
     crucible: { name: 'CRUCIBLE', desc: 'a boss rush — corrupt frames back to back', size: 180 },
     heist: { name: 'HEIST', desc: 'seize the relic, then outrun the alarm', size: 240 }
@@ -228,49 +228,143 @@ GH.dungeons = (function () {
   };
 
   // ---------------------------------------------------------------
-  // CIPHER HALLS: a handcrafted three-chamber puzzle, walls as solid
-  // blockers, energy barriers opened by pressure plates, and carryable
-  // power cores that can hold a plate down for you.
-  // Coordinates are fractions of the map half-size (mirrored later).
+  // CIPHER HALLS: handcrafted chamber-chain puzzles.
+  // Design law (the Portal rule): teach each element alone with a
+  // single readable solution, then combine, then subvert. Elements
+  // (the Talos kit, reworked): pressure plates, carryable weights,
+  // beam emitters + carryable relays + receptors (beams have limited
+  // reach; walls and CLOSED seals cut them), one signal jammer that
+  // forces any unhardened seal open while it sits aimed at it, timed
+  // switches, and violet matter screens the pilot walks through but
+  // carried objects cannot.
+  //   variant 'teach'  — glacier: four chambers, one lesson each.
+  //   variant 'master' — the null reach: same alphabet, no mercy.
   // ---------------------------------------------------------------
-  D.genHalls = function (size) {
-    var h = size / 2;
-    var u = size / 20; // one wall unit
-    var walls = [];    // static rects {x, z, w, d}
-    var addWall = function (x, z, w, d) { walls.push({ x: x, z: z, w: w, d: d }); };
-    // three chamber dividers across the map (entry at south)
-    addWall(-h * 0.55, h * 0.30, h * 0.9, u);  // divider 1, gap on the right
-    addWall(h * 0.62, h * 0.30, h * 0.75, u);
-    addWall(h * 0.55, -h * 0.15, h * 0.9, u);  // divider 2, gap on the left
-    addWall(-h * 0.62, -h * 0.15, h * 0.75, u);
-    addWall(-h * 0.55, -h * 0.60, h * 0.9, u); // divider 3, gap on the right
-    addWall(h * 0.62, -h * 0.60, h * 0.75, u);
-    return {
-      walls: walls,
-      // barriers close the three gaps until their plates are held
-      barriers: [
-        { id: 'b1', x: h * 0.12, z: h * 0.30, w: h * 0.25, d: u, plate: 'p1' },
-        { id: 'b2', x: -h * 0.12, z: -h * 0.15, w: h * 0.25, d: u, plate: 'p2' },
-        { id: 'b3', x: h * 0.12, z: -h * 0.60, w: h * 0.25, d: u, plates: ['p3', 'p4'] }
-      ],
-      // chamber 1: a plate right beside its barrier (stand OR weight it)
-      // chamber 2: the plate is far from the gap — you need the core
-      // chamber 3: two plates at once — core on one, pilot on the other
-      plates: [
-        { id: 'p1', x: -h * 0.30, z: h * 0.45 },
-        { id: 'p2', x: h * 0.55, z: h * 0.05 },
-        { id: 'p3', x: -h * 0.45, z: -h * 0.42 },
-        { id: 'p4', x: h * 0.35, z: -h * 0.42 }
-      ],
-      cores: [
-        { id: 'c1', x: h * 0.45, z: h * 0.55 },   // chamber 1 spare weight
-        { id: 'c2', x: -h * 0.55, z: h * 0.08 }   // chamber 2's key
-      ]
+  D.genHalls = function (size, variant) {
+    var h = size / 2; // authored for size 200 (h = 100); scaled by k
+    var k = h / 100;
+    var T = 10 * k;   // wall thickness
+    var scaleRects = function (list) {
+      list.forEach(function (r) { r.x *= k; r.z *= k; r.w *= k; r.d *= k; });
+      return list;
     };
+    var scalePts = function (list) {
+      list.forEach(function (p) { p.x *= k; p.z *= k; });
+      return list;
+    };
+    var lay;
+    if (variant === 'master') {
+      // ---- THE NULL VARIANT: retrieve, sacrifice, sprint, combine ----
+      lay = {
+        walls: scaleRects([
+          // row A (z 50): two gaps — east (screen + door plate), west (jam-only)
+          { x: -77.5, z: 50, w: 45, d: 10 },
+          { x: 0, z: 50, w: 60, d: 10 },
+          { x: 77.5, z: 50, w: 45, d: 10 },
+          // row B (z 5): center gap
+          { x: -56.25, z: 5, w: 87.5, d: 10 },
+          { x: 56.25, z: 5, w: 87.5, d: 10 },
+          // row C (z -28): east gap
+          { x: -35, z: -28, w: 130, d: 10 },
+          { x: 77.5, z: -28, w: 45, d: 10 },
+          // row D (z -60): west gap
+          { x: -77.5, z: -60, w: 45, d: 10 },
+          { x: 35, z: -60, w: 130, d: 10 }
+        ]),
+        barriers: scaleRects([
+          { id: 'b1', x: 42.5, z: 50, w: 25, d: 4, opener: 'plate', plate: 'p1' },
+          { id: 'b1w', x: -42.5, z: 50, w: 25, d: 4, opener: 'jam' },
+          { id: 'b2', x: 0, z: 5, w: 25, d: 4, opener: 'receptor', receptor: 'r1' },
+          { id: 'b3', x: 42.5, z: -28, w: 25, d: 4, opener: 'switch', noJam: true },
+          { id: 'b4', x: -42.5, z: -60, w: 25, d: 4, opener: 'receptor', receptor: 'r3', plate: 'p4', noJam: true },
+          // beam locks: low conduit fences that cut beams until jammed
+          { id: 'lk2', x: -25, z: 17, w: 4, d: 30, opener: 'lock' },
+          { id: 'lk3', x: -31, z: -46, w: 4, d: 20, opener: 'lock' }
+        ]),
+        screens: scaleRects([
+          { id: 's1', x: 42.5, z: 56.5, w: 25, d: 2 },   // items never enter by the east door
+          { id: 's2', x: -42.5, z: -66, w: 25, d: 2 }    // nothing carried leaves for the vault
+        ]),
+        plates: scalePts([
+          { id: 'p1', x: 42.5, z: 50, r: 4.5, door: true },
+          { id: 'p4', x: -70, z: -40, r: 2.6 }
+        ]),
+        emitters: scalePts([
+          { id: 'e1', x: -50, z: 24 },
+          { id: 'e3', x: -20, z: -40 }
+        ]),
+        receptors: scalePts([
+          { id: 'r1', x: 0, z: 10 },
+          { id: 'r3', x: -42.5, z: -52 }
+        ]),
+        switches: scalePts([
+          { id: 'sw1', x: -8, z: -12, opens: 'b3', window: 12 },
+          { id: 'sw2', x: 48, z: -38, opens: 'b3', window: 12 }
+        ]),
+        items: scalePts([
+          { id: 'l1', kind: 'relay', x: 10, z: 70 },
+          { id: 'j1', kind: 'jammer', x: -10, z: 70 },
+          { id: 'c2', kind: 'core', x: 30, z: -45 }
+        ])
+      };
+    } else {
+      // ---- THE TEACHING SET: plates, then beams, then the jammer, then all three ----
+      lay = {
+        walls: scaleRects([
+          // row A (z 50): gap x 15..40
+          { x: -42.5, z: 50, w: 115, d: 10 },
+          { x: 70, z: 50, w: 60, d: 10 },
+          // row B (z 5): gap x -40..-15
+          { x: -70, z: 5, w: 60, d: 10 },
+          { x: 42.5, z: 5, w: 115, d: 10 },
+          // row C (z -28): gap x 15..40
+          { x: -42.5, z: -28, w: 115, d: 10 },
+          { x: 70, z: -28, w: 60, d: 10 },
+          // row D (z -60): gap x -40..-15
+          { x: -70, z: -60, w: 60, d: 10 },
+          { x: 42.5, z: -60, w: 115, d: 10 }
+        ]),
+        barriers: scaleRects([
+          { id: 'b1', x: 27.5, z: 50, w: 25, d: 4, opener: 'plate', plate: 'p1' },
+          { id: 'b2', x: -27.5, z: 5, w: 25, d: 4, opener: 'receptor', receptor: 'r1' },
+          { id: 'b3', x: 27.5, z: -28, w: 25, d: 4, opener: 'jam' },
+          { id: 'b4', x: -27.5, z: -60, w: 25, d: 4, opener: 'receptor', receptor: 'r2', plate: 'p2', noJam: true },
+          // the conduit fence across chamber four's only bridging lane
+          { id: 'lk1', x: -7.5, z: -44, w: 55, d: 4, opener: 'lock' }
+        ]),
+        screens: scaleRects([
+          { id: 's1', x: -27.5, z: -66, w: 25, d: 2 }   // the vault admits pilots, not cargo
+        ]),
+        plates: scalePts([
+          { id: 'p1', x: 27.5, z: 50, r: 4.5, door: true },
+          { id: 'p2', x: -27.5, z: -60, r: 4.5, door: true }
+        ]),
+        emitters: scalePts([
+          { id: 'e1', x: -62, z: 27 },
+          { id: 'e2', x: 20, z: -34 }
+        ]),
+        receptors: scalePts([
+          { id: 'r1', x: -27.5, z: 12 },
+          { id: 'r2', x: -27.5, z: -52 }
+        ]),
+        switches: [],
+        items: scalePts([
+          { id: 'c1', kind: 'core', x: -20, z: 68 },
+          { id: 'l1', kind: 'relay', x: 30, z: 30 },
+          { id: 'j1', kind: 'jammer', x: -30, z: -12 },
+          { id: 'l2', kind: 'relay', x: 30, z: -50 }
+        ])
+      };
+    }
+    lay.variant = variant === 'master' ? 'master' : 'teach';
+    lay.linkRange = 28 * k;
+    lay.jamRange = 14 * k;
+    return lay;
   };
 
-  // point-in-any-solid-rect (walls always; barriers only while closed)
-  D.hallsBlocked = function (halls, barrierState, x, z, pad) {
+  // point-in-any-solid-rect (walls always; barriers only while closed;
+  // violet matter screens only while the pilot is carrying something)
+  D.hallsBlocked = function (halls, barrierState, x, z, pad, carrying) {
     pad = pad || 0.6;
     for (var i = 0; i < halls.walls.length; i++) {
       var w = halls.walls[i];
@@ -281,7 +375,160 @@ GH.dungeons = (function () {
       if (barrierState && barrierState[br.id]) continue; // open
       if (Math.abs(x - br.x) < br.w / 2 + pad && Math.abs(z - br.z) < br.d / 2 + pad) return true;
     }
+    if (carrying && halls.screens) {
+      for (var s = 0; s < halls.screens.length; s++) {
+        var sc = halls.screens[s];
+        if (Math.abs(x - sc.x) < sc.w / 2 + pad && Math.abs(z - sc.z) < sc.d / 2 + pad) return true;
+      }
+    }
     return false;
+  };
+
+  // is this point inside a matter screen? (pickups are refused there,
+  // so nobody can strand themselves mid-screen holding cargo)
+  D.inScreen = function (halls, x, z, pad) {
+    if (!halls.screens) return false;
+    pad = pad === undefined ? 0.8 : pad;
+    for (var s = 0; s < halls.screens.length; s++) {
+      var sc = halls.screens[s];
+      if (Math.abs(x - sc.x) < sc.w / 2 + pad && Math.abs(z - sc.z) < sc.d / 2 + pad) return true;
+    }
+    return false;
+  };
+
+  // beam sightline: sampled march against walls + CLOSED seals.
+  // Matter screens never cut light; skipId lets a jam ray ignore the
+  // very seal it is aimed at.
+  D.segClear = function (halls, barrierState, x1, z1, x2, z2, skipId) {
+    var dx = x2 - x1, dz = z2 - z1;
+    var len = Math.sqrt(dx * dx + dz * dz);
+    var steps = Math.max(2, Math.ceil(len / 1.2));
+    for (var i = 1; i < steps; i++) {
+      var t = i / steps;
+      var px = x1 + dx * t, pz = z1 + dz * t;
+      for (var w = 0; w < halls.walls.length; w++) {
+        var wl = halls.walls[w];
+        if (Math.abs(px - wl.x) < wl.w / 2 + 0.3 && Math.abs(pz - wl.z) < wl.d / 2 + 0.3) return false;
+      }
+      for (var b = 0; b < halls.barriers.length; b++) {
+        var br = halls.barriers[b];
+        if (br.id === skipId) continue;
+        if (barrierState && barrierState[br.id]) continue; // open seals pass light
+        if (Math.abs(px - br.x) < br.w / 2 + 0.3 && Math.abs(pz - br.z) < br.d / 2 + 0.3) return false;
+      }
+    }
+    return true;
+  };
+
+  // distance from a point to a rect's edge (0 when inside)
+  function rectDist(r, x, z) {
+    var ddx = Math.max(Math.abs(x - r.x) - r.w / 2, 0);
+    var ddz = Math.max(Math.abs(z - r.z) - r.d / 2, 0);
+    return Math.sqrt(ddx * ddx + ddz * ddz);
+  }
+
+  // the power graph: emitters are live; a grounded relay is live when it
+  // can see a live node in range; a receptor lights the same way.
+  // Returns { lit: {receptorId:true}, links: [{x1,z1,x2,z2}] }.
+  D.hallsPower = function (halls, barrierState, itemPos, carryingId) {
+    var nodes = []; // {x, z, live}
+    var links = [];
+    halls.emitters.forEach(function (em) {
+      nodes.push({ x: em.x, z: em.z, live: true });
+    });
+    var relays = [];
+    halls.items.forEach(function (it) {
+      if (it.kind !== 'relay') return;
+      if (carryingId === it.id) return; // a shouldered relay links nothing
+      var p = (itemPos && itemPos[it.id]) || it;
+      relays.push({ x: p.x, z: p.z, live: false });
+      nodes.push(relays[relays.length - 1]);
+    });
+    var range = halls.linkRange;
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (var i = 0; i < nodes.length; i++) {
+        var n = nodes[i];
+        if (n.live) continue;
+        for (var j = 0; j < nodes.length; j++) {
+          var m = nodes[j];
+          if (!m.live) continue;
+          var dx = n.x - m.x, dz = n.z - m.z;
+          if (dx * dx + dz * dz > range * range) continue;
+          if (!D.segClear(halls, barrierState, m.x, m.z, n.x, n.z)) continue;
+          n.live = true;
+          n.from = m;
+          changed = true;
+          break;
+        }
+      }
+    }
+    nodes.forEach(function (n) {
+      if (n.live && n.from) links.push({ x1: n.from.x, z1: n.from.z, x2: n.x, z2: n.z });
+    });
+    var lit = {};
+    halls.receptors.forEach(function (rc) {
+      for (var i = 0; i < nodes.length; i++) {
+        var n = nodes[i];
+        if (!n.live) continue;
+        var dx = rc.x - n.x, dz = rc.z - n.z;
+        if (dx * dx + dz * dz > range * range) continue;
+        if (!D.segClear(halls, barrierState, n.x, n.z, rc.x, rc.z)) continue;
+        lit[rc.id] = true;
+        links.push({ x1: n.x, z1: n.z, x2: rc.x, z2: rc.z });
+        break;
+      }
+    });
+    return { lit: lit, links: links };
+  };
+
+  // the jammer: grounded, it seizes the nearest unhardened seal within
+  // jamRange of its edge (sightline required, ignoring the target itself)
+  // and holds it open. Returns { jammed: {barrierId:true}, ray: {...} }.
+  D.hallsJam = function (halls, barrierState, itemPos, carryingId) {
+    var out = { jammed: {}, ray: null };
+    halls.items.forEach(function (it) {
+      if (it.kind !== 'jammer' || carryingId === it.id) return;
+      var p = (itemPos && itemPos[it.id]) || it;
+      var best = null, bestD = halls.jamRange;
+      halls.barriers.forEach(function (br) {
+        if (br.noJam) return;
+        var d = rectDist(br, p.x, p.z);
+        if (d > bestD) return;
+        if (!D.segClear(halls, barrierState, p.x, p.z, br.x, br.z, br.id)) return;
+        best = br; bestD = d;
+      });
+      if (best) {
+        out.jammed[best.id] = true;
+        out.ray = { x1: p.x, z1: p.z, x2: best.x, z2: best.z };
+      }
+    });
+    return out;
+  };
+
+  // one settling pass of the whole circuit: plates -> jam -> power ->
+  // seal states. Call with the previous frame's open map; it converges
+  // in a couple of frames as light finds newly opened paths.
+  D.hallsSolve = function (halls, prevOpen, itemPos, carryingId, pressed, switchOpen) {
+    var jam = D.hallsJam(halls, prevOpen, itemPos, carryingId);
+    // light travels through what the jam is holding open right now
+    var midState = {};
+    for (var kdb in prevOpen) midState[kdb] = prevOpen[kdb];
+    for (var kj in jam.jammed) midState[kj] = true;
+    var power = D.hallsPower(halls, midState, itemPos, carryingId);
+    var open = {};
+    halls.barriers.forEach(function (br) {
+      var o = false;
+      if (br.opener === 'plate') o = !!pressed[br.plate];
+      else if (br.opener === 'receptor') {
+        o = !!power.lit[br.receptor];
+        if (o && br.plate) o = !!pressed[br.plate];
+      } else if (br.opener === 'switch') o = !!switchOpen[br.id];
+      if (jam.jammed[br.id]) o = true;
+      open[br.id] = o;
+    });
+    return { open: open, lit: power.lit, links: power.links, jammed: jam.jammed, jamRay: jam.ray };
   };
 
   // ---------------------------------------------------------------

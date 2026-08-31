@@ -255,8 +255,9 @@ GH.world = (function () {
         lay.raceway = GH.dungeons.genRaceway(size);
         lay.chest = { x: 0, z: 0 }; // the winner's circle, mid-infield
       } else if (arch2 === 'halls') {
-        lay.halls = GH.dungeons.genHalls(size);
-        lay.chest = { x: 0, z: -half + 24 }; // beyond the third barrier
+        // the null reach runs the master set; everywhere else teaches
+        lay.halls = GH.dungeons.genHalls(size, info.parent === 'null' ? 'master' : 'teach');
+        lay.chest = { x: 0, z: -half + 24 }; // beyond the final seal
       } else if (arch2 === 'convoy') {
         lay.convoyPath = GH.dungeons.genConvoy(zoneId, size);
         lay.chest = { x: 0, z: -half + 24 }; // where the hauler docks
@@ -486,7 +487,9 @@ GH.world = (function () {
       chestMesh.position.set(lay.chest.x, 0, lay.chest.z);
       group.add(chestMesh);
     }
-    // RACEWAY: gate pylons around the ring, gold start arch
+    // RACEWAY: gate pylons, start gantry, and dense trackside furniture —
+    // the NFS lesson: speed only reads when things stream PAST you
+    var raceLights = null;
     if (lay.raceway) {
       var rw = lay.raceway;
       for (var rg = 0; rg < rw.gates; rg++) {
@@ -498,9 +501,47 @@ GH.world = (function () {
         rpg.rotation.y = rang;
         group.add(rpg);
       }
+      // the start-light gantry over the line
+      var startPt = rw.path[0];
+      var nxt = rw.path[1];
+      var gantry = GH.models.buildStartGantry();
+      gantry.position.set(startPt.x, 0, startPt.z);
+      gantry.rotation.y = Math.atan2(nxt.x - startPt.x, nxt.z - startPt.z);
+      group.add(gantry);
+      raceLights = gantry.userData.lamps;
+      // light posts and edge chevrons along the whole ring
+      var postGeo = new THREE.BoxGeometry(0.4, 5.5, 0.4);
+      var postMat = GH.assets.lambert({ color: 0x2a3038 });
+      var lampMatA = GH.assets.basic(0x60c8ff, { transparent: true, opacity: 0.85 });
+      var lampMatB = GH.assets.basic(0xffd050, { transparent: true, opacity: 0.85 });
+      var chevMat = new THREE.MeshBasicMaterial({ color: 0xfff2d0, transparent: true, opacity: 0.25, depthWrite: false });
+      var chevGeo = new THREE.PlaneGeometry(1.4, 3.2);
+      var lampGeo = new THREE.OctahedronGeometry(0.4);
+      for (var tp = 0; tp < rw.path.length; tp += 2) {
+        var pA = rw.path[tp];
+        var pB = rw.path[(tp + 1) % rw.path.length];
+        var tang = Math.atan2(pB.x - pA.x, pB.z - pA.z);
+        var side = (tp % 4 === 0) ? 1 : -1;
+        var offX = Math.cos(tang) * -side * 13;
+        var offZ = Math.sin(tang) * side * 13;
+        var post = new THREE.Mesh(postGeo, postMat);
+        post.position.set(pA.x + offX, 2.75, pA.z + offZ);
+        group.add(post);
+        var lamp = new THREE.Mesh(lampGeo, tp % 8 === 0 ? lampMatB : lampMatA);
+        lamp.position.set(pA.x + offX, 5.8, pA.z + offZ);
+        group.add(lamp);
+        // lane chevron painted on the racing line
+        var chev = new THREE.Mesh(chevGeo, chevMat);
+        chev.rotation.x = -Math.PI / 2;
+        chev.rotation.z = -tang;
+        chev.position.set(pA.x, 0.05, pA.z);
+        group.add(chev);
+      }
     }
-    // CIPHER HALLS: solid walls, energy barriers, plates, power cores
+    // CIPHER HALLS: solid walls, seals of four kinds, matter screens,
+    // plates, and the portable puzzle kit (cores, relays, the jammer)
     var barrierMeshes = null, plateMeshes = null, coreMeshes = null, relicMesh = null;
+    var receptorMeshes = null, switchMeshes = null, screenMeshes = null, beamPool = null;
     if (lay.halls) {
       var hallWallMat = GH.assets.lambert({ map: tex.wall });
       lay.halls.walls.forEach(function (wl) {
@@ -510,18 +551,32 @@ GH.world = (function () {
       });
       barrierMeshes = {};
       lay.halls.barriers.forEach(function (br) {
-        var bm = new THREE.Mesh(new THREE.BoxGeometry(br.w, 5, br.d * 0.7),
-          GH.assets.basic(0x60c8ff, { transparent: true, opacity: 0.4 }));
-        bm.position.set(br.x, 2.5, br.z);
+        // color speaks the rules: cyan = circuit seals, amber = hardened
+        // (the jammer cannot take them), green = low conduit fences
+        var col = br.opener === 'lock' ? 0x50d080 : br.noJam ? 0xffb040 : 0x60c8ff;
+        var hgt = br.opener === 'lock' ? 2.2 : 5;
+        var bm = new THREE.Mesh(
+          new THREE.BoxGeometry(Math.max(br.w * 0.7, br.w - 1.5), hgt, Math.max(br.d * 0.7, br.d - 1.5)),
+          GH.assets.basic(col, { transparent: true, opacity: 0.4 }));
+        bm.position.set(br.x, hgt / 2, br.z);
         group.add(bm);
         barrierMeshes[br.id] = bm;
       });
+      screenMeshes = {};
+      (lay.halls.screens || []).forEach(function (sc) {
+        var sm = new THREE.Mesh(new THREE.BoxGeometry(sc.w, 5, Math.max(0.5, sc.d * 0.5)),
+          GH.assets.basic(0xb060ff, { transparent: true, opacity: 0.18, depthWrite: false }));
+        sm.position.set(sc.x, 2.5, sc.z);
+        group.add(sm);
+        screenMeshes[sc.id] = sm;
+      });
       plateMeshes = {};
       lay.halls.plates.forEach(function (pl) {
-        var pm = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 0.3, 8),
+        var pr = pl.r || 2.4;
+        var pm = new THREE.Mesh(new THREE.CylinderGeometry(pr - 0.2, pr, 0.3, 8),
           GH.assets.lambert({ color: 0x3a4450 }));
         pm.position.set(pl.x, 0.15, pl.z);
-        var pmGlow = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.14, 8),
+        var pmGlow = new THREE.Mesh(new THREE.CylinderGeometry(pr - 0.8, pr - 0.8, 0.14, 8),
           GH.assets.basic(0xffd050, { transparent: true, opacity: 0.5 }));
         pmGlow.position.y = 0.24;
         pm.add(pmGlow);
@@ -529,14 +584,48 @@ GH.world = (function () {
         group.add(pm);
         plateMeshes[pl.id] = pm;
       });
-      coreMeshes = {};
-      lay.halls.cores.forEach(function (co) {
-        var cm = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1),
-          GH.assets.lambert({ color: 0xffd050, emissive: 0x806010, emissiveIntensity: 0.7 }));
-        cm.position.set(co.x, 0.8, co.z);
-        group.add(cm);
-        coreMeshes[co.id] = cm;
+      (lay.halls.emitters || []).forEach(function (em) {
+        var emesh = GH.models.buildEmitter();
+        emesh.position.set(em.x, 0, em.z);
+        group.add(emesh);
       });
+      receptorMeshes = {};
+      (lay.halls.receptors || []).forEach(function (rc) {
+        var rm = GH.models.buildReceptor();
+        rm.position.set(rc.x, 0, rc.z);
+        group.add(rm);
+        receptorMeshes[rc.id] = rm;
+      });
+      switchMeshes = {};
+      (lay.halls.switches || []).forEach(function (sw) {
+        var swm = GH.models.buildSwitchLever();
+        swm.position.set(sw.x, 0, sw.z);
+        group.add(swm);
+        switchMeshes[sw.id] = swm;
+      });
+      coreMeshes = {};
+      (lay.halls.items || []).forEach(function (it) {
+        var cm;
+        if (it.kind === 'relay') cm = GH.models.buildRelay();
+        else if (it.kind === 'jammer') cm = GH.models.buildJammer();
+        else {
+          cm = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1),
+            GH.assets.lambert({ color: 0xffd050, emissive: 0x806010, emissiveIntensity: 0.7 }));
+        }
+        cm.position.set(it.x, it.kind === 'core' ? 0.8 : 0, it.z);
+        group.add(cm);
+        coreMeshes[it.id] = cm;
+      });
+      // a small pool of beam segments, bent to the live links each frame
+      beamPool = [];
+      var beamGeo = new THREE.BoxGeometry(1, 1, 1);
+      for (var bp = 0; bp < 10; bp++) {
+        var beam = new THREE.Mesh(beamGeo,
+          GH.assets.basic(0x8ae8ff, { transparent: true, opacity: 0.55, depthWrite: false }));
+        beam.visible = false;
+        group.add(beam);
+        beamPool.push(beam);
+      }
     }
     // CONVOY: waypoint markers along the hauler's route
     if (lay.convoyPath) {
@@ -641,6 +730,9 @@ GH.world = (function () {
       fluxTiles: fluxTiles, cpMeshes: cpMeshes,
       barrierMeshes: barrierMeshes, plateMeshes: plateMeshes,
       coreMeshes: coreMeshes, relicMesh: relicMesh,
+      receptorMeshes: receptorMeshes, switchMeshes: switchMeshes,
+      screenMeshes: screenMeshes, beamPool: beamPool,
+      raceLights: raceLights,
       layout: lay, info: info
     };
   };

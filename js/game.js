@@ -920,6 +920,10 @@ GH.game = (function () {
       } else if (def.behavior === 'racer') {
         // RACEWAY rival: ride the circuit line, harass the pilot in passing
         var rwLay = worldH && worldH.layout.raceway;
+        if (dungeonState && dungeonState.race && dungeonState.race.countdown > 0) {
+          // held on the grid until the green
+          rwLay = null;
+        }
         if (rwLay) {
           var rwp = rwLay.path[e.racePi % rwLay.path.length];
           var rwa = GH.angleTo(e.x, e.z, rwp.x, rwp.z);
@@ -2180,6 +2184,16 @@ GH.game = (function () {
         fx.mesh.position.z += fx.vz * dt;
         fx.mesh.rotation.x += dt * 8;
         fx.mesh.rotation.y += dt * 8;
+      } else if (fx.kind === 'streak') {
+        // speed dust: rips backward past the hull, thins out and dies
+        fx.mesh.position.x += fx.vx * dt;
+        fx.mesh.position.z += fx.vz * dt;
+        fx.mesh.scale.z *= 1 - Math.min(0.9, 4 * dt);
+        fx.mesh.scale.x = fx.mesh.scale.y = 0.06 * Math.max(0.2, fx.t / fx.total);
+      } else if (fx.kind === 'skidmark') {
+        // scorch ribbon: lies where it was laid, shrinking away
+        var skk = GH.clamp(fx.t / fx.total, 0, 1);
+        fx.mesh.scale.x = fx.sx * (0.3 + skk * 0.7);
       } else if (fx.kind === 'fade') {
         fx.mesh.material.opacity = Math.max(0, fx.t / fx.total) * 0.6;
       } else if (fx.kind === 'fadeSlow') {
@@ -2673,6 +2687,88 @@ GH.game = (function () {
   }
 
   // =================================================================
+  // SKIMMER DRIVING — the Underground lessons, played top-down:
+  // heading and velocity are separate things; holding SPACE drops the
+  // lateral grip so the tail steps out (drift); time spent sideways at
+  // speed banks nitro; SHIFT burns the bottle; a wall dumps your speed
+  // AND everything you banked. Speed is drawn, not stated: FOV pull,
+  // world streaks, skid ribbons, camera shake.
+  // =================================================================
+  function approachAngle(a, b, maxStep) {
+    var d = b - a;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    if (d > maxStep) d = maxStep;
+    if (d < -maxStep) d = -maxStep;
+    return a + d;
+  }
+
+  function updateDrive(dt, input, spd, onIce) {
+    var d = player.drive;
+    if (!d) {
+      d = player.drive = {
+        heading: player.facing || 0, spd: 0, nitro: 0, nitroT: 0,
+        slip: 0, fwd: 0, top: 1, drift: false, crashCd: 0,
+        skidT: 0, streakT: 0, score: 0
+      };
+    }
+    player.dashTime = 0; // no frame-dash on the throttle
+    var top = spd * 3.3;
+    // the bottle: SHIFT burns while there's charge
+    var wantNitro = !!input.special && d.nitro > 0.03;
+    if (wantNitro) {
+      d.nitro = Math.max(0, d.nitro - 0.38 * dt);
+      d.nitroT = 0.12;
+    } else {
+      d.nitroT = Math.max(0, d.nitroT - dt);
+    }
+    var nitroOn = d.nitroT > 0;
+    if (nitroOn) top *= 1.5;
+    var hasInput = player.moveX !== 0 || player.moveZ !== 0;
+    d.drift = !!input.boostHeld && d.spd > top * 0.2;
+    if (hasInput) {
+      var want = Math.atan2(player.moveX, player.moveZ);
+      var speedFrac = GH.clamp(d.spd / Math.max(0.01, top), 0, 1);
+      // grip narrows the wheel at speed; a drift throws it wide open
+      var turn = (d.drift ? 3.8 : 2.6 - speedFrac * 1.1) * dt;
+      d.heading = approachAngle(d.heading, want, turn);
+      var dot = Math.sin(d.heading) * player.moveX + Math.cos(d.heading) * player.moveZ;
+      if (dot < -0.55 && d.spd > 4) {
+        d.spd = Math.max(0, d.spd - 34 * dt); // stand on the brakes
+      } else {
+        d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * dt);
+      }
+    } else {
+      d.spd = Math.max(0, d.spd - (d.drift ? 6 : 12) * dt);
+    }
+    if (d.drift) d.spd = Math.max(0, d.spd - 3.5 * dt); // the slide scrubs speed
+    // decompose velocity: forward chases the throttle, lateral bleeds by grip
+    var fx = Math.sin(d.heading), fz = Math.cos(d.heading);
+    var fwd = player.velX * fx + player.velZ * fz;
+    var latX = player.velX - fx * fwd, latZ = player.velZ - fz * fwd;
+    var grip = d.drift ? 1.5 : (onIce ? 2.4 : 7.5);
+    var gk = Math.min(1, grip * dt);
+    latX -= latX * gk;
+    latZ -= latZ * gk;
+    fwd += (d.spd - fwd) * Math.min(1, 9 * dt);
+    player.velX = fx * fwd + latX;
+    player.velZ = fz * fwd + latZ;
+    d.slip = Math.sqrt(latX * latX + latZ * latZ);
+    d.fwd = fwd;
+    d.top = top;
+    d.crashCd = Math.max(0, d.crashCd - dt);
+    // sideways at speed banks nitro — the Underground loop
+    if (d.drift && d.slip > 2 && fwd > top * 0.3) {
+      d.nitro = Math.min(1, d.nitro + 0.28 * dt);
+      var styleGain = d.slip * dt * 2;
+      d.score += styleGain;
+      if (dungeonState && dungeonState.race) {
+        dungeonState.race.style = (dungeonState.race.style || 0) + styleGain;
+      }
+    }
+  }
+
+  // =================================================================
   // PLAYER UPDATE
   // =================================================================
   function updatePlayer(dt, input) {
@@ -2683,7 +2779,12 @@ GH.game = (function () {
     // Skimmer: 2.6x speed, ram hits, its own strafe cannons, +25% damage taken.
     if (input.transformPressed) {
       input.transformPressed = false;
-      toggleSpeeder();
+      if (dungeonState && dungeonState.carrying && !player.speederOn) {
+        announce('SERVOS LOADED — CANNOT TRANSFORM', 18);
+        GH.audio.hit();
+      } else {
+        toggleSpeeder();
+      }
     }
 
     // aim priority: right stick / touch aim > mouse
@@ -2706,11 +2807,10 @@ GH.game = (function () {
       player.moveX = mx / nlen; player.moveZ = mz / nlen;
     } else { player.moveX = 0; player.moveZ = 0; }
 
-    player.blocking = player.def.special === 'block' && input.special;
+    player.blocking = player.def.special === 'block' && input.special && !player.speederOn;
 
     var spd = s.speed * (player.blocking ? 0.55 : 1);
     if (player.protocols.vents && player.hp < s.maxHP * 0.35) spd *= 1.2;
-    if (player.speederOn) spd *= 2.6;
     if (artOn('circuit_laurel')) spd *= 1.08;
     // a shouldered power core weighs on the servos
     if (dungeonState && dungeonState.carrying) spd *= 0.8;
@@ -2720,7 +2820,13 @@ GH.game = (function () {
     var onIce = !!inHazard('ice', player.x, player.z);
 
     var preMoveX = player.x, preMoveZ = player.z; // for maze wall resolution
-    if (player.dashTime > 0) {
+    if (player.speederOn) {
+      // skimmer form drives on the NFS model: momentum, drift, nitro
+      input.boostPressed = false; // no frame-dash in vehicle form
+      updateDrive(dt, input, spd, onIce);
+      player.x += player.velX * dt;
+      player.z += player.velZ * dt;
+    } else if (player.dashTime > 0) {
       player.dashTime -= dt;
       player.x += player.dashX * 26 * dt;
       player.z += player.dashZ * 26 * dt;
@@ -2760,10 +2866,11 @@ GH.game = (function () {
       player.z = GH.clamp(player.z, -GH.world.BOUNDS.z, GH.world.BOUNDS.z);
       // solid walls (labyrinth cells, hall dividers, closed barriers):
       // resolve per axis so you slide along them
-      if (zoneBlockedAt(player.x, player.z)) {
-        if (!zoneBlockedAt(player.x, preMoveZ)) {
+      var laden = !!(dungeonState && dungeonState.carrying);
+      if (zoneBlockedAt(player.x, player.z, laden)) {
+        if (!zoneBlockedAt(player.x, preMoveZ, laden)) {
           player.z = preMoveZ;
-        } else if (!zoneBlockedAt(preMoveX, player.z)) {
+        } else if (!zoneBlockedAt(preMoveX, player.z, laden)) {
           player.x = preMoveX;
         } else {
           player.x = preMoveX;
@@ -2794,17 +2901,99 @@ GH.game = (function () {
     // pose
     if (player.speederOn) {
       var sm = player.speederMesh;
+      var dr = player.drive;
+      var fwdFrac = dr ? GH.clamp(dr.fwd / Math.max(0.01, dr.top), 0, 1) : 0;
+      // wall check: the hull expected to travel but barely moved — a crash.
+      // NFSU2's harshest rule kept: the wall takes your speed AND your bottle.
+      if (dr && dr.crashCd <= 0) {
+        var expX = player.velX * dt, expZ = player.velZ * dt;
+        var exp2 = expX * expX + expZ * expZ;
+        var actX = player.x - preMoveX, actZ = player.z - preMoveZ;
+        var act2 = actX * actX + actZ * actZ;
+        if (exp2 > 0.004 && act2 < exp2 * 0.2 && dr.fwd > dr.top * 0.45) {
+          dr.crashCd = 0.9;
+          dr.spd *= 0.25;
+          player.velX *= 0.2; player.velZ *= 0.2;
+          if (dr.nitro > 0.15) {
+            announce('WALL — NITRO DUMPED', 18);
+          }
+          dr.nitro = 0;
+          dr.nitroT = 0;
+          shake = Math.min(0.6, shake + 0.3);
+          spawnBurst(player.x, 1, player.z, 0xffb040, 12);
+          GH.audio.hit();
+        }
+      }
       sm.position.set(player.x, 0, player.z);
-      var movingS = player.moveX !== 0 || player.moveZ !== 0;
-      if (movingS) player.speederHeading = Math.atan2(player.moveX, player.moveZ);
-      sm.rotation.y = player.speederHeading || player.facing;
-      sm.rotation.z = GH.lerp(sm.rotation.z, movingS ? -player.moveX * 0.18 : 0, dt * 6);
+      var movingS = dr ? dr.fwd > 0.6 : false;
+      player.speederHeading = dr ? dr.heading : player.facing;
+      sm.rotation.y = player.speederHeading;
+      // bank into the slide: lateral slip leans the hull
+      var slipSign = 0;
+      if (dr && dr.slip > 0.2) {
+        var latDot = player.velX * Math.cos(dr.heading) - player.velZ * Math.sin(dr.heading);
+        slipSign = latDot > 0 ? 1 : -1;
+      }
+      var leanT = dr ? GH.clamp(-slipSign * dr.slip * 0.045, -0.55, 0.55) : 0;
+      sm.rotation.z = GH.lerp(sm.rotation.z, leanT, dt * 7);
       sm.position.y = 0.12 + Math.sin(runTime * 6) * 0.06; // hover bob
+      var nitroLive = dr && dr.nitroT > 0;
       if (sm.userData.flames) {
         sm.userData.flames.forEach(function (fl) {
           fl.visible = movingS || Math.floor(runTime * 16) % 2 === 0;
-          fl.scale.y = movingS ? 1.5 : 0.7;
+          fl.scale.y = nitroLive ? 2.6 : movingS ? 1.2 + fwdFrac * 0.8 : 0.7;
         });
+      }
+      // world streaks: dust ripped past the hull sells the speed
+      if (dr) {
+        dr.streakT -= dt;
+        if (fwdFrac > 0.45 && dr.streakT <= 0) {
+          dr.streakT = 0.035;
+          var va = Math.atan2(player.velX, player.velZ);
+          for (var stx = 0; stx < 2; stx++) {
+            var sideOff = (Math.random() < 0.5 ? -1 : 1) * GH.rand(2.5, 9);
+            var aheadOff = GH.rand(6, 16);
+            var stm = poolGet('box', nitroLive ? 0xbfe8ff : 0xdfe8f0);
+            stm.scale.set(0.06, 0.06, 1.6 + dr.fwd * 0.09);
+            stm.position.set(
+              player.x + Math.sin(va) * aheadOff + Math.cos(va) * sideOff,
+              GH.rand(0.5, 3),
+              player.z + Math.cos(va) * aheadOff - Math.sin(va) * sideOff);
+            stm.rotation.set(0, va, 0);
+            scene.add(stm);
+            effects.push({
+              kind: 'streak', mesh: stm, t: 0.3, total: 0.3,
+              vx: -player.velX * 0.55, vz: -player.velZ * 0.55
+            });
+          }
+        }
+        // skid ribbons under a real slide
+        if (dr.drift && dr.slip > 2.2 && dr.fwd > 3) {
+          dr.skidT -= dt;
+          if (dr.skidT <= 0) {
+            dr.skidT = 0.055;
+            var ha = dr.heading;
+            for (var sk = -1; sk <= 1; sk += 2) {
+              var skm = poolGet('box', 0x14181e);
+              skm.scale.set(0.5, 0.03, 1.9);
+              skm.position.set(
+                player.x + Math.cos(ha) * 0.8 * sk - Math.sin(ha) * 1.1,
+                0.04,
+                player.z - Math.sin(ha) * 0.8 * sk - Math.cos(ha) * 1.1);
+              skm.rotation.set(0, Math.atan2(player.velX, player.velZ), 0);
+              scene.add(skm);
+              effects.push({ kind: 'skidmark', mesh: skm, t: 2.4, total: 2.4, sx: 0.5 });
+            }
+          }
+          if (Math.random() < 0.35) {
+            spawnBurst(player.x - Math.sin(dr.heading) * 1.2, 0.2,
+              player.z - Math.cos(dr.heading) * 1.2, 0xffd050, 1);
+          }
+        }
+        if (nitroLive && Math.random() < 0.5) {
+          spawnBurst(player.x - Math.sin(dr.heading) * 1.6, 0.5,
+            player.z - Math.cos(dr.heading) * 1.6, 0x70c0ff, 2);
+        }
       }
       // ram: the skimmer's mass is its weapon
       if (movingS) {
@@ -3103,9 +3292,16 @@ GH.game = (function () {
       dungeonState.objHp = lay.objective.hp;
     }
     if (lay.halls) {
-      lay.halls.cores.forEach(function (co) {
-        dungeonState.corePos[co.id] = { x: co.x, z: co.z };
+      lay.halls.items.forEach(function (it) {
+        dungeonState.corePos[it.id] = { x: it.x, z: it.z };
       });
+      dungeonState.switchT = {};
+      dungeonState.litR = {};
+      dungeonState.jammedB = {};
+      dungeonState.beamLinks = [];
+      queueAnnounce(lay.halls.variant === 'master'
+        ? 'THE ARCHIVE GIVES NOTHING AWAY — EVERY TOOL YOU KNOW, TURNED AGAINST YOU'
+        : 'READ THE ROOM — EACH CHAMBER TEACHES ONE TRUTH', 22);
     }
     if (lay.convoyPath) {
       dungeonState.hauler = {
@@ -3185,14 +3381,15 @@ GH.game = (function () {
   // (tier ascension replaced in-run deeper gates: the overworld gate
   // itself climbs one tier per clear, with fresh modifiers stacking)
 
-  // solid geometry in the loaded zone: maze cells, hall walls, barriers
-  function zoneBlockedAt(x, z) {
+  // solid geometry in the loaded zone: maze cells, hall walls, barriers.
+  // carrying=true adds the matter screens (they refuse carried cargo).
+  function zoneBlockedAt(x, z, carrying) {
     if (!worldH || !zoneNow) return false;
     if (worldH.layout.maze &&
       GH.dungeons.mazeBlocked(worldH.layout.maze, zoneNow.size, x, z)) return true;
     if (worldH.layout.halls &&
       GH.dungeons.hallsBlocked(worldH.layout.halls,
-        dungeonState && dungeonState.barrierOpen, x, z)) return true;
+        dungeonState && dungeonState.barrierOpen, x, z, 0.6, !!carrying)) return true;
     return false;
   }
 
@@ -3221,7 +3418,16 @@ GH.game = (function () {
         ' · POS ' + ds.race.pos + '/4';
     }
     if (ds.arch === 'halls') {
-      return ds.carrying ? 'CARRYING A POWER CORE [E TO SET IT DOWN]' : 'PLATES OPEN BARRIERS';
+      if (ds.carrying) {
+        var ck = hallsItemKind(ds.carrying);
+        return 'CARRYING THE ' + (HALLS_ITEM_NAMES[ck] || 'CARGO') + ' [E SETS IT DOWN]';
+      }
+      for (var swk in ds.switchT) {
+        if (ds.switchT[swk] > 0) return 'TIMED SEAL — ' + GH.fmt1(ds.switchT[swk]) + 's';
+      }
+      return worldH.layout.halls.variant === 'master'
+        ? 'THE ARCHIVE TESTS EVERYTHING AT ONCE'
+        : 'ROUTE POWER — OPEN THE SEALS';
     }
     if (ds.arch === 'convoy') {
       if (ds.done) return 'CACHE UNSEALED';
@@ -3348,7 +3554,11 @@ GH.game = (function () {
     for (var i = enemies.length - 1; i >= 0; i--) {
       if (!enemies[i].nestId) { scene.remove(enemies[i].mesh); enemies.splice(i, 1); }
     }
-    ds.race = { lap: 1, gate: 1, laps: rw.laps, pos: 1, countdown: 3.4, rivals: [], respawns: [] };
+    ds.race = {
+      lap: 1, gate: 1, laps: rw.laps, pos: 1, countdown: 3.9,
+      rivals: [], respawns: [], style: 0, lightStep: -1,
+      throttleAt: null, launched: false
+    };
     for (var rv = 0; rv < 3; rv++) {
       var gridPt = rw.path[2 + rv * 2];
       var rr = spawnEnemy('racer', gridPt.x, gridPt.z);
@@ -3359,12 +3569,13 @@ GH.game = (function () {
         rr.racePi = 2 + rv * 2;
         rr.raceLap = 1;
         rr.raceGate = 1;
-        rr.raceSkill = 10.5 + rv * 0.9;
+        rr.raceSkill = 13 + rv * 1.0;
         ds.race.rivals.push(rr);
       }
     }
     if (!player.speederOn) toggleSpeeder(); // the race runs in vehicle form
-    announce('THREE LAPS — LIVE FIRE PERMITTED', 30);
+    if (player.drive) { player.drive.spd = 0; player.drive.nitro = 0; }
+    announce('THREE LAPS — LIVE FIRE PERMITTED. THROTTLE ON THE GREEN.', 30);
     GH.audio.boss();
   }
 
@@ -3376,6 +3587,39 @@ GH.game = (function () {
     var race = ds.race;
     if (race.countdown > 0) {
       race.countdown -= dt;
+      // NFSU launch window: first throttle inside the last 0.7s primes nitro
+      var throttling = player.moveX !== 0 || player.moveZ !== 0;
+      if (throttling && race.throttleAt === null) race.throttleAt = race.countdown;
+      if (!throttling) race.throttleAt = null;
+      // hold the grid: no rolling starts
+      if (player.drive) { player.drive.spd = Math.min(player.drive.spd, 2); }
+      // gantry lamps: red, red, red ... green
+      var step = race.countdown > 2.6 ? 0 : race.countdown > 1.3 ? 1 : 2;
+      if (step !== race.lightStep) {
+        race.lightStep = step;
+        GH.audio.coin();
+        if (worldH.raceLights) {
+          worldH.raceLights.forEach(function (lamp, li) {
+            lamp.material.color.setHex(li <= step ? 0xff4040 : 0x552222);
+            lamp.material.opacity = li <= step ? 0.95 : 0.5;
+          });
+        }
+      }
+      if (race.countdown <= 0) {
+        if (worldH.raceLights) {
+          worldH.raceLights.forEach(function (lamp) {
+            lamp.material.color.setHex(0x40ff70);
+            lamp.material.opacity = 0.95;
+          });
+        }
+        GH.audio.dash();
+        if (race.throttleAt !== null && race.throttleAt <= 0.7 && player.drive) {
+          player.drive.nitro = Math.min(1, player.drive.nitro + 0.6);
+          announce('PERFECT LAUNCH — NITRO PRIMED', 22);
+        } else {
+          announce('GO', 26);
+        }
+      }
       return;
     }
     var gateEvery = Math.floor(rw.path.length / rw.gates);
@@ -3390,6 +3634,13 @@ GH.game = (function () {
         if (race.lap > race.laps) {
           ds.done = true;
           announce('CHECKERED — THE CACHE UNSEALS', 30);
+          // the drift ledger pays out as style salvage
+          var styleBonus = Math.min(150, Math.round((race.style || 0) / 4));
+          if (styleBonus >= 10) {
+            GH.meta.data.salvage += styleBonus;
+            GH.meta.save();
+            queueAnnounce('STYLE BONUS — +' + styleBonus + ' SALVAGE FOR THE SLIDES', 24);
+          }
           GH.audio.win();
           return;
         }
@@ -3405,7 +3656,7 @@ GH.game = (function () {
       if (GH.dist2(rr.x, rr.z, tp.x, tp.z) < 25) rr.racePi++;
       // rubber-band around the player's progress
       var band = playerProg - racewayProgress(rr.raceLap, rr.raceGate);
-      rr.raceSpeed = rr.raceSkill * (band > 2 ? 1.2 : band < -2 ? 0.88 : 1);
+      rr.raceSpeed = rr.raceSkill * (band > 2 ? 1.35 : band < -2 ? 0.8 : 1);
       // gate bookkeeping
       var rg = rw.path[(rr.raceGate % rw.gates) * gateEvery];
       if (GH.dist2(rr.x, rr.z, rg.x, rg.z) < 8 * 8) {
@@ -3455,24 +3706,52 @@ GH.game = (function () {
     }).length;
   }
 
-  // ---------------- CIPHER HALLS: plates, cores, barriers ----------------
+  // ---------------- CIPHER HALLS: the full cipher circuit ----------------
+  // plates + weights, beam emitters/relays/receptors, the one jammer,
+  // timed switches, matter screens. All truth lives in GH.dungeons.hallsSolve;
+  // this just gathers inputs and paints the answer.
+  function hallsItemKind(id) {
+    var items = worldH.layout.halls.items;
+    for (var i = 0; i < items.length; i++) if (items[i].id === id) return items[i].kind;
+    return 'core';
+  }
+  var HALLS_ITEM_NAMES = { core: 'POWER CORE', relay: 'BEAM RELAY', jammer: 'SIGNAL JAMMER' };
+
   function updateHalls(dt, lay) {
     var ds = dungeonState;
     var halls = lay.halls;
-    // carried core rides on the frame's back
+    // carried cargo rides on the frame's back
     if (ds.carrying && worldH.coreMeshes[ds.carrying]) {
       worldH.coreMeshes[ds.carrying].position.set(player.x, 2.6, player.z);
       worldH.coreMeshes[ds.carrying].rotation.y += dt * 2;
     }
-    // plate state: held by the pilot or by a grounded core
+    // timed switch windows tick down
+    for (var swId in ds.switchT) {
+      if (ds.switchT[swId] > 0) {
+        ds.switchT[swId] -= dt;
+        if (ds.switchT[swId] <= 0) {
+          ds.switchT[swId] = 0;
+          announce('THE TIMED SEAL SLAMS SHUT', 18);
+          GH.audio.hit();
+        } else if (ds.switchT[swId] < 3 && Math.floor(ds.switchT[swId] * 2) !== Math.floor((ds.switchT[swId] + dt) * 2)) {
+          GH.audio.tick ? GH.audio.tick() : GH.audio.coin();
+        }
+      }
+    }
+    // plate state: pilot, wingmate, or any grounded object with mass
     var pressed = {};
     halls.plates.forEach(function (pl) {
-      var held = GH.dist2(player.x, player.z, pl.x, pl.z) < 2.4 * 2.4;
+      var pr = pl.r || 2.4;
+      var held = GH.dist2(player.x, player.z, pl.x, pl.z) < pr * pr;
+      if (!held && mate && !mate.down) {
+        held = GH.dist2(mate.x, mate.z, pl.x, pl.z) < pr * pr;
+      }
       if (!held) {
         for (var cid in ds.corePos) {
           if (ds.carrying === cid) continue;
           var cp = ds.corePos[cid];
-          if (GH.dist2(cp.x, cp.z, pl.x, pl.z) < 2.2 * 2.2) { held = true; break; }
+          var wr = Math.max(2.2, pr - 0.2);
+          if (GH.dist2(cp.x, cp.z, pl.x, pl.z) < wr * wr) { held = true; break; }
         }
       }
       pressed[pl.id] = held;
@@ -3481,43 +3760,138 @@ GH.game = (function () {
         pm.userData.glow.material.opacity = held ? 0.95 : 0.35 + Math.sin(runTime * 4) * 0.15;
       }
     });
-    halls.barriers.forEach(function (br) {
-      var open = br.plates
-        ? br.plates.every(function (pid) { return pressed[pid]; })
-        : pressed[br.plate];
-      ds.barrierOpen[br.id] = open;
-      var bm = worldH.barrierMeshes[br.id];
-      if (bm) {
-        bm.visible = !open;
-        if (!open) bm.material.opacity = 0.3 + Math.sin(runTime * 6) * 0.12;
+    // switch-opened seals
+    var switchOpen = {};
+    (halls.switches || []).forEach(function (sw) {
+      if (ds.switchT[sw.id] > 0) switchOpen[sw.opens] = true;
+      var swm = worldH.switchMeshes && worldH.switchMeshes[sw.id];
+      if (swm) {
+        var live = ds.switchT[sw.id] > 0;
+        swm.userData.arm.rotation.z = GH.lerp(swm.userData.arm.rotation.z, live ? -0.5 : 0.5, dt * 8);
+        swm.userData.lamp.material.opacity = live
+          ? 0.6 + Math.sin(runTime * 10) * 0.35 : 0.35;
       }
     });
+    // once the cache is open every seal releases — the hall stands solved
+    if (ds.opened) {
+      halls.barriers.forEach(function (br) { ds.barrierOpen[br.id] = true; });
+    } else {
+      var solved = GH.dungeons.hallsSolve(halls, ds.barrierOpen, ds.corePos, ds.carrying, pressed, switchOpen);
+      ds.barrierOpen = solved.open;
+      ds.litR = solved.lit;
+      ds.jammedB = solved.jammed;
+      ds.beamLinks = solved.links.slice();
+      if (solved.jamRay) ds.beamLinks.push({ x1: solved.jamRay.x1, z1: solved.jamRay.z1, x2: solved.jamRay.x2, z2: solved.jamRay.z2, jam: true });
+    }
+    // paint: seals
+    halls.barriers.forEach(function (br) {
+      var bm = worldH.barrierMeshes[br.id];
+      if (!bm) return;
+      var open = ds.barrierOpen[br.id];
+      bm.visible = !open;
+      if (!open) bm.material.opacity = 0.3 + Math.sin(runTime * 6) * 0.12;
+    });
+    // receptors light when fed
+    (halls.receptors || []).forEach(function (rc) {
+      var rm = worldH.receptorMeshes && worldH.receptorMeshes[rc.id];
+      if (rm && rm.userData.eye) {
+        var lit = !!ds.litR[rc.id];
+        rm.userData.eye.material.opacity = lit ? 0.85 + Math.sin(runTime * 8) * 0.15 : 0.22;
+        rm.userData.eye.rotation.y += dt * (lit ? 4 : 0.6);
+      }
+    });
+    // matter screens shimmer harder at a laden pilot
+    if (worldH.screenMeshes) {
+      for (var scId in worldH.screenMeshes) {
+        worldH.screenMeshes[scId].material.opacity = ds.carrying
+          ? 0.4 + Math.sin(runTime * 9) * 0.12 : 0.15;
+      }
+    }
+    // beams: stretch pool segments along the live links
+    if (worldH.beamPool) {
+      for (var bi = 0; bi < worldH.beamPool.length; bi++) {
+        var beam = worldH.beamPool[bi];
+        var link = ds.beamLinks[bi];
+        if (!link) { beam.visible = false; continue; }
+        var bdx = link.x2 - link.x1, bdz = link.z2 - link.z1;
+        var blen = Math.sqrt(bdx * bdx + bdz * bdz);
+        beam.visible = true;
+        beam.scale.set(0.22, 0.22, Math.max(0.1, blen));
+        beam.position.set((link.x1 + link.x2) / 2, link.jam ? 1.2 : 2.2, (link.z1 + link.z2) / 2);
+        beam.rotation.y = Math.atan2(bdx, bdz);
+        beam.material.color.setHex(link.jam ? 0xe080ff : 0x8ae8ff);
+        beam.material.opacity = (link.jam ? 0.5 : 0.45) + Math.sin(runTime * 10 + bi) * 0.12;
+      }
+    }
   }
 
   function hallsCoreInteract(input) {
     var ds = dungeonState;
     if (!ds || ds.arch !== 'halls' || !input.interactPressed) return false;
     var halls = worldH.layout.halls;
+    // timed switches first: pull one within reach
+    var sws = halls.switches || [];
+    for (var si = 0; si < sws.length; si++) {
+      var sw = sws[si];
+      if (GH.dist2(player.x, player.z, sw.x, sw.z) < 3 * 3) {
+        ds.switchT[sw.id] = sw.window;
+        input.interactPressed = false;
+        GH.audio.card();
+        announce('TIMED SEAL OPEN — ' + sw.window + ' SECONDS. MOVE.', 20);
+        return true;
+      }
+    }
+    if (player.speederOn) {
+      // cargo handling wants hands, not thrusters
+      var nearAny = false;
+      for (var scd in ds.corePos) {
+        if (GH.dist2(player.x, player.z, ds.corePos[scd].x, ds.corePos[scd].z) < 3 * 3) { nearAny = true; break; }
+      }
+      if (nearAny || ds.carrying) {
+        input.interactPressed = false;
+        announce('DISMOUNT TO HANDLE CARGO [T]', 18);
+        return true;
+      }
+      return false;
+    }
     if (ds.carrying) {
-      // set it down here
+      // set it down here — unless a matter screen owns this ground
+      if (GH.dungeons.inScreen(halls, player.x, player.z)) {
+        input.interactPressed = false;
+        announce('THE SCREEN REJECTS CARRIED MATTER', 18);
+        GH.audio.hit();
+        return true;
+      }
       ds.corePos[ds.carrying] = { x: player.x, z: player.z };
       if (worldH.coreMeshes[ds.carrying]) {
-        worldH.coreMeshes[ds.carrying].position.set(player.x, 0.8, player.z);
+        worldH.coreMeshes[ds.carrying].position.set(
+          player.x, hallsItemKind(ds.carrying) === 'core' ? 0.8 : 0, player.z);
       }
       ds.carrying = null;
       input.interactPressed = false;
       GH.audio.card();
       return true;
     }
+    // pick up the nearest portable
+    var bestId = null, bestD = 2.6 * 2.6;
     for (var cid in ds.corePos) {
       var cp = ds.corePos[cid];
-      if (GH.dist2(player.x, player.z, cp.x, cp.z) < 2.4 * 2.4) {
-        ds.carrying = cid;
+      var d2 = GH.dist2(player.x, player.z, cp.x, cp.z);
+      if (d2 < bestD) { bestD = d2; bestId = cid; }
+    }
+    if (bestId) {
+      if (GH.dungeons.inScreen(halls, player.x, player.z)) {
         input.interactPressed = false;
-        GH.audio.card();
-        announce('POWER CORE LIFTED — IT WEIGHS ON THE SERVOS', 18);
+        announce('THE SCREEN REJECTS CARRIED MATTER', 18);
+        GH.audio.hit();
         return true;
       }
+      ds.carrying = bestId;
+      input.interactPressed = false;
+      GH.audio.card();
+      var kind = hallsItemKind(bestId);
+      announce((HALLS_ITEM_NAMES[kind] || 'CARGO') + ' LIFTED — IT WEIGHS ON THE SERVOS', 18);
+      return true;
     }
     return false;
   }
@@ -4183,9 +4557,21 @@ GH.game = (function () {
     player.speederOn = !player.speederOn;
     player.mesh.visible = !player.speederOn;
     player.speederMesh.visible = player.speederOn;
+    if (player.speederOn) {
+      // fresh drivetrain: heading picks up the frame's facing, tank empty
+      player.drive = {
+        heading: player.facing || 0, spd: 0, nitro: 0, nitroT: 0,
+        slip: 0, fwd: 0, top: 1, drift: false, crashCd: 0,
+        skidT: 0, streakT: 0, score: 0
+      };
+    } else {
+      player.velX = 0;
+      player.velZ = 0;
+    }
     GH.audio.dash();
     spawnBurst(player.x, 1, player.z, 0x70c0ff, 14);
-    announce(player.speederOn ? 'SKIMMER FORM — STRAFE CANNONS HOT' : 'FRAME FORM', 22);
+    announce(player.speederOn
+      ? 'SKIMMER FORM — SPACE DRIFTS, SHIFT BURNS NITRO' : 'FRAME FORM', 22);
   }
 
   function startSiege(relay) {
@@ -5001,10 +5387,26 @@ GH.game = (function () {
       var sep = Math.sqrt(GH.dist2(player.x, player.z, mate.x, mate.z));
       zoomTarget = 1 + GH.clamp((sep - 6) / 14, 0, 0.65);
     }
-    // skimmer form and races see farther — speed needs sightlines
-    if (player && player.speederOn) zoomTarget *= 1.35;
+    // skimmer form and races see farther — and the camera itself sells
+    // the speed: it pulls back with velocity, the FOV blooms open, and
+    // a top-speed hull rides on a faint constant tremor
+    var speedFrac = 0;
+    if (player && player.speederOn && player.drive) {
+      speedFrac = GH.clamp(player.drive.fwd / Math.max(0.01, player.drive.top), 0, 1);
+      zoomTarget *= 1.12 + speedFrac * 0.5 + (player.drive.nitroT > 0 ? 0.1 : 0);
+      if (speedFrac > 0.8) shake = Math.min(0.16, shake + dt * 0.25);
+      if (player.drive.nitroT > 0) shake = Math.min(0.28, shake + dt * 0.9);
+    } else if (player && player.speederOn) {
+      zoomTarget *= 1.35;
+    }
     if (G.state === 'race') zoomTarget = Math.max(zoomTarget, 1.3);
     camZoom = GH.lerp(camZoom, zoomTarget, dt * 3);
+    var fovTarget = 48 + speedFrac * 13 +
+      (player && player.speederOn && player.drive && player.drive.nitroT > 0 ? 7 : 0);
+    if (Math.abs(camera.fov - fovTarget) > 0.05) {
+      camera.fov += (fovTarget - camera.fov) * Math.min(1, dt * 5);
+      camera.updateProjectionMatrix();
+    }
     var sx = (Math.random() - 0.5) * shake;
     var sz = (Math.random() - 0.5) * shake;
     shake = Math.max(0, shake - dt * 1.4);
@@ -5021,7 +5423,8 @@ GH.game = (function () {
   function cacheEls() {
     ['hp-fill', 'hp-text', 'xp-fill', 'lvl-text', 'wave-label', 'wave-timer',
       'coin-count', 'boost-fill', 'stat-icons', 'boss-bar-wrap', 'boss-name',
-      'boss-fill', 'announce', 'buff-line', 'reload-line'].forEach(function (id) {
+      'boss-fill', 'announce', 'buff-line', 'reload-line',
+      'drive-hud', 'dh-speed', 'dh-nitro-fill', 'dh-drift'].forEach(function (id) {
         el[id] = document.getElementById(id);
       });
   }
@@ -5060,6 +5463,18 @@ GH.game = (function () {
     }
     el['coin-count'].textContent = '×' + coinsRun;
     el['boost-fill'].style.width = (player.boost * 100) + '%';
+    // skimmer drive cluster: velocity readout, the bottle, the drift call
+    if (el['drive-hud']) {
+      var driving = !!(player.speederOn && player.drive);
+      el['drive-hud'].classList.toggle('hidden', !driving);
+      if (driving) {
+        var dvd = player.drive;
+        el['dh-speed'].textContent = Math.round(Math.max(0, dvd.fwd) * 11);
+        el['dh-nitro-fill'].style.width = Math.round(dvd.nitro * 100) + '%';
+        el['dh-nitro-fill'].classList.toggle('dh-burning', dvd.nitroT > 0);
+        el['dh-drift'].classList.toggle('hidden', !(dvd.drift && dvd.slip > 1.2));
+      }
+    }
     // energy capacitor + ability hotbar
     var enEl = document.getElementById('energy-fill');
     if (enEl) enEl.style.width = GH.clamp(player.energy / player.stats.energyMax * 100, 0, 100) + '%';
@@ -5692,12 +6107,27 @@ GH.game = (function () {
         race: dungeonState.race ? {
           lap: dungeonState.race.lap, gate: dungeonState.race.gate, pos: dungeonState.race.pos,
           countdown: Math.round(dungeonState.race.countdown * 10) / 10,
+          style: Math.round(dungeonState.race.style || 0),
           rivals: dungeonState.race.rivals.map(function (rr) {
             return { dead: !!rr.dead, lap: rr.raceLap, gate: rr.raceGate, hp: Math.round(rr.hp) };
           })
         } : null,
         carrying: dungeonState.carrying,
         barrierOpen: dungeonState.barrierOpen,
+        lit: dungeonState.litR || null,
+        jammed: dungeonState.jammedB || null,
+        switches: dungeonState.switchT || null,
+        beamLinks: dungeonState.beamLinks ? dungeonState.beamLinks.length : 0,
+        items: dungeonState.corePos ? (function () {
+          var out = {};
+          for (var ik in dungeonState.corePos) {
+            out[ik] = {
+              x: Math.round(dungeonState.corePos[ik].x * 10) / 10,
+              z: Math.round(dungeonState.corePos[ik].z * 10) / 10
+            };
+          }
+          return out;
+        })() : null,
         hauler: dungeonState.hauler ? {
           hp: Math.round(dungeonState.hauler.hp), wp: dungeonState.hauler.wp,
           x: Math.round(dungeonState.hauler.x * 10) / 10, z: Math.round(dungeonState.hauler.z * 10) / 10
@@ -5720,6 +6150,16 @@ GH.game = (function () {
       artifactOn: GH.meta.data.world.equipped,
       coinsRun: coinsRun,
       transformed: player ? !!player.speederOn : false,
+      drive: player && player.speederOn && player.drive ? {
+        spd: Math.round(player.drive.fwd * 10) / 10,
+        cap: Math.round(player.drive.top * 10) / 10,
+        nitro: Math.round(player.drive.nitro * 100) / 100,
+        nitroOn: player.drive.nitroT > 0,
+        slip: Math.round(player.drive.slip * 10) / 10,
+        drift: !!player.drive.drift,
+        heading: Math.round(player.drive.heading * 100) / 100,
+        score: Math.round(player.drive.score)
+      } : null,
       race: G.state === 'race' ? { mode: GH.race.mode(), t: Math.round(GH.race.time() * 10) / 10, riders: GH.race.debug() } : null,
       duelWins: GH.meta.data.world.duelWins,
       raceBest: GH.meta.data.world.raceBest,

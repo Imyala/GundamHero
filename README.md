@@ -38,8 +38,8 @@ or move between browsers.
 | Z / X / C | Raise KINETIC / BALLISTIC / ARC ward (your "protection prayers") |
 | Q (or gamepad LB, touch WARD) | Cycle wards |
 | K | Open the pilot skill tree (works mid-run; camp training applies live) |
-| Space | Boost (dash — some frames weaponize it) |
-| Shift / Right-click | Special (per frame: Block, Overdrive, Nova, Lunge, Shade, Frenzy, Blink, Bulwark) |
+| Space | Boost (dash — some frames weaponize it) · **hold to DRIFT in skimmer form** |
+| Shift / Right-click | Special (per frame: Block, Overdrive, Nova, Lunge, Shade, Frenzy, Blink, Bulwark) · **NITRO in skimmer form** |
 | E (expedition) | Interact — camp stations, relays, vaults, race starts |
 | T (gamepad Y, touch TRANS) | Transform between frame and skimmer combat forms — any mode |
 | 1–6 (gem screen) | Pick a socket target |
@@ -117,15 +117,37 @@ world-wide, each a separate dark map one danger rank hotter, drawn from
   buying you seconds; run out and you start over.
 - **FLUXWAYS** — the floor itself shifts: diagonal safe lanes sweep
   across a scorching tile field. Read the pattern and cross.
-- **RACEWAY** — a combat race: fold into skimmer form and run three laps
-  against three rival racer frames, **live fire permitted** — strafe and
-  ram them off the track (they regrid a few gates back), and they shoot
-  back. Finish first to unseal the cache.
-- **CIPHER HALLS** — a puzzle dungeon in the classic contemplative
-  tradition: energy barriers seal three chambers; **pressure plates**
-  open them, and **carryable power cores** (E to lift, they weigh on the
-  servos) can hold a plate down while you walk through. The last door
-  needs two plates at once.
+- **RACEWAY** — a combat race that drives like a racing game. The
+  skimmer runs a real handling model: momentum, a throttle that takes a
+  second to wind up, and **drift** on held SPACE — the tail steps out,
+  skid ribbons scorch the track, and every second spent sideways at
+  speed **banks nitro** (SHIFT burns the bottle for a +50% top-speed
+  surge). Hit a wall and you lose your speed *and* your bottle. The
+  start is a three-lamp gantry: first touch the throttle inside the
+  last 0.7s of the countdown for a **PERFECT LAUNCH** that primes your
+  nitro. Speed is drawn, not stated — the camera pulls back and the FOV
+  blooms with velocity, world-streaks rip past the hull, and the drive
+  cluster reads out VEL, the bottle, and the drift call. Three laps
+  against three rivals, live fire permitted (they regrid a few gates
+  back); the finish pays a **style bonus** for your drift ledger.
+- **CIPHER HALLS** — a real puzzle dungeon in the Talos/Portal
+  tradition: each chamber **teaches one element in isolation, then the
+  last combines and subverts them**. The kit: **pressure plates** and
+  carryable **power cores** to weight them; **beam emitters, carryable
+  relays and receptors** (light has limited reach, and walls or closed
+  seals cut it — bridge the gap by placing relays on true sightlines);
+  the single **signal jammer**, which forces any unhardened seal open
+  while it sits aimed at it — commit it, pass through, reach back
+  across the thin gap to retrieve it and hear the seal slam behind you;
+  **timed switches** that hold a seal open for seconds; and violet
+  **matter screens** the pilot walks through but carried cargo cannot
+  (they also keep you from stranding your tools where you can't follow).
+  Amber-lit seals are hardened — the jammer won't take them; green
+  conduit fences only block light, not pilots. Carrying cargo slows the
+  servos and refuses the transform. The glacier hall is the teaching
+  set; the null reach runs a **master variant** that turns every taught
+  rule on its head — retrieve-through-the-gap tricks, a timed sprint,
+  and a final chamber wanting beam, jam, and weight at once.
 - **CONVOY** — escort the six-legged hauler along its route: it only
   rolls while you ride close, ambushes trip at marked waypoints, and
   hunters converge on it, not you. Dock it to clear.
@@ -179,10 +201,14 @@ a pack is a choice, not a default. There are no waves and no timer:
 ### Skimmer transform — a true combat form
 Every frame can fold into an anti-grav **skimmer** (T, gamepad Y, touch
 TRANS) in *any* mode, arenas included — a real mech↔vehicle combat
-transform, not just traversal. Skimmer form trades armor for tempo: ~2.6×
-speed, your hull becomes a ram, and twin **strafe cannons** auto-fire along
-your aim — but you take **+25% damage** until you fold back. Weave through
-the swarm gunning, transform back to bring the full weapon suite to bear.
+transform, not just traversal. Skimmer form trades armor for tempo — and it
+*drives*: a real handling model with momentum and a wound-up throttle
+(~3.3× speed flat out), **drift on held SPACE** (lateral grip drops, the
+tail steps out, sideways time banks **nitro**), **SHIFT** to burn the
+bottle, and walls that take your speed and your charge. Your hull becomes
+a ram and twin **strafe cannons** auto-fire along your aim — but you take
+**+25% damage** until you fold back. The camera pulls wide with velocity
+and the drive cluster reads VEL / bottle / drift call bottom-right.
 
 ### Racing
 Two race sites use the skimmer form:
