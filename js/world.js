@@ -53,7 +53,8 @@ GH.world = (function () {
         arch: dg.arch, tier: dg.tier,
         danger: Math.min(4, pz.danger + dg.tier),
         size: arch.size,
-        name: W.stageFor(dg.zone).name + ' ' + arch.name + (dg.tier === 2 ? ' II' : '')
+        name: W.stageFor(dg.zone).name + ' ' + arch.name +
+          (dg.tier > 1 ? ' ' + (['', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][dg.tier - 1] || 'T' + dg.tier) : '')
       };
     }
     var zn = W.zoneById(zoneId);
@@ -124,8 +125,10 @@ GH.world = (function () {
         var gp = gatePos(sides[to], size);
         lay.gates.push({ to: to, x: gp.x, z: gp.z, side: sides[to] });
       }
-      // THREE dungeon gates per territory: the depths plus two more
-      // archetypes from the zone's set, scattered deep in the map
+      // FOUR dungeon gates per territory: the depths plus three more
+      // archetypes from the zone's set. Each gate leads to the NEXT
+      // uncleared tier of its dungeon — clears ascend the gate forever.
+      var dgTiers = (GH.meta.data.world && GH.meta.data.world.dgTier) || {};
       var archList = ['depths'].concat(GH.dungeons.ZONE_SETS[zoneId] || []);
       archList.forEach(function (arch, ai) {
         var dgx = (rnd() - 0.5) * (size * 0.62);
@@ -136,7 +139,8 @@ GH.world = (function () {
           if (GH.dist2(dgx, dgz, W.CAMP.x, W.CAMP.z) < 45 * 45) dgz -= 110;
           if (GH.dist2(dgx, dgz, W.CIRCUIT.x, W.CIRCUIT.z) < 50 * 50) dgx -= 110;
         }
-        lay.gates.push({ to: GH.dungeons.makeId(zoneId, arch, 1), x: dgx, z: dgz, arch: arch });
+        var tier = (dgTiers[GH.dungeons.baseId(zoneId, arch)] || 0) + 1;
+        lay.gates.push({ to: GH.dungeons.makeId(zoneId, arch, tier), x: dgx, z: dgz, arch: arch, tier: tier });
       });
 
       // husk nests scattered wide
@@ -247,9 +251,31 @@ GH.world = (function () {
         lay.flux = GH.dungeons.genFlux(size);
         lay.chest = { x: 0, z: -half + 22 };
         lay.packs.push({ x: 0, z: -half + 40, n: 3 }); // the far-side welcome
+      } else if (arch2 === 'raceway') {
+        lay.raceway = GH.dungeons.genRaceway(size);
+        lay.chest = { x: 0, z: 0 }; // the winner's circle, mid-infield
+      } else if (arch2 === 'halls') {
+        lay.halls = GH.dungeons.genHalls(size);
+        lay.chest = { x: 0, z: -half + 24 }; // beyond the third barrier
+      } else if (arch2 === 'convoy') {
+        lay.convoyPath = GH.dungeons.genConvoy(zoneId, size);
+        lay.chest = { x: 0, z: -half + 24 }; // where the hauler docks
+      } else if (arch2 === 'crucible') {
+        lay.crucible = { bosses: 3, x: 0, z: -20 };
+        lay.chest = { x: 0, z: -half + 24 };
+      } else if (arch2 === 'heist') {
+        lay.relic = { x: 0, z: -half + 30 }; // the prize, deep in
+        lay.noChest = true; // the exit gate pays the heist directly
+        for (var hh = 0; hh < 4; hh++) {
+          lay.packs.push({
+            x: (rnd() - 0.5) * (size - 70),
+            z: (rnd() - 0.5) * (size - 90),
+            n: 2 + Math.floor(rnd() * 2)
+          });
+        }
       }
       // every non-depths dungeon pays out at a chest (flux set its own)
-      if (!lay.chest && arch2 !== 'depths') {
+      if (!lay.chest && arch2 !== 'depths' && !lay.noChest) {
         lay.chest = arch2 === 'labyrinth' ? { x: lay.heart.x, z: lay.heart.z } :
           arch2 === 'gauntlet' ? { x: lay.checkpoints[lay.checkpoints.length - 1].x, z: lay.checkpoints[lay.checkpoints.length - 1].z } :
           { x: 0, z: -half + 26 };
@@ -355,7 +381,8 @@ GH.world = (function () {
     // Mazes and flux floors keep their arenas clean.
     var rnd = zrng('props:' + zoneId);
     var propCount = info.dungeon ?
-      (info.arch === 'labyrinth' || info.arch === 'fluxways' ? 0 : 46) : 150;
+      (info.arch === 'labyrinth' || info.arch === 'fluxways' ||
+        info.arch === 'raceway' || info.arch === 'halls' ? 0 : 46) : 150;
     for (var i = 0; i < propCount; i++) {
       var kind = st.props[Math.floor(rnd() * st.props.length)];
       var p = GH.models.props[kind]();
@@ -459,6 +486,75 @@ GH.world = (function () {
       chestMesh.position.set(lay.chest.x, 0, lay.chest.z);
       group.add(chestMesh);
     }
+    // RACEWAY: gate pylons around the ring, gold start arch
+    if (lay.raceway) {
+      var rw = lay.raceway;
+      for (var rg = 0; rg < rw.gates; rg++) {
+        var rpt = rw.path[Math.floor(rg * rw.path.length / rw.gates)];
+        var rnx = rw.path[(Math.floor(rg * rw.path.length / rw.gates) + 1) % rw.path.length];
+        var rang = Math.atan2(rnx.x - rpt.x, rnx.z - rpt.z);
+        var rpg = GH.models.buildPylonPair(rg === 0 ? 0xffd050 : 0x60c8ff);
+        rpg.position.set(rpt.x, 0, rpt.z);
+        rpg.rotation.y = rang;
+        group.add(rpg);
+      }
+    }
+    // CIPHER HALLS: solid walls, energy barriers, plates, power cores
+    var barrierMeshes = null, plateMeshes = null, coreMeshes = null, relicMesh = null;
+    if (lay.halls) {
+      var hallWallMat = GH.assets.lambert({ map: tex.wall });
+      lay.halls.walls.forEach(function (wl) {
+        var wm = new THREE.Mesh(new THREE.BoxGeometry(wl.w, 6, wl.d), hallWallMat);
+        wm.position.set(wl.x, 3, wl.z);
+        group.add(wm);
+      });
+      barrierMeshes = {};
+      lay.halls.barriers.forEach(function (br) {
+        var bm = new THREE.Mesh(new THREE.BoxGeometry(br.w, 5, br.d * 0.7),
+          GH.assets.basic(0x60c8ff, { transparent: true, opacity: 0.4 }));
+        bm.position.set(br.x, 2.5, br.z);
+        group.add(bm);
+        barrierMeshes[br.id] = bm;
+      });
+      plateMeshes = {};
+      lay.halls.plates.forEach(function (pl) {
+        var pm = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 0.3, 8),
+          GH.assets.lambert({ color: 0x3a4450 }));
+        pm.position.set(pl.x, 0.15, pl.z);
+        var pmGlow = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.14, 8),
+          GH.assets.basic(0xffd050, { transparent: true, opacity: 0.5 }));
+        pmGlow.position.y = 0.24;
+        pm.add(pmGlow);
+        pm.userData.glow = pmGlow;
+        group.add(pm);
+        plateMeshes[pl.id] = pm;
+      });
+      coreMeshes = {};
+      lay.halls.cores.forEach(function (co) {
+        var cm = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1),
+          GH.assets.lambert({ color: 0xffd050, emissive: 0x806010, emissiveIntensity: 0.7 }));
+        cm.position.set(co.x, 0.8, co.z);
+        group.add(cm);
+        coreMeshes[co.id] = cm;
+      });
+    }
+    // CONVOY: waypoint markers along the hauler's route
+    if (lay.convoyPath) {
+      lay.convoyPath.forEach(function (wp) {
+        var wpd = new THREE.Mesh(new THREE.CircleGeometry(2.2, 12),
+          new THREE.MeshBasicMaterial({ color: wp.ambush ? 0xc05050 : 0x60c8ff, transparent: true, opacity: 0.2, depthWrite: false }));
+        wpd.rotation.x = -Math.PI / 2;
+        wpd.position.set(wp.x, 0.05, wp.z);
+        group.add(wpd);
+      });
+    }
+    // HEIST: the relic itself, styled after its territory
+    if (lay.relic) {
+      relicMesh = GH.models.buildObjective(GH.dungeons.OBJECTIVES[info.parent].kind);
+      relicMesh.scale.setScalar(0.7);
+      relicMesh.position.set(lay.relic.x, 0, lay.relic.z);
+      group.add(relicMesh);
+    }
 
     // ---- overworld landmarks: ruins, hulks, stains, roads ----
     if (!info.dungeon) {
@@ -543,6 +639,8 @@ GH.world = (function () {
       group: group, nestMeshes: nestMeshes, vaultMeshes: vaultMeshes,
       chestMesh: chestMesh, objectiveMesh: objectiveMesh,
       fluxTiles: fluxTiles, cpMeshes: cpMeshes,
+      barrierMeshes: barrierMeshes, plateMeshes: plateMeshes,
+      coreMeshes: coreMeshes, relicMesh: relicMesh,
       layout: lay, info: info
     };
   };
@@ -571,6 +669,13 @@ GH.world = (function () {
     }
     if (layout.chest) {
       list.push({ kind: 'chest', x: layout.chest.x, z: layout.chest.z, label: 'OPEN THE REWARD CACHE' });
+    }
+    if (layout.raceway) {
+      var start = layout.raceway.path[0];
+      list.push({ kind: 'racestart', x: start.x, z: start.z, label: 'START THE RACE — 3 LAPS, LIVE FIRE' });
+    }
+    if (layout.relic) {
+      list.push({ kind: 'relic', x: layout.relic.x, z: layout.relic.z, label: 'SEIZE THE RELIC (THE ALARM WILL SOUND)' });
     }
     return list;
   };

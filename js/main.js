@@ -158,6 +158,10 @@
         (GH.game.state === 'play' || GH.game.state === 'title')) {
         openSkills(GH.game.state === 'play');
       }
+      if (e.code === 'KeyM' &&
+        (GH.game.state === 'play' || GH.game.state === 'title')) {
+        openWorldMap(GH.game.state === 'play');
+      }
       if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
       if (e.code === 'KeyF') {
         document.getElementById('crt-overlay').classList.toggle('off');
@@ -293,7 +297,7 @@
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
     'trials-screen', 'season-screen', 'hub-screen', 'save-screen',
-    'reward-screen', 'pause-screen', 'end-screen', 'skills-screen'];
+    'reward-screen', 'pause-screen', 'end-screen', 'skills-screen', 'map-screen'];
 
   function show(id) {
     SCREENS.forEach(function (s) {
@@ -627,6 +631,9 @@
     var comp = GH.progress.completion();
     var b = GH.meta.data.broker;
     var cards = [
+      { id: 'hub-map', glyph: '🗺', name: 'WORLD MAP',
+        sub: Object.keys(GH.meta.data.world.dgTier || {}).length + '/24 dungeons ascended',
+        open: function () { openWorldMap(false); } },
       { id: 'hub-skills', glyph: '❈', name: 'PILOT TRAINING',
         sub: 'Pilot Lv ' + GH.skills.pilotProgress().lvl +
           (GH.meta.data.skillPoints > 0 ? ' · ' + GH.meta.data.skillPoints + ' POINTS READY' : ' · skill tree'),
@@ -998,6 +1005,59 @@
   }
 
   // ----------------------------------------------------------------
+  // WORLD MAP — every territory, its dungeons, tiers, and today's
+  // phenomena, on one screen (M in the field, or from the hub).
+  function openWorldMap(fromPlay) {
+    GH.audio.card();
+    if (fromPlay) expEntry = 'map';
+    if (GH.game.state !== 'play' || fromPlay) GH.game.state = 'hangar';
+    renderWorldMap();
+    show('map-screen');
+  }
+
+  function renderWorldMap() {
+    var w = GH.meta.data.world;
+    var weather = GH.world.weatherToday();
+    var harrow = w.harrowDay !== GH.world.dayStamp() ? GH.world.harrowToday() : null;
+    var cleared = 0, totalTiers = 0;
+    for (var k in (w.dgTier || {})) { cleared++; totalTiers += w.dgTier[k]; }
+    document.getElementById('map-head').innerHTML =
+      'NESTS CLEANSED <b>' + Object.keys(w.nests).length + '/' + GH.world.totalNests() + '</b>' +
+      ' · DUNGEONS ASCENDED <b>' + cleared + '/24</b>' +
+      ' · TOTAL TIERS CLIMBED <b>' + totalTiers + '</b>' +
+      (harrow ? ' · <span class="mp-harrow">THE HARROW: ' + GH.world.stageFor(harrow.zone).name + '</span>' : '');
+    var wrap = document.getElementById('map-zones');
+    wrap.innerHTML = '';
+    GH.world.ZONES.forEach(function (zn) {
+      var st = GH.world.stageFor(zn.id);
+      var card = document.createElement('div');
+      card.className = 'mp-zone';
+      var head = '<div class="mp-name">' + st.name +
+        ' <span class="mp-danger">DANGER ' + ['I', 'II', 'III', 'IV'][zn.danger - 1] + '</span></div>';
+      if (weather[zn.id]) {
+        head += '<div class="mp-weather">☁ ' + weather[zn.id].name + ' — ' + weather[zn.id].desc + '</div>';
+      }
+      if (harrow && harrow.zone === zn.id) {
+        head += '<div class="mp-harrow">☠ THE HARROW ROOSTS HERE TODAY</div>';
+      }
+      var rows = '';
+      var archList = ['depths'].concat(GH.dungeons.ZONE_SETS[zn.id] || []);
+      archList.forEach(function (arch) {
+        var tier = (w.dgTier || {})[GH.dungeons.baseId(zn.id, arch)] || 0;
+        var next = tier + 1;
+        var mods = GH.dungeons.modsFor(GH.dungeons.baseId(zn.id, arch), next);
+        rows += '<div class="mp-dg' + (tier > 0 ? ' cleared' : '') + '">' +
+          '<span class="mp-arch">' + GH.dungeons.ARCHETYPES[arch].name + '</span>' +
+          '<span class="mp-tier">' + (tier > 0 ? 'CLIMBED T' + tier + ' · NEXT T' + next : 'UNCONQUERED') + '</span>' +
+          (mods.length ? '<span class="mp-mods">' + mods.map(function (m) { return m.name; }).join(' · ') + '</span>' : '') +
+          '</div>';
+      });
+      card.innerHTML = head + rows;
+      wrap.appendChild(card);
+    });
+  }
+
+  // ----------------------------------------------------------------
   // PILOT TRAINING — the skill tree. Reached from play (K), the hub,
   // or the title; backing out of an in-play open resumes the run.
   function openSkills(fromPlay) {
@@ -1123,6 +1183,7 @@
     document.getElementById('btn-profile').onclick = cycleProfile;
     // meta screens live under the hub now (or under a camp station)
     document.getElementById('btn-season-back').onclick = openHub;
+    document.getElementById('btn-map-back').onclick = metaBack('map', openHub);
     document.getElementById('btn-skills-back').onclick = metaBack('skills', openHub);
     document.getElementById('btn-respec').onclick = function () {
       if (GH.skills.respec()) {

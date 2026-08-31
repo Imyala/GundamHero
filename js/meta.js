@@ -52,6 +52,7 @@ GH.meta = (function () {
         relaysHeld: {},     // relay id -> true (siege won)
         vaults: {},         // vault id -> true (breached, stays open)
         dungeons: {},       // dungeon zone id (with tier) -> cleared
+        dgTier: {},         // dungeon base id -> highest tier cleared (ascension)
         artifacts: {},      // artifact id -> owned
         equipped: null,     // one artifact slot
         exp: null,          // serialized expedition character

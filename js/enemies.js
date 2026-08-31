@@ -55,6 +55,13 @@ GH.enemyDefs = {
     behavior: 'boss', slamInterval: 7, summonInterval: 6, summons: 'shardling', summonCount: 5
   },
 
+  // ---- RACEWAY rivals: hostile racer frames in vehicle form ----
+  racer: {
+    name: 'Rival Racer',
+    hp: 160, speed: 14, damage: 10, radius: 1.1, xp: 10, mass: 4,
+    behavior: 'racer', shootInterval: 2.6, shotSpeed: 16
+  },
+
   // ---- THE HARROW — the world boss that roams the Shattered Reach daily ----
   harrow: {
     name: 'THE HARROW', boss: true,
@@ -88,7 +95,15 @@ GH.enemyBuilders = {
   volt: function () { return GH.models.buildVolt(); },
   warden: function () { return GH.models.buildWarden(); },
   carapace: function () { return GH.models.buildCarapace(); },
-  harrow: function () { return GH.models.buildHarrow(); }
+  harrow: function () { return GH.models.buildHarrow(); },
+  racer: function () {
+    var liveries = [
+      { body: 0xb03838, accent: 0xffd050, dark: 0x381414 },
+      { body: 0x3870b0, accent: 0x80ffd0, dark: 0x142038 },
+      { body: 0x50a048, accent: 0xf0f0f0, dark: 0x1a3018 }
+    ];
+    return GH.models.buildSpeeder(liveries[Math.floor(Math.random() * liveries.length)]);
+  }
 };
 
 // corrupt bosses reuse the mech builder in corrupt colors at boss scale

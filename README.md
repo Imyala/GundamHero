@@ -98,9 +98,9 @@ because every map is generated in-memory, crossing a gate is a blink of
 black, **never a loading screen**. Territories carry **fixed danger
 ratings I–IV** — the world doesn't scale to you; you grow into it.
 
-Every territory hides **three violet dungeon gates** — 18 dungeons
+Every territory hides **four violet dungeon gates** — 24 dungeons
 world-wide, each a separate dark map one danger rank hotter, drawn from
-six archetypes so no two runs play alike:
+**eleven archetypes** so no two runs play alike:
 
 - **DEPTHS** — the classic crawl: guardian packs, the territory's
   **sealed vault** mid-depth, and its **corrupt-frame lair** at the far
@@ -117,12 +117,37 @@ six archetypes so no two runs play alike:
   buying you seconds; run out and you start over.
 - **FLUXWAYS** — the floor itself shifts: diagonal safe lanes sweep
   across a scorching tile field. Read the pattern and cross.
+- **RACEWAY** — a combat race: fold into skimmer form and run three laps
+  against three rival racer frames, **live fire permitted** — strafe and
+  ram them off the track (they regrid a few gates back), and they shoot
+  back. Finish first to unseal the cache.
+- **CIPHER HALLS** — a puzzle dungeon in the classic contemplative
+  tradition: energy barriers seal three chambers; **pressure plates**
+  open them, and **carryable power cores** (E to lift, they weigh on the
+  servos) can hold a plate down while you walk through. The last door
+  needs two plates at once.
+- **CONVOY** — escort the six-legged hauler along its route: it only
+  rolls while you ride close, ambushes trip at marked waypoints, and
+  hunters converge on it, not you. Dock it to clear.
+- **CRUCIBLE** — a boss rush: corrupted frames enter the arena one by
+  one. Three bouts, no breather worth the name.
+- **HEIST** — seize the territory's relic off its plinth deep in the
+  vaults; the alarm howls, the halls flood, and the clock runs. Make the
+  exit gate with the relic for the payout.
 
 Objective dungeons pay out at a **reward cache** (banked salvage + a gem;
-first clears add a bonus cache) — and every tier-1 clear tears open a red
-**DEEPER gate**: tier II of the same dungeon, harder garrisons, richer
-loot, and in the Depths a corrupt-frame rematch. The exit gate always
-walks you back to the surface.
+first clears add a bonus cache) — and every clear **ascends the dungeon
+forever**: its overworld gate now leads to the next tier — compounding
+garrison strength, richer loot, and from tier 2 up a stack of seeded
+**modifiers** (FRENZIED, ARMORED, VOLATILE, SWIFT, REGENERATING, THORNED,
+DAMPENED, GILDED — up to four at once) that you can preview on the world
+map before stepping in. The climb never ends; how high you take each
+dungeon is the long game. The exit gate always walks you back to the
+surface.
+
+Press **M** for the **world map**: every territory with its danger
+rating, today's weather front and Harrow roost, and all 24 dungeons with
+their climbed tiers and the modifiers waiting on the next one.
 
 Hostiles are **territorial**: they idle and wander around their nests
 until you come close enough to be noticed (or wound one), chase while

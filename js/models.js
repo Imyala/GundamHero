@@ -576,6 +576,28 @@ GH.models = (function () {
     return g;
   };
 
+  // CONVOY hauler: a heavy six-legged cargo crawler
+  M.buildHauler = function () {
+    var g = new THREE.Group();
+    var hull = box(3.2, 2.0, 4.6, 0x6a6248); hull.position.y = 2.0;
+    var cab = box(2.2, 1.2, 1.4, 0x7a7258); cab.position.set(0, 3.2, 1.8);
+    var lamp = new THREE.Mesh(new THREE.SphereGeometry(0.24, 6, 5),
+      GH.assets.basic(0xffd050, { transparent: true, opacity: 0.95 }));
+    lamp.position.set(0, 4.0, 2.2);
+    g.add(hull, cab, lamp);
+    var legs = [];
+    [[-1.6, 1.6], [1.6, 1.6], [-1.6, 0], [1.6, 0], [-1.6, -1.6], [1.6, -1.6]].forEach(function (p) {
+      var leg = box(0.5, 1.6, 0.5, 0x4a4436);
+      leg.position.set(p[0], 0.8, p[1]);
+      g.add(leg);
+      legs.push(leg);
+    });
+    g.userData.legs = legs;
+    g.userData.core = lamp;
+    blobShadow(g, 5);
+    return g;
+  };
+
   // BASTION objectives: the ancient relic on its pedestal, per flavor
   M.buildObjective = function (kind) {
     var g = new THREE.Group();

@@ -769,6 +769,41 @@ html, body {
   color: #fff; line-height: 48px;
 }
 
+/* ---------------- world map ---------------- */
+
+#map-head {
+  font-family: "Times New Roman", serif; font-size: 14px;
+  color: #c8c8d8; text-shadow: 1px 1px 0 #000;
+  margin-bottom: 10px; letter-spacing: 1px;
+}
+#map-zones {
+  display: grid; grid-template-columns: repeat(3, 300px);
+  gap: 10px; justify-content: center;
+  max-height: 62vh; overflow-y: auto; padding: 4px;
+}
+.mp-zone {
+  background: rgba(10, 14, 30, 0.9);
+  border: 1px solid #3a4456;
+  padding: 8px 10px; text-align: left;
+}
+.mp-name {
+  font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px;
+  color: #f0f0f6; text-shadow: 1px 1px 0 #000;
+}
+.mp-danger { color: #c86060; font-size: 11px; }
+.mp-weather { font-size: 11px; color: #80d8ff; margin-top: 2px; }
+.mp-harrow { font-size: 11px; color: #ff5040; font-weight: bold; }
+.mp-dg {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+  border-top: 1px solid #222833;
+  padding: 4px 0; margin-top: 4px;
+  font-size: 11px;
+}
+.mp-arch { color: #c050ff; font-weight: bold; min-width: 92px; }
+.mp-dg.cleared .mp-arch { color: #60c890; }
+.mp-tier { color: #a8a8b6; }
+.mp-mods { color: #ffd050; width: 100%; }
+
 /* ---------------- skill tree ---------------- */
 
 #skills-head {
@@ -1090,6 +1125,14 @@ html, body {
     <div id="log-head"></div>
     <div id="log-body"></div>
     <button id="btn-collection-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== WORLD MAP ===================== -->
+  <div id="map-screen" class="screen hidden">
+    <h2 class="select-title">THE&nbsp;SHATTERED&nbsp;REACH</h2>
+    <div id="map-head"></div>
+    <div id="map-zones"></div>
+    <button id="btn-map-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== SKILL TREE ===================== -->
@@ -2284,6 +2327,28 @@ GH.models = (function () {
     return g;
   };
 
+  // CONVOY hauler: a heavy six-legged cargo crawler
+  M.buildHauler = function () {
+    var g = new THREE.Group();
+    var hull = box(3.2, 2.0, 4.6, 0x6a6248); hull.position.y = 2.0;
+    var cab = box(2.2, 1.2, 1.4, 0x7a7258); cab.position.set(0, 3.2, 1.8);
+    var lamp = new THREE.Mesh(new THREE.SphereGeometry(0.24, 6, 5),
+      GH.assets.basic(0xffd050, { transparent: true, opacity: 0.95 }));
+    lamp.position.set(0, 4.0, 2.2);
+    g.add(hull, cab, lamp);
+    var legs = [];
+    [[-1.6, 1.6], [1.6, 1.6], [-1.6, 0], [1.6, 0], [-1.6, -1.6], [1.6, -1.6]].forEach(function (p) {
+      var leg = box(0.5, 1.6, 0.5, 0x4a4436);
+      leg.position.set(p[0], 0.8, p[1]);
+      g.add(leg);
+      legs.push(leg);
+    });
+    g.userData.legs = legs;
+    g.userData.core = lamp;
+    blobShadow(g, 5);
+    return g;
+  };
+
   // BASTION objectives: the ancient relic on its pedestal, per flavor
   M.buildObjective = function (kind) {
     var g = new THREE.Group();
@@ -2835,6 +2900,7 @@ GH.meta = (function () {
         relaysHeld: {},     // relay id -> true (siege won)
         vaults: {},         // vault id -> true (breached, stays open)
         dungeons: {},       // dungeon zone id (with tier) -> cleared
+        dgTier: {},         // dungeon base id -> highest tier cleared (ascension)
         artifacts: {},      // artifact id -> owned
         equipped: null,     // one artifact slot
         exp: null,          // serialized expedition character
@@ -3262,6 +3328,13 @@ GH.enemyDefs = {
     behavior: 'boss', slamInterval: 7, summonInterval: 6, summons: 'shardling', summonCount: 5
   },
 
+  // ---- RACEWAY rivals: hostile racer frames in vehicle form ----
+  racer: {
+    name: 'Rival Racer',
+    hp: 160, speed: 14, damage: 10, radius: 1.1, xp: 10, mass: 4,
+    behavior: 'racer', shootInterval: 2.6, shotSpeed: 16
+  },
+
   // ---- THE HARROW — the world boss that roams the Shattered Reach daily ----
   harrow: {
     name: 'THE HARROW', boss: true,
@@ -3295,7 +3368,15 @@ GH.enemyBuilders = {
   volt: function () { return GH.models.buildVolt(); },
   warden: function () { return GH.models.buildWarden(); },
   carapace: function () { return GH.models.buildCarapace(); },
-  harrow: function () { return GH.models.buildHarrow(); }
+  harrow: function () { return GH.models.buildHarrow(); },
+  racer: function () {
+    var liveries = [
+      { body: 0xb03838, accent: 0xffd050, dark: 0x381414 },
+      { body: 0x3870b0, accent: 0x80ffd0, dark: 0x142038 },
+      { body: 0x50a048, accent: 0xf0f0f0, dark: 0x1a3018 }
+    ];
+    return GH.models.buildSpeeder(liveries[Math.floor(Math.random() * liveries.length)]);
+  }
 };
 
 // corrupt bosses reuse the mech builder in corrupt colors at boss scale
@@ -4326,14 +4407,15 @@ GH.music = (function () {
 GH.dungeons = (function () {
   var D = {};
 
-  // which two extra archetypes each territory offers (gate 0 is always depths)
+  // which three extra archetypes each territory offers (gate 0 is always
+  // depths) — all eleven types are represented somewhere in the world
   D.ZONE_SETS = {
-    wreck: ['hive', 'gauntlet'],
-    glacier: ['labyrinth', 'bastion'],
-    cloister: ['bastion', 'hive'],
-    ember: ['gauntlet', 'fluxways'],
-    storm: ['fluxways', 'labyrinth'],
-    null: ['labyrinth', 'hive']
+    wreck: ['hive', 'gauntlet', 'raceway'],
+    glacier: ['labyrinth', 'bastion', 'halls'],
+    cloister: ['bastion', 'convoy', 'hive'],
+    ember: ['fluxways', 'crucible', 'gauntlet'],
+    storm: ['raceway', 'fluxways', 'convoy'],
+    null: ['halls', 'crucible', 'heist']
   };
 
   D.ARCHETYPES = {
@@ -4342,8 +4424,44 @@ GH.dungeons = (function () {
     bastion: { name: 'BASTION', desc: 'DEFEND the relic through four waves', size: 200 },
     labyrinth: { name: 'LABYRINTH', desc: 'find the heart of the maze', size: 230 },
     gauntlet: { name: 'GAUNTLET', desc: 'a timed rush — ride the checkpoints', size: 260 },
-    fluxways: { name: 'FLUXWAYS', desc: 'the floor shifts — cross on the safe lanes', size: 200 }
+    fluxways: { name: 'FLUXWAYS', desc: 'the floor shifts — cross on the safe lanes', size: 200 },
+    raceway: { name: 'RACEWAY', desc: 'a combat race — three laps, live fire', size: 300 },
+    halls: { name: 'CIPHER HALLS', desc: 'plates, cores, barriers — think your way through', size: 200 },
+    convoy: { name: 'CONVOY', desc: 'ESCORT the hauler through the ambush line', size: 260 },
+    crucible: { name: 'CRUCIBLE', desc: 'a boss rush — corrupt frames back to back', size: 180 },
+    heist: { name: 'HEIST', desc: 'seize the relic, then outrun the alarm', size: 240 }
   };
+
+  // ---------------------------------------------------------------
+  // TIER MODIFIERS — every ascension past tier 1 stacks another one,
+  // seeded per dungeon per tier so a given climb is always the same.
+  // ---------------------------------------------------------------
+  D.MODIFIERS = [
+    { id: 'frenzied', name: 'FRENZIED', desc: 'hostiles attack faster' },
+    { id: 'armored', name: 'ARMORED', desc: 'hostiles carry +40% hull' },
+    { id: 'volatile', name: 'VOLATILE', desc: 'hostiles detonate on death' },
+    { id: 'swift', name: 'SWIFT', desc: 'hostiles move +25% faster' },
+    { id: 'regen', name: 'REGENERATING', desc: 'hostiles knit themselves back together' },
+    { id: 'thorns', name: 'THORNED', desc: 'melee hits sting you back' },
+    { id: 'dampened', name: 'DAMPENED', desc: 'your energy regenerates slower here' },
+    { id: 'gilded', name: 'GILDED', desc: 'hostiles shed bonus salvage' }
+  ];
+
+  // tier N carries min(N-1, 4) modifiers, deterministically
+  D.modsFor = function (baseId, tier) {
+    var n = Math.min(Math.max(0, tier - 1), 4);
+    if (n === 0) return [];
+    var rnd = rng('mods:' + baseId + ':' + tier);
+    var pool = D.MODIFIERS.slice();
+    var out = [];
+    while (out.length < n && pool.length) {
+      out.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]);
+    }
+    return out;
+  };
+
+  // base id (no tier) — the ascension ladder is keyed on this
+  D.baseId = function (zone, arch) { return 'dg_' + zone + '_' + arch; };
 
   // what the BASTION relic is, per territory (all original fiction)
   D.OBJECTIVES = {
@@ -4355,18 +4473,23 @@ GH.dungeons = (function () {
     null: { name: 'THE VOID ARCHIVE', kind: 'archive' }
   };
 
-  // tier scaling: tougher garrisons, richer clears
+  // tier scaling: unbounded — every ascension compounds the garrison
   D.tierMult = function (tier) {
-    return { hp: tier === 2 ? 1.7 : 1, dmg: tier === 2 ? 1.35 : 1, loot: tier };
+    var t = Math.max(1, tier || 1);
+    return {
+      hp: Math.pow(1.55, t - 1),
+      dmg: Math.pow(1.25, t - 1),
+      loot: t
+    };
   };
 
   // dungeon zone ids: dg_<zone>_<archetype>_t<tier>
   D.makeId = function (zone, arch, tier) { return 'dg_' + zone + '_' + arch + '_t' + (tier || 1); };
 
   D.parseId = function (id) {
-    var m = /^dg_([a-z]+)_([a-z]+)_t([12])$/.exec(id);
+    var m = /^dg_([a-z]+)_([a-z]+)_t(\d+)$/.exec(id);
     if (!m) return null;
-    return { zone: m[1], arch: m[2], tier: parseInt(m[3], 10) };
+    return { zone: m[1], arch: m[2], tier: Math.max(1, parseInt(m[3], 10)) };
   };
 
   // seeded rng (self-contained so generators stay pure)
@@ -4483,6 +4606,98 @@ GH.dungeons = (function () {
     };
   };
 
+  // ---------------------------------------------------------------
+  // RACEWAY: a wide ring circuit with ordered gates. Rivals follow the
+  // centerline; everyone's lap/gate progress uses the same points.
+  // ---------------------------------------------------------------
+  D.genRaceway = function (size) {
+    var r = size * 0.36;
+    var pts = [];
+    for (var i = 0; i < 72; i++) {
+      var a = (i / 72) * Math.PI * 2 + Math.PI / 2; // start line by the south entry
+      var rr = r + Math.sin(a * 4) * (size * 0.05);
+      pts.push({ x: Math.cos(a) * rr, z: Math.sin(a) * rr, a: a });
+    }
+    return { path: pts, gates: 8, laps: 3, r: r };
+  };
+
+  // ---------------------------------------------------------------
+  // CIPHER HALLS: a handcrafted three-chamber puzzle, walls as solid
+  // blockers, energy barriers opened by pressure plates, and carryable
+  // power cores that can hold a plate down for you.
+  // Coordinates are fractions of the map half-size (mirrored later).
+  // ---------------------------------------------------------------
+  D.genHalls = function (size) {
+    var h = size / 2;
+    var u = size / 20; // one wall unit
+    var walls = [];    // static rects {x, z, w, d}
+    var addWall = function (x, z, w, d) { walls.push({ x: x, z: z, w: w, d: d }); };
+    // three chamber dividers across the map (entry at south)
+    addWall(-h * 0.55, h * 0.30, h * 0.9, u);  // divider 1, gap on the right
+    addWall(h * 0.62, h * 0.30, h * 0.75, u);
+    addWall(h * 0.55, -h * 0.15, h * 0.9, u);  // divider 2, gap on the left
+    addWall(-h * 0.62, -h * 0.15, h * 0.75, u);
+    addWall(-h * 0.55, -h * 0.60, h * 0.9, u); // divider 3, gap on the right
+    addWall(h * 0.62, -h * 0.60, h * 0.75, u);
+    return {
+      walls: walls,
+      // barriers close the three gaps until their plates are held
+      barriers: [
+        { id: 'b1', x: h * 0.12, z: h * 0.30, w: h * 0.25, d: u, plate: 'p1' },
+        { id: 'b2', x: -h * 0.12, z: -h * 0.15, w: h * 0.25, d: u, plate: 'p2' },
+        { id: 'b3', x: h * 0.12, z: -h * 0.60, w: h * 0.25, d: u, plates: ['p3', 'p4'] }
+      ],
+      // chamber 1: a plate right beside its barrier (stand OR weight it)
+      // chamber 2: the plate is far from the gap — you need the core
+      // chamber 3: two plates at once — core on one, pilot on the other
+      plates: [
+        { id: 'p1', x: -h * 0.30, z: h * 0.45 },
+        { id: 'p2', x: h * 0.55, z: h * 0.05 },
+        { id: 'p3', x: -h * 0.45, z: -h * 0.42 },
+        { id: 'p4', x: h * 0.35, z: -h * 0.42 }
+      ],
+      cores: [
+        { id: 'c1', x: h * 0.45, z: h * 0.55 },   // chamber 1 spare weight
+        { id: 'c2', x: -h * 0.55, z: h * 0.08 }   // chamber 2's key
+      ]
+    };
+  };
+
+  // point-in-any-solid-rect (walls always; barriers only while closed)
+  D.hallsBlocked = function (halls, barrierState, x, z, pad) {
+    pad = pad || 0.6;
+    for (var i = 0; i < halls.walls.length; i++) {
+      var w = halls.walls[i];
+      if (Math.abs(x - w.x) < w.w / 2 + pad && Math.abs(z - w.z) < w.d / 2 + pad) return true;
+    }
+    for (var b = 0; b < halls.barriers.length; b++) {
+      var br = halls.barriers[b];
+      if (barrierState && barrierState[br.id]) continue; // open
+      if (Math.abs(x - br.x) < br.w / 2 + pad && Math.abs(z - br.z) < br.d / 2 + pad) return true;
+    }
+    return false;
+  };
+
+  // ---------------------------------------------------------------
+  // CONVOY: the hauler's route — south entry to north exit, weaving,
+  // with ambush triggers at every second waypoint.
+  // ---------------------------------------------------------------
+  D.genConvoy = function (seed, size) {
+    var rnd = rng('convoy:' + seed);
+    var half = size / 2;
+    var pts = [];
+    var n = 7;
+    for (var i = 0; i <= n; i++) {
+      var t = i / n;
+      pts.push({
+        x: i === 0 || i === n ? 0 : (rnd() - 0.5) * (size * 0.55),
+        z: (half - 30) - t * (size - 60),
+        ambush: i > 0 && i < n && i % 2 === 0
+      });
+    }
+    return pts;
+  };
+
   D.fluxSafe = function (cfg, time, x, z, size) {
     var half = size / 2;
     var zIn = z - cfg.zTop;
@@ -4555,7 +4770,8 @@ GH.world = (function () {
         arch: dg.arch, tier: dg.tier,
         danger: Math.min(4, pz.danger + dg.tier),
         size: arch.size,
-        name: W.stageFor(dg.zone).name + ' ' + arch.name + (dg.tier === 2 ? ' II' : '')
+        name: W.stageFor(dg.zone).name + ' ' + arch.name +
+          (dg.tier > 1 ? ' ' + (['', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][dg.tier - 1] || 'T' + dg.tier) : '')
       };
     }
     var zn = W.zoneById(zoneId);
@@ -4626,8 +4842,10 @@ GH.world = (function () {
         var gp = gatePos(sides[to], size);
         lay.gates.push({ to: to, x: gp.x, z: gp.z, side: sides[to] });
       }
-      // THREE dungeon gates per territory: the depths plus two more
-      // archetypes from the zone's set, scattered deep in the map
+      // FOUR dungeon gates per territory: the depths plus three more
+      // archetypes from the zone's set. Each gate leads to the NEXT
+      // uncleared tier of its dungeon — clears ascend the gate forever.
+      var dgTiers = (GH.meta.data.world && GH.meta.data.world.dgTier) || {};
       var archList = ['depths'].concat(GH.dungeons.ZONE_SETS[zoneId] || []);
       archList.forEach(function (arch, ai) {
         var dgx = (rnd() - 0.5) * (size * 0.62);
@@ -4638,7 +4856,8 @@ GH.world = (function () {
           if (GH.dist2(dgx, dgz, W.CAMP.x, W.CAMP.z) < 45 * 45) dgz -= 110;
           if (GH.dist2(dgx, dgz, W.CIRCUIT.x, W.CIRCUIT.z) < 50 * 50) dgx -= 110;
         }
-        lay.gates.push({ to: GH.dungeons.makeId(zoneId, arch, 1), x: dgx, z: dgz, arch: arch });
+        var tier = (dgTiers[GH.dungeons.baseId(zoneId, arch)] || 0) + 1;
+        lay.gates.push({ to: GH.dungeons.makeId(zoneId, arch, tier), x: dgx, z: dgz, arch: arch, tier: tier });
       });
 
       // husk nests scattered wide
@@ -4749,9 +4968,31 @@ GH.world = (function () {
         lay.flux = GH.dungeons.genFlux(size);
         lay.chest = { x: 0, z: -half + 22 };
         lay.packs.push({ x: 0, z: -half + 40, n: 3 }); // the far-side welcome
+      } else if (arch2 === 'raceway') {
+        lay.raceway = GH.dungeons.genRaceway(size);
+        lay.chest = { x: 0, z: 0 }; // the winner's circle, mid-infield
+      } else if (arch2 === 'halls') {
+        lay.halls = GH.dungeons.genHalls(size);
+        lay.chest = { x: 0, z: -half + 24 }; // beyond the third barrier
+      } else if (arch2 === 'convoy') {
+        lay.convoyPath = GH.dungeons.genConvoy(zoneId, size);
+        lay.chest = { x: 0, z: -half + 24 }; // where the hauler docks
+      } else if (arch2 === 'crucible') {
+        lay.crucible = { bosses: 3, x: 0, z: -20 };
+        lay.chest = { x: 0, z: -half + 24 };
+      } else if (arch2 === 'heist') {
+        lay.relic = { x: 0, z: -half + 30 }; // the prize, deep in
+        lay.noChest = true; // the exit gate pays the heist directly
+        for (var hh = 0; hh < 4; hh++) {
+          lay.packs.push({
+            x: (rnd() - 0.5) * (size - 70),
+            z: (rnd() - 0.5) * (size - 90),
+            n: 2 + Math.floor(rnd() * 2)
+          });
+        }
       }
       // every non-depths dungeon pays out at a chest (flux set its own)
-      if (!lay.chest && arch2 !== 'depths') {
+      if (!lay.chest && arch2 !== 'depths' && !lay.noChest) {
         lay.chest = arch2 === 'labyrinth' ? { x: lay.heart.x, z: lay.heart.z } :
           arch2 === 'gauntlet' ? { x: lay.checkpoints[lay.checkpoints.length - 1].x, z: lay.checkpoints[lay.checkpoints.length - 1].z } :
           { x: 0, z: -half + 26 };
@@ -4857,7 +5098,8 @@ GH.world = (function () {
     // Mazes and flux floors keep their arenas clean.
     var rnd = zrng('props:' + zoneId);
     var propCount = info.dungeon ?
-      (info.arch === 'labyrinth' || info.arch === 'fluxways' ? 0 : 46) : 150;
+      (info.arch === 'labyrinth' || info.arch === 'fluxways' ||
+        info.arch === 'raceway' || info.arch === 'halls' ? 0 : 46) : 150;
     for (var i = 0; i < propCount; i++) {
       var kind = st.props[Math.floor(rnd() * st.props.length)];
       var p = GH.models.props[kind]();
@@ -4961,6 +5203,75 @@ GH.world = (function () {
       chestMesh.position.set(lay.chest.x, 0, lay.chest.z);
       group.add(chestMesh);
     }
+    // RACEWAY: gate pylons around the ring, gold start arch
+    if (lay.raceway) {
+      var rw = lay.raceway;
+      for (var rg = 0; rg < rw.gates; rg++) {
+        var rpt = rw.path[Math.floor(rg * rw.path.length / rw.gates)];
+        var rnx = rw.path[(Math.floor(rg * rw.path.length / rw.gates) + 1) % rw.path.length];
+        var rang = Math.atan2(rnx.x - rpt.x, rnx.z - rpt.z);
+        var rpg = GH.models.buildPylonPair(rg === 0 ? 0xffd050 : 0x60c8ff);
+        rpg.position.set(rpt.x, 0, rpt.z);
+        rpg.rotation.y = rang;
+        group.add(rpg);
+      }
+    }
+    // CIPHER HALLS: solid walls, energy barriers, plates, power cores
+    var barrierMeshes = null, plateMeshes = null, coreMeshes = null, relicMesh = null;
+    if (lay.halls) {
+      var hallWallMat = GH.assets.lambert({ map: tex.wall });
+      lay.halls.walls.forEach(function (wl) {
+        var wm = new THREE.Mesh(new THREE.BoxGeometry(wl.w, 6, wl.d), hallWallMat);
+        wm.position.set(wl.x, 3, wl.z);
+        group.add(wm);
+      });
+      barrierMeshes = {};
+      lay.halls.barriers.forEach(function (br) {
+        var bm = new THREE.Mesh(new THREE.BoxGeometry(br.w, 5, br.d * 0.7),
+          GH.assets.basic(0x60c8ff, { transparent: true, opacity: 0.4 }));
+        bm.position.set(br.x, 2.5, br.z);
+        group.add(bm);
+        barrierMeshes[br.id] = bm;
+      });
+      plateMeshes = {};
+      lay.halls.plates.forEach(function (pl) {
+        var pm = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 0.3, 8),
+          GH.assets.lambert({ color: 0x3a4450 }));
+        pm.position.set(pl.x, 0.15, pl.z);
+        var pmGlow = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.14, 8),
+          GH.assets.basic(0xffd050, { transparent: true, opacity: 0.5 }));
+        pmGlow.position.y = 0.24;
+        pm.add(pmGlow);
+        pm.userData.glow = pmGlow;
+        group.add(pm);
+        plateMeshes[pl.id] = pm;
+      });
+      coreMeshes = {};
+      lay.halls.cores.forEach(function (co) {
+        var cm = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1),
+          GH.assets.lambert({ color: 0xffd050, emissive: 0x806010, emissiveIntensity: 0.7 }));
+        cm.position.set(co.x, 0.8, co.z);
+        group.add(cm);
+        coreMeshes[co.id] = cm;
+      });
+    }
+    // CONVOY: waypoint markers along the hauler's route
+    if (lay.convoyPath) {
+      lay.convoyPath.forEach(function (wp) {
+        var wpd = new THREE.Mesh(new THREE.CircleGeometry(2.2, 12),
+          new THREE.MeshBasicMaterial({ color: wp.ambush ? 0xc05050 : 0x60c8ff, transparent: true, opacity: 0.2, depthWrite: false }));
+        wpd.rotation.x = -Math.PI / 2;
+        wpd.position.set(wp.x, 0.05, wp.z);
+        group.add(wpd);
+      });
+    }
+    // HEIST: the relic itself, styled after its territory
+    if (lay.relic) {
+      relicMesh = GH.models.buildObjective(GH.dungeons.OBJECTIVES[info.parent].kind);
+      relicMesh.scale.setScalar(0.7);
+      relicMesh.position.set(lay.relic.x, 0, lay.relic.z);
+      group.add(relicMesh);
+    }
 
     // ---- overworld landmarks: ruins, hulks, stains, roads ----
     if (!info.dungeon) {
@@ -5045,6 +5356,8 @@ GH.world = (function () {
       group: group, nestMeshes: nestMeshes, vaultMeshes: vaultMeshes,
       chestMesh: chestMesh, objectiveMesh: objectiveMesh,
       fluxTiles: fluxTiles, cpMeshes: cpMeshes,
+      barrierMeshes: barrierMeshes, plateMeshes: plateMeshes,
+      coreMeshes: coreMeshes, relicMesh: relicMesh,
       layout: lay, info: info
     };
   };
@@ -5073,6 +5386,13 @@ GH.world = (function () {
     }
     if (layout.chest) {
       list.push({ kind: 'chest', x: layout.chest.x, z: layout.chest.z, label: 'OPEN THE REWARD CACHE' });
+    }
+    if (layout.raceway) {
+      var start = layout.raceway.path[0];
+      list.push({ kind: 'racestart', x: start.x, z: start.z, label: 'START THE RACE — 3 LAPS, LIVE FIRE' });
+    }
+    if (layout.relic) {
+      list.push({ kind: 'relic', x: layout.relic.x, z: layout.relic.z, label: 'SEIZE THE RELIC (THE ALARM WILL SOUND)' });
     }
     return list;
   };
@@ -6024,6 +6344,8 @@ GH.game = (function () {
       mesh.add(aura);
       elitesSpawned++;
     }
+    // dungeon tier modifiers stamp everything born inside
+    if (expActive && dungeonState && dungeonState.mods.length) applyDungeonMods(e);
     enemies.push(e);
     if (def.boss) {
       bossRef = e;
@@ -6066,6 +6388,11 @@ GH.game = (function () {
       crit ? dmg + '!' : dmg, cls, crit ? 20 : (opts.isDot ? 12 : 15));
     if (!opts.isDot) { if (crit) GH.audio.crit(); else GH.audio.hit(); }
 
+    // THORNED modifier: melee strikes sting the striker
+    if (e.modThorns && opts.inst &&
+      (opts.inst.w.type === 'melee' || opts.inst.w.type === 'aura') && !opts.isDot) {
+      playerDamage(4 + (zoneNow ? zoneNow.danger * 2 : 2), null, 'kinetic');
+    }
     // sustain: global lifesteal + weapon Sol sockets
     if (player.stats.lifesteal > 0) player.heal(dmg * player.stats.lifesteal / 100 * 0.35);
     if (inst && inst.mods.lifegain > 0) player.heal(dmg * inst.mods.lifegain * 0.5);
@@ -6151,15 +6478,11 @@ GH.game = (function () {
         if (GH.progress.grantArtifact(lairArtifacts[e.lairZone])) {
           queueAnnounce('ARTIFACT — ' + GH.progress.artifactById(lairArtifacts[e.lairZone]).name.toUpperCase(), 28);
         }
-        // the depths pay like every other dungeon: cleared + the way down
+        // the depths pay like every other dungeon: cleared + ascension
         if (dungeonState) {
           GH.meta.data.world.dungeons[curZone] = true;
-          if (dungeonState.tier === 1) {
-            spawnDeeperGate(e.x, e.z - 12);
-          } else {
-            coinsRun += 60;
-            queueAnnounce('DEPTHS II CONQUERED — +60 SALVAGE', 26);
-          }
+          coinsRun += 40 * dungeonState.tier;
+          ascendDungeon();
         }
         saveExpedition();
       }
@@ -6200,12 +6523,13 @@ GH.game = (function () {
       effects.push({ kind: 'patch', x: e.x, z: e.z, t: 3, radius: 1.3, dps: 5,
         mesh: groundDisc(e.x, e.z, 1.3, 0xff5020, 0.3) });
     }
-    if (e.elite === 'volatile') {
+    if (e.elite === 'volatile' || e.modVolatile) {
       // detonates on death — respect the ARC ward
       spawnBurst(e.x, 1, e.z, 0xff40a0, 14);
       GH.audio.explode();
       if (GH.dist2(e.x, e.z, player.x, player.z) < 6.25) playerDamage(e.damage, null, 'arc');
     }
+    if (e.modGilded && Math.random() < 0.35) spawnPickup('coin', e.x, e.z);
     if (e.elite) {
       spawnPickup('coin', e.x, e.z);
       spawnPickup('spark1', e.x + 0.5, e.z);
@@ -6277,6 +6601,12 @@ GH.game = (function () {
           tgtP = { x: worldH.layout.objective.x, z: worldH.layout.objective.z };
         }
       }
+      // CONVOY ambushers run down the hauler
+      if (e.huntHauler && dungeonState && dungeonState.hauler && !dungeonState.failed) {
+        if (GH.dist2(e.x, e.z, player.x, player.z) > 9 * 9) {
+          tgtP = { x: dungeonState.hauler.x, z: dungeonState.hauler.z };
+        }
+      }
       var dx = tgtP.x - e.x, dz = tgtP.z - e.z;
       var dist = Math.sqrt(dx * dx + dz * dz) || 0.001;
       var nx = dx / dist, nz = dz / dist;
@@ -6315,6 +6645,9 @@ GH.game = (function () {
       e.anim += dt * (4 + def.speed);
       if (e.elite === 'vampiric' && e.hp < e.maxHp) {
         e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.02 * dt);
+      }
+      if (e.modRegen && e.hp < e.maxHp) {
+        e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.015 * dt);
       }
       var mx = 0, mz = 0;
 
@@ -6417,6 +6750,25 @@ GH.game = (function () {
         var r = corruptAI(e, dt, dist, nx, nz);
         mx = r.mx; mz = r.mz;
         if (r.spd !== undefined) spd = r.spd;
+      } else if (def.behavior === 'racer') {
+        // RACEWAY rival: ride the circuit line, harass the pilot in passing
+        var rwLay = worldH && worldH.layout.raceway;
+        if (rwLay) {
+          var rwp = rwLay.path[e.racePi % rwLay.path.length];
+          var rwa = GH.angleTo(e.x, e.z, rwp.x, rwp.z);
+          mx = Math.sin(rwa); mz = Math.cos(rwa);
+          spd = e.raceSpeed || def.speed;
+        }
+        e.shootCd -= dt;
+        if (e.shootCd <= 0 && dist < 16) {
+          e.shootCd = def.shootInterval;
+          spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage);
+        }
+        // hover pose
+        e.mesh.position.y = 0.12 + Math.sin(runTime * 6 + e.anim) * 0.05;
+        if (e.mesh.userData.flames) {
+          e.mesh.userData.flames.forEach(function (fl) { fl.visible = true; fl.scale.y = 1.4; });
+        }
       }
 
       // separation
@@ -6442,9 +6794,8 @@ GH.game = (function () {
       if (expActive) {
         e.x = GH.clamp(e.x, -GH.world.BOUNDS.x, GH.world.BOUNDS.x);
         e.z = GH.clamp(e.z, -GH.world.BOUNDS.z, GH.world.BOUNDS.z);
-        // hostiles respect the maze walls too
-        if (worldH && worldH.layout.maze &&
-          GH.dungeons.mazeBlocked(worldH.layout.maze, zoneNow.size, e.x, e.z)) {
+        // hostiles respect the solid walls too
+        if (zoneBlockedAt(e.x, e.z)) {
           e.x = ePreX;
           e.z = ePreZ;
         }
@@ -6504,7 +6855,7 @@ GH.game = (function () {
       e.attackCd -= dt;
       if (e.attackCd <= 0) {
         if (GH.dist2(e.x, e.z, player.x, player.z) < Math.pow(def.radius + 0.8, 2)) {
-          e.attackCd = 1.1;
+          e.attackCd = e.modFrenzied ? 0.75 : 1.1;
           playerDamage(e.damage, e, 'kinetic');
         } else if (mate && !mate.down &&
           GH.dist2(e.x, e.z, mate.x, mate.z) < Math.pow(def.radius + 0.8, 2)) {
@@ -6994,7 +7345,9 @@ GH.game = (function () {
   function updateWeapons(dt, input) {
     var s = player.stats;
     // the capacitor always refills; cooldowns always tick
-    player.energy = Math.min(s.energyMax, player.energy + s.energyRegen * dt);
+    // (a DAMPENED dungeon chokes the reactor)
+    var enRate = dungeonState && dungeonState.modIds.dampened ? 0.55 : 1;
+    player.energy = Math.min(s.energyMax, player.energy + s.energyRegen * enRate * dt);
     for (var c = 1; c <= 4; c++) {
       if (player.abilityCds[c] > 0) player.abilityCds[c] -= dt;
     }
@@ -8192,6 +8545,8 @@ GH.game = (function () {
     if (player.protocols.vents && player.hp < s.maxHP * 0.35) spd *= 1.2;
     if (player.speederOn) spd *= 2.6;
     if (artOn('circuit_laurel')) spd *= 1.08;
+    // a shouldered power core weighs on the servos
+    if (dungeonState && dungeonState.carrying) spd *= 0.8;
 
     // hazards underfoot: vines snare, ice steals traction
     if (inHazard('vines', player.x, player.z)) spd *= 0.65;
@@ -8236,18 +8591,16 @@ GH.game = (function () {
     if (expActive) {
       player.x = GH.clamp(player.x, -GH.world.BOUNDS.x, GH.world.BOUNDS.x);
       player.z = GH.clamp(player.z, -GH.world.BOUNDS.z, GH.world.BOUNDS.z);
-      // LABYRINTH walls are solid: resolve per axis so you slide along them
-      if (worldH && worldH.layout.maze) {
-        var mzd = worldH.layout.maze;
-        if (GH.dungeons.mazeBlocked(mzd, zoneNow.size, player.x, player.z)) {
-          if (!GH.dungeons.mazeBlocked(mzd, zoneNow.size, player.x, preMoveZ)) {
-            player.z = preMoveZ;
-          } else if (!GH.dungeons.mazeBlocked(mzd, zoneNow.size, preMoveX, player.z)) {
-            player.x = preMoveX;
-          } else {
-            player.x = preMoveX;
-            player.z = preMoveZ;
-          }
+      // solid walls (labyrinth cells, hall dividers, closed barriers):
+      // resolve per axis so you slide along them
+      if (zoneBlockedAt(player.x, player.z)) {
+        if (!zoneBlockedAt(player.x, preMoveZ)) {
+          player.z = preMoveZ;
+        } else if (!zoneBlockedAt(preMoveX, player.z)) {
+          player.x = preMoveX;
+        } else {
+          player.x = preMoveX;
+          player.z = preMoveZ;
         }
       }
     } else {
@@ -8481,6 +8834,7 @@ GH.game = (function () {
     if (worldH) { scene.remove(worldH.group); worldH = null; }
     if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
     if (harrowTotem) { scene.remove(harrowTotem); harrowTotem = null; }
+    if (dungeonState && dungeonState.haulerMesh) scene.remove(dungeonState.haulerMesh);
     harrowUp = false;
 
     curZone = zoneId;
@@ -8543,15 +8897,30 @@ GH.game = (function () {
 
   function initDungeon() {
     var lay = worldH.layout;
+    var baseId = GH.dungeons.baseId(zoneNow.parent, zoneNow.arch);
+    var mods = GH.dungeons.modsFor(baseId, zoneNow.tier);
+    var modIds = {};
+    mods.forEach(function (m) { modIds[m.id] = true; });
     dungeonState = {
-      arch: zoneNow.arch, tier: zoneNow.tier,
+      arch: zoneNow.arch, tier: zoneNow.tier, baseId: baseId,
+      mods: mods, modIds: modIds,
       done: false, opened: false, spawned: false,
       firstClear: !GH.meta.data.world.dungeons[curZone],
       remaining: 0,
       cp: 0, timer: 26,
       defenseActive: false, defenseWon: false, failed: false,
       wave: 0, waveT: 0, objHp: 0, objMax: 0,
-      fluxTick: 0
+      fluxTick: 0,
+      // raceway
+      race: null,
+      // cipher halls
+      barrierOpen: {}, carrying: null, corePos: {},
+      // convoy
+      hauler: null, haulerMesh: null,
+      // crucible
+      cruIdx: 0, cruWaitT: 2.5,
+      // heist
+      heistCarrying: false, heistT: 0
     };
     // garrison
     lay.packs.forEach(function (pk) {
@@ -8566,21 +8935,68 @@ GH.game = (function () {
       dungeonState.objMax = lay.objective.hp;
       dungeonState.objHp = lay.objective.hp;
     }
+    if (lay.halls) {
+      lay.halls.cores.forEach(function (co) {
+        dungeonState.corePos[co.id] = { x: co.x, z: co.z };
+      });
+    }
+    if (lay.convoyPath) {
+      dungeonState.hauler = {
+        x: lay.convoyPath[0].x, z: lay.convoyPath[0].z,
+        wp: 1, hp: 400 + zoneNow.danger * 120, max: 400 + zoneNow.danger * 120,
+        fired: {}
+      };
+      dungeonState.haulerMesh = GH.models.buildHauler();
+      dungeonState.haulerMesh.position.set(dungeonState.hauler.x, 0, dungeonState.hauler.z);
+      scene.add(dungeonState.haulerMesh);
+      queueAnnounce('THE HAULER ROLLS — KEEP IT ALIVE', 24);
+    }
+    if (lay.crucible) {
+      queueAnnounce('THE CRUCIBLE — THEY COME ONE BY ONE', 24);
+    }
     queueAnnounce(GH.dungeons.ARCHETYPES[zoneNow.arch].desc.toUpperCase(), 20);
+    mods.forEach(function (m) {
+      queueAnnounce('MODIFIER — ' + m.name + ': ' + m.desc.toUpperCase(), 18);
+    });
+  }
+
+  // tier modifiers stamp every hostile born in this dungeon
+  function applyDungeonMods(e) {
+    var ids = dungeonState.modIds;
+    if (ids.armored) { e.hp *= 1.4; e.maxHp *= 1.4; }
+    if (ids.swift) e.speedMult = (e.speedMult || 1) * 1.25;
+    if (ids.frenzied) e.modFrenzied = true;
+    if (ids.volatile) e.modVolatile = true;
+    if (ids.regen) e.modRegen = true;
+    if (ids.thorns) e.modThorns = true;
+    if (ids.gilded) e.modGilded = true;
+  }
+
+  // a clear pushes this dungeon's gate up a tier, forever
+  function ascendDungeon() {
+    var w = GH.meta.data.world;
+    w.dgTier = w.dgTier || {};
+    if ((w.dgTier[dungeonState.baseId] || 0) < dungeonState.tier) {
+      w.dgTier[dungeonState.baseId] = dungeonState.tier;
+    }
+    GH.meta.save();
+    queueAnnounce('THE ' + GH.dungeons.ARCHETYPES[dungeonState.arch].name +
+      ' ASCENDS — TIER ' + (dungeonState.tier + 1) + ' NOW WAITS AT ITS GATE', 26);
   }
 
   function chestReady() {
     var ds = dungeonState;
     if (!ds || ds.opened) return false;
-    if (ds.arch === 'hive' || ds.arch === 'gauntlet' || ds.arch === 'bastion') return ds.done;
-    return true; // labyrinth / fluxways: reaching the chest IS the feat
+    var needsDone = { hive: 1, gauntlet: 1, bastion: 1, raceway: 1, convoy: 1, crucible: 1 };
+    if (needsDone[ds.arch]) return ds.done;
+    return true; // labyrinth / fluxways / halls: reaching the chest IS the feat
   }
 
   function openChest() {
     var ds = dungeonState;
     var lay = worldH.layout;
     ds.opened = true;
-    var loot = 60 * zoneNow.danger * ds.tier;
+    var loot = Math.round(60 * zoneNow.danger * ds.tier * (1 + ds.mods.length * 0.15));
     GH.meta.data.salvage += loot;
     coinsRun += 20 * ds.tier;
     spawnPickup('gem:' + GH.pick(GH.gems.typeIds), lay.chest.x + 1.5, lay.chest.z + 1.5);
@@ -8595,21 +9011,22 @@ GH.game = (function () {
     if (worldH.chestMesh && worldH.chestMesh.userData.core) {
       worldH.chestMesh.userData.core.material.opacity = 0.12;
     }
-    if (ds.tier === 1) spawnDeeperGate(lay.chest.x, lay.chest.z - 10);
+    ascendDungeon();
     saveExpedition();
   }
 
-  // tier 1 cleared: the way down opens
-  function spawnDeeperGate(x, z) {
-    var toId = GH.dungeons.makeId(zoneNow.parent, zoneNow.arch, 2);
-    var mesh = GH.models.buildGate('deeper');
-    var gz = GH.clamp(z, -GH.world.BOUNDS.z + 18, GH.world.BOUNDS.z - 18);
-    mesh.position.set(x, 0, gz);
-    mesh.rotation.y = Math.atan2(-x, -gz);
-    worldH.group.add(mesh);
-    worldH.layout.gates.push({ to: toId, x: x, z: gz, mesh: mesh, deeper: true });
-    queueAnnounce('A DEEPER GATE TEARS OPEN', 28);
-    GH.audio.boss();
+  // (tier ascension replaced in-run deeper gates: the overworld gate
+  // itself climbs one tier per clear, with fresh modifiers stacking)
+
+  // solid geometry in the loaded zone: maze cells, hall walls, barriers
+  function zoneBlockedAt(x, z) {
+    if (!worldH || !zoneNow) return false;
+    if (worldH.layout.maze &&
+      GH.dungeons.mazeBlocked(worldH.layout.maze, zoneNow.size, x, z)) return true;
+    if (worldH.layout.halls &&
+      GH.dungeons.hallsBlocked(worldH.layout.halls,
+        dungeonState && dungeonState.barrierOpen, x, z)) return true;
+    return false;
   }
 
   function dungeonStatusText() {
@@ -8629,6 +9046,28 @@ GH.game = (function () {
     }
     if (ds.arch === 'labyrinth') return 'FIND THE HEART';
     if (ds.arch === 'fluxways') return 'CROSS ON THE SAFE LANES';
+    if (ds.arch === 'raceway') {
+      if (ds.done) return 'CACHE UNSEALED';
+      if (!ds.race) return 'START AT THE GOLD PYLONS';
+      if (ds.race.countdown > 0) return Math.ceil(ds.race.countdown) + '…';
+      return 'LAP ' + Math.min(ds.race.lap, ds.race.laps) + '/' + ds.race.laps +
+        ' · POS ' + ds.race.pos + '/4';
+    }
+    if (ds.arch === 'halls') {
+      return ds.carrying ? 'CARRYING A POWER CORE [E TO SET IT DOWN]' : 'PLATES OPEN BARRIERS';
+    }
+    if (ds.arch === 'convoy') {
+      if (ds.done) return 'CACHE UNSEALED';
+      if (ds.failed) return 'HAULER DESTROYED — IT REBUILDS AT THE START';
+      return ds.hauler ? 'HAULER ' + Math.max(0, Math.round(ds.hauler.hp / ds.hauler.max * 100)) + '%' : '';
+    }
+    if (ds.arch === 'crucible') {
+      return ds.done ? 'CACHE UNSEALED' : 'CHALLENGER ' + Math.min(ds.cruIdx + 1, 3) + '/3';
+    }
+    if (ds.arch === 'heist') {
+      if (ds.done) return 'ESCAPED — PAID IN FULL';
+      return ds.heistCarrying ? 'ESCAPE — ' + GH.fmt1(Math.max(0, ds.heistT)) + 's' : 'SEIZE THE RELIC';
+    }
     return null; // depths reads like the wilds
   }
 
@@ -8703,6 +9142,323 @@ GH.game = (function () {
       }
     } else if (ds.arch === 'bastion' && ds.defenseActive) {
       updateDefense(dt);
+    } else if (ds.arch === 'raceway' && ds.race && !ds.done) {
+      updateRaceway(dt);
+    } else if (ds.arch === 'halls') {
+      updateHalls(dt, lay);
+    } else if (ds.arch === 'convoy' && ds.hauler && !ds.done) {
+      updateConvoy(dt, lay);
+    } else if (ds.arch === 'crucible' && !ds.done) {
+      updateCrucible(dt, lay);
+    } else if (ds.arch === 'heist' && ds.heistCarrying && !ds.done) {
+      ds.heistT -= dt;
+      if (worldH.relicMesh) worldH.relicMesh.visible = false;
+      // the alarm floods the halls
+      ds.heistSpawnT = (ds.heistSpawnT || 0) - dt;
+      if (ds.heistSpawnT <= 0) {
+        ds.heistSpawnT = 5;
+        for (var hs = 0; hs < 2 + Math.floor(zoneNow.danger / 2); hs++) {
+          var ha = Math.random() * Math.PI * 2;
+          var he = spawnEnemy(GH.weightedPick(wavePlan.types).id,
+            player.x + Math.cos(ha) * GH.rand(18, 26), player.z + Math.sin(ha) * GH.rand(18, 26));
+          if (he) { he.aggro = true; he.event = true; }
+        }
+      }
+      if (ds.heistT <= 0) {
+        ds.heistCarrying = false;
+        if (worldH.relicMesh) worldH.relicMesh.visible = true;
+        announce('THE RELIC PHASES BACK TO ITS PLINTH — SEIZE IT AGAIN', 26);
+        GH.audio.die();
+      }
+    }
+  }
+
+  // ---------------- RACEWAY: a combat race ----------------
+  function startRaceway() {
+    var ds = dungeonState;
+    var rw = worldH.layout.raceway;
+    // clear the field, summon three rivals to the grid
+    for (var i = enemies.length - 1; i >= 0; i--) {
+      if (!enemies[i].nestId) { scene.remove(enemies[i].mesh); enemies.splice(i, 1); }
+    }
+    ds.race = { lap: 1, gate: 1, laps: rw.laps, pos: 1, countdown: 3.4, rivals: [], respawns: [] };
+    for (var rv = 0; rv < 3; rv++) {
+      var gridPt = rw.path[2 + rv * 2];
+      var rr = spawnEnemy('racer', gridPt.x, gridPt.z);
+      if (rr) {
+        rr.aggro = true;
+        rr.event = true;
+        rr.racer = true;
+        rr.racePi = 2 + rv * 2;
+        rr.raceLap = 1;
+        rr.raceGate = 1;
+        rr.raceSkill = 10.5 + rv * 0.9;
+        ds.race.rivals.push(rr);
+      }
+    }
+    if (!player.speederOn) toggleSpeeder(); // the race runs in vehicle form
+    announce('THREE LAPS — LIVE FIRE PERMITTED', 30);
+    GH.audio.boss();
+  }
+
+  function racewayProgress(lap, gateIdx) { return lap * 100 + gateIdx; }
+
+  function updateRaceway(dt) {
+    var ds = dungeonState;
+    var rw = worldH.layout.raceway;
+    var race = ds.race;
+    if (race.countdown > 0) {
+      race.countdown -= dt;
+      return;
+    }
+    var gateEvery = Math.floor(rw.path.length / rw.gates);
+    // player gates
+    var pg = rw.path[(race.gate % rw.gates) * gateEvery];
+    if (GH.dist2(player.x, player.z, pg.x, pg.z) < 7 * 7) {
+      race.gate++;
+      GH.audio.coin();
+      if (race.gate > rw.gates) {
+        race.gate = 1;
+        race.lap++;
+        if (race.lap > race.laps) {
+          ds.done = true;
+          announce('CHECKERED — THE CACHE UNSEALS', 30);
+          GH.audio.win();
+          return;
+        }
+        announce('LAP ' + race.lap + '/' + race.laps, 24);
+      }
+    }
+    // rivals ride the centerline; destroyed ones regrid after a beat
+    var playerProg = racewayProgress(race.lap, race.gate);
+    var bestRivalProg = 0;
+    race.rivals.forEach(function (rr) {
+      if (rr.dead) return;
+      var tp = rw.path[rr.racePi % rw.path.length];
+      if (GH.dist2(rr.x, rr.z, tp.x, tp.z) < 25) rr.racePi++;
+      // rubber-band around the player's progress
+      var band = playerProg - racewayProgress(rr.raceLap, rr.raceGate);
+      rr.raceSpeed = rr.raceSkill * (band > 2 ? 1.2 : band < -2 ? 0.88 : 1);
+      // gate bookkeeping
+      var rg = rw.path[(rr.raceGate % rw.gates) * gateEvery];
+      if (GH.dist2(rr.x, rr.z, rg.x, rg.z) < 8 * 8) {
+        rr.raceGate++;
+        if (rr.raceGate > rw.gates) {
+          rr.raceGate = 1;
+          rr.raceLap++;
+          if (rr.raceLap > race.laps) {
+            // a rival takes it — reset to try again
+            announce('A RIVAL TAKES THE FLAG — RESTART AT THE PYLONS', 28);
+            GH.audio.die();
+            race.rivals.forEach(function (r2) {
+              if (!r2.dead) { r2.dead = true; scene.remove(r2.mesh); }
+            });
+            ds.race = null;
+            return;
+          }
+        }
+      }
+      bestRivalProg = Math.max(bestRivalProg, racewayProgress(rr.raceLap, rr.raceGate));
+    });
+    if (!ds.race) return; // the reset above
+    // respawn destroyed rivals at their last gate, two gates back
+    race.rivals.forEach(function (rr) {
+      if (rr.dead && !rr.regridT) rr.regridT = 3;
+    });
+    race.rivals.forEach(function (rr, idx) {
+      if (!rr.dead || !rr.regridT) return;
+      rr.regridT -= dt;
+      if (rr.regridT <= 0) {
+        var backGate = Math.max(1, rr.raceGate - 2);
+        var np = rw.path[(backGate % rw.gates) * gateEvery];
+        var nr = spawnEnemy('racer', np.x, np.z);
+        if (nr) {
+          nr.aggro = true; nr.event = true; nr.racer = true;
+          nr.racePi = (backGate % rw.gates) * gateEvery + 1;
+          nr.raceLap = rr.raceLap;
+          nr.raceGate = backGate;
+          nr.raceSkill = rr.raceSkill;
+          race.rivals[idx] = nr;
+          queueAnnounce('A RIVAL REGRIDS', 14);
+        }
+      }
+    });
+    race.pos = 1 + race.rivals.filter(function (rr) {
+      return !rr.dead && racewayProgress(rr.raceLap, rr.raceGate) > playerProg;
+    }).length;
+  }
+
+  // ---------------- CIPHER HALLS: plates, cores, barriers ----------------
+  function updateHalls(dt, lay) {
+    var ds = dungeonState;
+    var halls = lay.halls;
+    // carried core rides on the frame's back
+    if (ds.carrying && worldH.coreMeshes[ds.carrying]) {
+      worldH.coreMeshes[ds.carrying].position.set(player.x, 2.6, player.z);
+      worldH.coreMeshes[ds.carrying].rotation.y += dt * 2;
+    }
+    // plate state: held by the pilot or by a grounded core
+    var pressed = {};
+    halls.plates.forEach(function (pl) {
+      var held = GH.dist2(player.x, player.z, pl.x, pl.z) < 2.4 * 2.4;
+      if (!held) {
+        for (var cid in ds.corePos) {
+          if (ds.carrying === cid) continue;
+          var cp = ds.corePos[cid];
+          if (GH.dist2(cp.x, cp.z, pl.x, pl.z) < 2.2 * 2.2) { held = true; break; }
+        }
+      }
+      pressed[pl.id] = held;
+      var pm = worldH.plateMeshes[pl.id];
+      if (pm && pm.userData.glow) {
+        pm.userData.glow.material.opacity = held ? 0.95 : 0.35 + Math.sin(runTime * 4) * 0.15;
+      }
+    });
+    halls.barriers.forEach(function (br) {
+      var open = br.plates
+        ? br.plates.every(function (pid) { return pressed[pid]; })
+        : pressed[br.plate];
+      ds.barrierOpen[br.id] = open;
+      var bm = worldH.barrierMeshes[br.id];
+      if (bm) {
+        bm.visible = !open;
+        if (!open) bm.material.opacity = 0.3 + Math.sin(runTime * 6) * 0.12;
+      }
+    });
+  }
+
+  function hallsCoreInteract(input) {
+    var ds = dungeonState;
+    if (!ds || ds.arch !== 'halls' || !input.interactPressed) return false;
+    var halls = worldH.layout.halls;
+    if (ds.carrying) {
+      // set it down here
+      ds.corePos[ds.carrying] = { x: player.x, z: player.z };
+      if (worldH.coreMeshes[ds.carrying]) {
+        worldH.coreMeshes[ds.carrying].position.set(player.x, 0.8, player.z);
+      }
+      ds.carrying = null;
+      input.interactPressed = false;
+      GH.audio.card();
+      return true;
+    }
+    for (var cid in ds.corePos) {
+      var cp = ds.corePos[cid];
+      if (GH.dist2(player.x, player.z, cp.x, cp.z) < 2.4 * 2.4) {
+        ds.carrying = cid;
+        input.interactPressed = false;
+        GH.audio.card();
+        announce('POWER CORE LIFTED — IT WEIGHS ON THE SERVOS', 18);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------------- CONVOY: walk the hauler home ----------------
+  function updateConvoy(dt, lay) {
+    var ds = dungeonState;
+    var h = ds.hauler;
+    var path = lay.convoyPath;
+    if (ds.failed) {
+      // it rebuilds at the start after a breath
+      ds.rebuildT = (ds.rebuildT || 6) - dt;
+      if (ds.rebuildT <= 0) {
+        ds.failed = false;
+        ds.rebuildT = null;
+        h.hp = h.max;
+        h.wp = 1;
+        h.x = path[0].x; h.z = path[0].z;
+        h.fired = {};
+        ds.haulerMesh.visible = true;
+        announce('THE HAULER ROLLS AGAIN', 24);
+      }
+      return;
+    }
+    var wp = path[h.wp];
+    if (!wp) return;
+    // ambush trips as the hauler arrives
+    var wd2 = GH.dist2(h.x, h.z, wp.x, wp.z);
+    if (wd2 < 9 && wp.ambush && !h.fired[h.wp]) {
+      h.fired[h.wp] = true;
+      announce('AMBUSH!', 26);
+      GH.audio.boss();
+      for (var am = 0; am < 4 + zoneNow.danger; am++) {
+        var aa = Math.random() * Math.PI * 2;
+        var ae = spawnEnemy(GH.weightedPick(wavePlan.types).id,
+          h.x + Math.cos(aa) * GH.rand(12, 18), h.z + Math.sin(aa) * GH.rand(12, 18));
+        if (ae) { ae.aggro = true; ae.event = true; ae.huntHauler = true; }
+      }
+    }
+    if (wd2 < 9) {
+      h.wp++;
+      if (h.wp >= path.length) {
+        ds.done = true;
+        announce('THE HAULER DOCKS — THE CACHE UNSEALS', 30);
+        GH.audio.win();
+        return;
+      }
+    }
+    // it rolls while the pilot is close and the road is quiet enough
+    var hunters = 0;
+    for (var hu = 0; hu < enemies.length; hu++) {
+      var hue = enemies[hu];
+      if (!hue.dead && hue.huntHauler && GH.dist2(hue.x, hue.z, h.x, h.z) < 8 * 8) hunters++;
+    }
+    var escortNear = GH.dist2(player.x, player.z, h.x, h.z) < 26 * 26;
+    if (hunters === 0 && escortNear) {
+      var wa = GH.angleTo(h.x, h.z, wp.x, wp.z);
+      h.x += Math.sin(wa) * 3.4 * dt;
+      h.z += Math.cos(wa) * 3.4 * dt;
+      ds.haulerMesh.rotation.y = wa;
+    }
+    // hunters chew the hauler
+    if (hunters > 0) h.hp -= Math.min(hunters, 6) * (2 + zoneNow.danger * 0.8) * dt;
+    ds.haulerMesh.position.set(h.x, 0, h.z);
+    if (ds.haulerMesh.userData.core) {
+      ds.haulerMesh.userData.core.scale.setScalar(1 + Math.sin(runTime * 6) * 0.2);
+    }
+    if (h.hp <= 0) {
+      ds.failed = true;
+      ds.haulerMesh.visible = false;
+      spawnBurst(h.x, 2, h.z, 0xffa040, 26);
+      GH.audio.explode();
+      announce('THE HAULER IS DESTROYED', 28);
+      // its hunters disperse
+      for (var dh = enemies.length - 1; dh >= 0; dh--) {
+        if (enemies[dh].huntHauler) { scene.remove(enemies[dh].mesh); enemies.splice(dh, 1); }
+      }
+    }
+  }
+
+  // ---------------- CRUCIBLE: corrupt frames, one by one ----------------
+  var CRUCIBLE_ROSTER = ['fang', 'hexen', 'viper', 'morrow', 'strix', 'titan'];
+  function updateCrucible(dt, lay) {
+    var ds = dungeonState;
+    var bossAlive = false;
+    for (var i = 0; i < enemies.length; i++) {
+      if (!enemies[i].dead && enemies[i].def.boss) { bossAlive = true; break; }
+    }
+    if (bossAlive) return;
+    if (ds.cruIdx >= lay.crucible.bosses) {
+      ds.done = true;
+      announce('THE CRUCIBLE IS COLD — THE CACHE UNSEALS', 30);
+      GH.audio.win();
+      return;
+    }
+    ds.cruWaitT -= dt;
+    if (ds.cruWaitT <= 0) {
+      ds.cruWaitT = 3;
+      var rnd = GH.dungeons.rng('cru:' + curZone + ':' + ds.cruIdx);
+      var pick = CRUCIBLE_ROSTER[Math.floor(rnd() * CRUCIBLE_ROSTER.length)];
+      var cb = spawnEnemy(pick, lay.crucible.x, lay.crucible.z);
+      if (cb) {
+        // no lairZone: a crucible kill is a bout, not a territory scar
+        cb.hp *= 0.55;
+        cb.maxHp *= 0.55;
+        cb.event = true;
+        ds.cruIdx++;
+      }
     }
   }
 
@@ -8889,6 +9645,20 @@ GH.game = (function () {
         gt.mesh.userData.veil.material.opacity = 0.24 + Math.sin(runTime * 3 + gi) * 0.1;
       }
       if (travelCd <= 0 && GH.dist2(player.x, player.z, gt.x, gt.z) < 3.6 * 3.6) {
+        // a HEIST pays out the moment you make the exit with the relic
+        if (gt.exit && dungeonState && dungeonState.arch === 'heist' &&
+          dungeonState.heistCarrying && !dungeonState.done) {
+          dungeonState.done = true;
+          var heistLoot = Math.round(90 * zoneNow.danger * dungeonState.tier *
+            (1 + dungeonState.mods.length * 0.15));
+          GH.meta.data.salvage += heistLoot;
+          coinsRun += 25 * dungeonState.tier;
+          GH.meta.data.world.dungeons[curZone] = true;
+          GH.music.setBoss(false);
+          queueAnnounce('CLEAN GETAWAY — +' + heistLoot + ' SALVAGE BANKED', 28);
+          GH.audio.win();
+          ascendDungeon();
+        }
         travelZone(gt);
         return; // the world just changed under our feet
       }
@@ -8978,7 +9748,9 @@ GH.game = (function () {
       if (it.kind === 'vault' && (w.vaults[it.id] || cipherRun)) continue;
       if (it.kind === 'chest' && (!dungeonState || dungeonState.opened)) continue;
       if (it.kind === 'objective' && (!dungeonState || dungeonState.defenseActive || dungeonState.done)) continue;
-      var iR = it.kind === 'objective' ? 5.5 : 3.2; // the relic pedestal is wide
+      if (it.kind === 'racestart' && (!dungeonState || dungeonState.race || dungeonState.done)) continue;
+      if (it.kind === 'relic' && (!dungeonState || dungeonState.heistCarrying || dungeonState.done)) continue;
+      var iR = it.kind === 'objective' || it.kind === 'racestart' || it.kind === 'relic' ? 5.5 : 3.2;
       if (GH.dist2(player.x, player.z, it.x, it.z) < iR * iR) { nearInteract = it; break; }
     }
     var promptEl = document.getElementById('interact-line');
@@ -9001,12 +9773,26 @@ GH.game = (function () {
         promptEl.classList.add('hidden');
       }
     }
+    // CIPHER HALLS cores claim E first (pick up / set down)
+    if (input.interactPressed) hallsCoreInteract(input);
     if (input.interactPressed) {
       input.interactPressed = false;
       if (nearInteract && !siege) {
         if (nearInteract.kind === 'relay') startSiege(nearInteract);
         else if (nearInteract.kind === 'vault') startVaultTrial(nearInteract);
         else if (nearInteract.kind === 'objective') startDefense();
+        else if (nearInteract.kind === 'racestart') {
+          if (!dungeonState.done && !dungeonState.race) startRaceway();
+        }
+        else if (nearInteract.kind === 'relic') {
+          if (!dungeonState.heistCarrying && !dungeonState.done) {
+            dungeonState.heistCarrying = true;
+            dungeonState.heistT = 40 + zoneNow.danger * 5;
+            announce('RELIC SEIZED — THE ALARM HOWLS. RUN.', 30);
+            GH.music.setBoss(true);
+            GH.audio.boss();
+          }
+        }
         else if (nearInteract.kind === 'chest') {
           if (chestReady()) openChest();
           else {
@@ -10277,6 +11063,7 @@ GH.game = (function () {
     if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
     if (harrowTotem) { scene.remove(harrowTotem); harrowTotem = null; }
     scene.fog.near = 18; scene.fog.far = 52; // undo whiteout/dungeon gloom
+    if (dungeonState && dungeonState.haulerMesh) scene.remove(dungeonState.haulerMesh);
     dungeonState = null;
     weatherNow = null;
     weatherToday = null;
@@ -10733,8 +11520,26 @@ GH.game = (function () {
         opened: dungeonState.opened, remaining: dungeonState.remaining,
         cp: dungeonState.cp, timer: Math.round(dungeonState.timer * 10) / 10,
         wave: dungeonState.wave, objHp: Math.round(dungeonState.objHp), objMax: dungeonState.objMax,
-        defenseActive: dungeonState.defenseActive, failed: dungeonState.failed
+        defenseActive: dungeonState.defenseActive, failed: dungeonState.failed,
+        mods: dungeonState.mods.map(function (m) { return m.id; }),
+        race: dungeonState.race ? {
+          lap: dungeonState.race.lap, gate: dungeonState.race.gate, pos: dungeonState.race.pos,
+          countdown: Math.round(dungeonState.race.countdown * 10) / 10,
+          rivals: dungeonState.race.rivals.map(function (rr) {
+            return { dead: !!rr.dead, lap: rr.raceLap, gate: rr.raceGate, hp: Math.round(rr.hp) };
+          })
+        } : null,
+        carrying: dungeonState.carrying,
+        barrierOpen: dungeonState.barrierOpen,
+        hauler: dungeonState.hauler ? {
+          hp: Math.round(dungeonState.hauler.hp), wp: dungeonState.hauler.wp,
+          x: Math.round(dungeonState.hauler.x * 10) / 10, z: Math.round(dungeonState.hauler.z * 10) / 10
+        } : null,
+        cruIdx: dungeonState.cruIdx,
+        heistCarrying: dungeonState.heistCarrying,
+        heistT: Math.round(dungeonState.heistT * 10) / 10
       } : null,
+      dgTier: GH.meta.data.world.dgTier || {},
       dungeonsCleared: Object.keys(GH.meta.data.world.dungeons || {}),
       px: player ? Math.round(player.x * 10) / 10 : 0,
       pz: player ? Math.round(player.z * 10) / 10 : 0,
@@ -10941,6 +11746,10 @@ GH.game = (function () {
         (GH.game.state === 'play' || GH.game.state === 'title')) {
         openSkills(GH.game.state === 'play');
       }
+      if (e.code === 'KeyM' &&
+        (GH.game.state === 'play' || GH.game.state === 'title')) {
+        openWorldMap(GH.game.state === 'play');
+      }
       if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
       if (e.code === 'KeyF') {
         document.getElementById('crt-overlay').classList.toggle('off');
@@ -11076,7 +11885,7 @@ GH.game = (function () {
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
     'trials-screen', 'season-screen', 'hub-screen', 'save-screen',
-    'reward-screen', 'pause-screen', 'end-screen', 'skills-screen'];
+    'reward-screen', 'pause-screen', 'end-screen', 'skills-screen', 'map-screen'];
 
   function show(id) {
     SCREENS.forEach(function (s) {
@@ -11410,6 +12219,9 @@ GH.game = (function () {
     var comp = GH.progress.completion();
     var b = GH.meta.data.broker;
     var cards = [
+      { id: 'hub-map', glyph: '🗺', name: 'WORLD MAP',
+        sub: Object.keys(GH.meta.data.world.dgTier || {}).length + '/24 dungeons ascended',
+        open: function () { openWorldMap(false); } },
       { id: 'hub-skills', glyph: '❈', name: 'PILOT TRAINING',
         sub: 'Pilot Lv ' + GH.skills.pilotProgress().lvl +
           (GH.meta.data.skillPoints > 0 ? ' · ' + GH.meta.data.skillPoints + ' POINTS READY' : ' · skill tree'),
@@ -11781,6 +12593,59 @@ GH.game = (function () {
   }
 
   // ----------------------------------------------------------------
+  // WORLD MAP — every territory, its dungeons, tiers, and today's
+  // phenomena, on one screen (M in the field, or from the hub).
+  function openWorldMap(fromPlay) {
+    GH.audio.card();
+    if (fromPlay) expEntry = 'map';
+    if (GH.game.state !== 'play' || fromPlay) GH.game.state = 'hangar';
+    renderWorldMap();
+    show('map-screen');
+  }
+
+  function renderWorldMap() {
+    var w = GH.meta.data.world;
+    var weather = GH.world.weatherToday();
+    var harrow = w.harrowDay !== GH.world.dayStamp() ? GH.world.harrowToday() : null;
+    var cleared = 0, totalTiers = 0;
+    for (var k in (w.dgTier || {})) { cleared++; totalTiers += w.dgTier[k]; }
+    document.getElementById('map-head').innerHTML =
+      'NESTS CLEANSED <b>' + Object.keys(w.nests).length + '/' + GH.world.totalNests() + '</b>' +
+      ' · DUNGEONS ASCENDED <b>' + cleared + '/24</b>' +
+      ' · TOTAL TIERS CLIMBED <b>' + totalTiers + '</b>' +
+      (harrow ? ' · <span class="mp-harrow">THE HARROW: ' + GH.world.stageFor(harrow.zone).name + '</span>' : '');
+    var wrap = document.getElementById('map-zones');
+    wrap.innerHTML = '';
+    GH.world.ZONES.forEach(function (zn) {
+      var st = GH.world.stageFor(zn.id);
+      var card = document.createElement('div');
+      card.className = 'mp-zone';
+      var head = '<div class="mp-name">' + st.name +
+        ' <span class="mp-danger">DANGER ' + ['I', 'II', 'III', 'IV'][zn.danger - 1] + '</span></div>';
+      if (weather[zn.id]) {
+        head += '<div class="mp-weather">☁ ' + weather[zn.id].name + ' — ' + weather[zn.id].desc + '</div>';
+      }
+      if (harrow && harrow.zone === zn.id) {
+        head += '<div class="mp-harrow">☠ THE HARROW ROOSTS HERE TODAY</div>';
+      }
+      var rows = '';
+      var archList = ['depths'].concat(GH.dungeons.ZONE_SETS[zn.id] || []);
+      archList.forEach(function (arch) {
+        var tier = (w.dgTier || {})[GH.dungeons.baseId(zn.id, arch)] || 0;
+        var next = tier + 1;
+        var mods = GH.dungeons.modsFor(GH.dungeons.baseId(zn.id, arch), next);
+        rows += '<div class="mp-dg' + (tier > 0 ? ' cleared' : '') + '">' +
+          '<span class="mp-arch">' + GH.dungeons.ARCHETYPES[arch].name + '</span>' +
+          '<span class="mp-tier">' + (tier > 0 ? 'CLIMBED T' + tier + ' · NEXT T' + next : 'UNCONQUERED') + '</span>' +
+          (mods.length ? '<span class="mp-mods">' + mods.map(function (m) { return m.name; }).join(' · ') + '</span>' : '') +
+          '</div>';
+      });
+      card.innerHTML = head + rows;
+      wrap.appendChild(card);
+    });
+  }
+
+  // ----------------------------------------------------------------
   // PILOT TRAINING — the skill tree. Reached from play (K), the hub,
   // or the title; backing out of an in-play open resumes the run.
   function openSkills(fromPlay) {
@@ -11906,6 +12771,7 @@ GH.game = (function () {
     document.getElementById('btn-profile').onclick = cycleProfile;
     // meta screens live under the hub now (or under a camp station)
     document.getElementById('btn-season-back').onclick = openHub;
+    document.getElementById('btn-map-back').onclick = metaBack('map', openHub);
     document.getElementById('btn-skills-back').onclick = metaBack('skills', openHub);
     document.getElementById('btn-respec').onclick = function () {
       if (GH.skills.respec()) {

@@ -762,6 +762,41 @@ html, body {
   color: #fff; line-height: 48px;
 }
 
+/* ---------------- world map ---------------- */
+
+#map-head {
+  font-family: "Times New Roman", serif; font-size: 14px;
+  color: #c8c8d8; text-shadow: 1px 1px 0 #000;
+  margin-bottom: 10px; letter-spacing: 1px;
+}
+#map-zones {
+  display: grid; grid-template-columns: repeat(3, 300px);
+  gap: 10px; justify-content: center;
+  max-height: 62vh; overflow-y: auto; padding: 4px;
+}
+.mp-zone {
+  background: rgba(10, 14, 30, 0.9);
+  border: 1px solid #3a4456;
+  padding: 8px 10px; text-align: left;
+}
+.mp-name {
+  font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px;
+  color: #f0f0f6; text-shadow: 1px 1px 0 #000;
+}
+.mp-danger { color: #c86060; font-size: 11px; }
+.mp-weather { font-size: 11px; color: #80d8ff; margin-top: 2px; }
+.mp-harrow { font-size: 11px; color: #ff5040; font-weight: bold; }
+.mp-dg {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+  border-top: 1px solid #222833;
+  padding: 4px 0; margin-top: 4px;
+  font-size: 11px;
+}
+.mp-arch { color: #c050ff; font-weight: bold; min-width: 92px; }
+.mp-dg.cleared .mp-arch { color: #60c890; }
+.mp-tier { color: #a8a8b6; }
+.mp-mods { color: #ffd050; width: 100%; }
+
 /* ---------------- skill tree ---------------- */
 
 #skills-head {
