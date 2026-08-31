@@ -50,6 +50,13 @@
     </div>
     <div id="announce" class="hidden"></div>
     <div id="hint-line" class="hidden"></div>
+    <div id="interact-line" class="hidden"></div>
+    <canvas id="minimap" class="hidden" width="132" height="88"></canvas>
+    <div id="race-hud" class="hidden">
+      <div id="race-lap"></div>
+      <div id="race-time"></div>
+      <div id="race-place"></div>
+    </div>
   </div>
 
   <div id="damage-layer"></div>
@@ -59,7 +66,8 @@
     <div class="title-grid"></div>
     <h1 class="game-title">HERO&nbsp;FRAME</h1>
     <div class="title-sub">A MECH ARENA SURVIVOR</div>
-    <button id="btn-start" class="menu-btn">CLASSIC</button>
+    <button id="btn-expedition" class="menu-btn">THE SHATTERED REACH</button>
+    <button id="btn-start" class="menu-btn small">CLASSIC</button>
     <button id="btn-arena" class="menu-btn small">ARENA — ENDLESS</button>
     <button id="btn-weekly" class="menu-btn small">WEEKLY CHALLENGE</button>
     <div class="title-row">
@@ -176,7 +184,7 @@
 
   <!-- ===================== WAVE REWARD ===================== -->
   <div id="reward-screen" class="screen hidden">
-    <h2 class="reward-title">WAVE&nbsp;REWARD</h2>
+    <h2 id="reward-heading" class="reward-title">WAVE&nbsp;REWARD</h2>
     <div id="reward-sub">Choose one upgrade</div>
     <div id="reward-cards"></div>
   </div>
@@ -222,6 +230,8 @@
 <script src="js/progress.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/music.js"></script>
+<script src="js/world.js"></script>
+<script src="js/race.js"></script>
 <script src="js/game.js"></script>
 <script src="js/main.js"></script>
 </body>

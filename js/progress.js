@@ -187,6 +187,49 @@ GH.progress = (function () {
   };
 
   // =================================================================
+  // NAMED ARTIFACTS — handcrafted relics found at specific places in
+  // the Shattered Reach. One may be equipped at a time.
+  // =================================================================
+  P.artifacts = [
+    { id: 'bulwark_fragment', name: 'Bulwark Fragment', source: 'Tide Wreckage lair',
+      desc: 'When a ward collapses, it detonates — a force nova shoves and wounds the swarm.' },
+    { id: 'glacier_core', name: 'Glacier Core', source: 'Glacier Hollow lair',
+      desc: 'Whatever strikes your hull is flash-chilled and slowed.' },
+    { id: 'harvest_coil', name: 'Harvest Coil', source: 'Verdant Cloister lair',
+      desc: 'Kills sometimes shake loose bonus salvage.' },
+    { id: 'cinder_heart', name: 'Cinder Heart', source: 'Ember Core lair',
+      desc: 'Burn damage +50%; boosting leaves a trail of fire that scalds pursuers.' },
+    { id: 'stormcap', name: 'Stormcap', source: 'Stormspire lair',
+      desc: 'Every boost discharges chain lightning into nearby enemies.' },
+    { id: 'null_lens', name: 'Null Lens', source: 'Null Sanctum lair',
+      desc: 'Shielded elites take full damage; +10% critical chance.' },
+    { id: 'circuit_laurel', name: 'Circuit Laurel', source: 'Win the Sunspire Circuit',
+      desc: 'A racer’s tuning: +8% move speed.' },
+    { id: 'trace_emblem', name: 'Trace Emblem', source: 'Win the Trace Duel',
+      desc: 'Boosting briefly leaves a cutting light-wall behind you.' }
+  ];
+
+  P.artifactById = function (id) {
+    for (var i = 0; i < P.artifacts.length; i++) {
+      if (P.artifacts[i].id === id) return P.artifacts[i];
+    }
+    return null;
+  };
+
+  P.grantArtifact = function (id) {
+    var w = GH.meta.data.world;
+    if (w.artifacts[id]) return false;
+    w.artifacts[id] = true;
+    if (!w.equipped) w.equipped = id;
+    GH.meta.save();
+    return true;
+  };
+
+  P.artifactActive = function (id) {
+    return GH.meta.data.world.equipped === id;
+  };
+
+  // =================================================================
   // COLLECTION LOG helpers
   // =================================================================
   P.logKill = function (enemyId) {

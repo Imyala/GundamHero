@@ -495,6 +495,179 @@ GH.models = (function () {
   };
 
   // ---------------------------------------------------------------
+  // World structures (The Shattered Reach)
+  // ---------------------------------------------------------------
+  M.buildNest = function (dead) {
+    var g = new THREE.Group();
+    var c = dead ? 0x4a4a46 : 0x6a5a48;
+    for (var i = 0; i < 4; i++) {
+      var a = (i / 4) * Math.PI * 2 + 0.4;
+      var spike = new THREE.Mesh(new THREE.ConeGeometry(0.5, GH.rand(2.2, 3.4), 5), mat(c));
+      spike.position.set(Math.cos(a) * 1.4, 1.1, Math.sin(a) * 1.4);
+      spike.rotation.z = Math.cos(a) * 0.4;
+      spike.rotation.x = -Math.sin(a) * 0.4;
+      g.add(spike);
+    }
+    var core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 0),
+      dead ? mat(0x2a2a28) : mat(0xd04030, { emissive: 0x601008, emissiveIntensity: 0.7 }));
+    core.position.y = 1.4;
+    g.add(core);
+    g.userData.core = core;
+    blobShadow(g, 4);
+    return g;
+  };
+
+  M.buildLair = function (down) {
+    var g = new THREE.Group();
+    var arch1 = box(0.8, 5, 0.8, 0x3a3440); arch1.position.set(-2.2, 2.5, 0);
+    var arch2 = box(0.8, 5, 0.8, 0x3a3440); arch2.position.set(2.2, 2.5, 0);
+    var lintel = box(5.6, 0.8, 0.9, 0x2a2430); lintel.position.y = 5.2;
+    g.add(arch1, arch2, lintel);
+    var eye = new THREE.Mesh(new THREE.OctahedronGeometry(0.5),
+      down ? mat(0x333333) : mat(0xff2838, { emissive: 0x800a10, emissiveIntensity: 0.9 }));
+    eye.position.y = 4.2;
+    g.add(eye);
+    g.userData.eye = eye;
+    blobShadow(g, 5);
+    return g;
+  };
+
+  M.buildRelay = function () {
+    var g = new THREE.Group();
+    var mast = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, 6, 6), mat(0x707880));
+    mast.position.y = 3;
+    var dish = new THREE.Mesh(new THREE.ConeGeometry(1.2, 0.8, 8), mat(0x9aa0a8));
+    dish.position.y = 6.2;
+    dish.rotation.x = Math.PI;
+    var lamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5),
+      mat(0xffd050, { emissive: 0x806010, emissiveIntensity: 0.8 }));
+    lamp.position.y = 6.6;
+    g.add(mast, dish, lamp);
+    blobShadow(g, 3);
+    return g;
+  };
+
+  M.buildCampFire = function () {
+    var g = new THREE.Group();
+    for (var i = 0; i < 5; i++) {
+      var a = (i / 5) * Math.PI * 2;
+      var log = box(0.18, 0.18, 1.2, 0x4a3828);
+      log.position.set(Math.cos(a) * 0.4, 0.12, Math.sin(a) * 0.4);
+      log.rotation.y = a + 0.6;
+      g.add(log);
+    }
+    var flame = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.1, 5),
+      GH.assets.basic(0xffa040, { transparent: true, opacity: 0.85 }));
+    flame.position.y = 0.7;
+    g.add(flame);
+    g.userData.flame = flame;
+    return g;
+  };
+
+  M.buildBrokerTable = function () {
+    var g = new THREE.Group();
+    var top = box(2.2, 0.15, 1.1, 0x6a5638); top.position.y = 0.9;
+    var leg1 = box(0.15, 0.9, 0.15, 0x4a3a24); leg1.position.set(-0.9, 0.45, 0.4);
+    var leg2 = box(0.15, 0.9, 0.15, 0x4a3a24); leg2.position.set(0.9, 0.45, -0.4);
+    g.add(top, leg1, leg2);
+    var broker = M.buildHusk(0.9, 0x8a7a5a); // a hooded scavenger figure
+    broker.position.set(0, 0, -1.2);
+    g.add(broker);
+    return g;
+  };
+
+  M.buildShrine = function () {
+    var g = new THREE.Group();
+    var base = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.2, 0.5, 6), mat(0x8a8a86));
+    base.position.y = 0.25;
+    var column = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 1.6, 6), mat(0x9a9a94));
+    column.position.y = 1.3;
+    var gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.45),
+      mat(0xfff2c8, { emissive: 0x807040, emissiveIntensity: 0.7 }));
+    gem.position.y = 2.5;
+    g.add(base, column, gem);
+    g.userData.gem = gem;
+    return g;
+  };
+
+  M.buildMemorialWall = function () {
+    var g = new THREE.Group();
+    var wall = box(4.5, 2.2, 0.4, 0x76766f);
+    wall.position.y = 1.1;
+    g.add(wall);
+    for (var i = 0; i < 6; i++) {
+      var plaque = box(0.5, 0.34, 0.06, 0xd8b040);
+      plaque.position.set(-1.6 + (i % 3) * 1.6, 1.4 - Math.floor(i / 3) * 0.7, 0.24);
+      g.add(plaque);
+    }
+    return g;
+  };
+
+  M.buildSimConsole = function () {
+    var g = new THREE.Group();
+    var body = box(1.2, 1.4, 0.7, 0x30405a);
+    body.position.y = 0.7;
+    var screen = box(0.9, 0.6, 0.08, 0x60c8ff);
+    screen.position.set(0, 1.1, 0.38);
+    g.add(body, screen);
+    g.userData.screen = screen;
+    return g;
+  };
+
+  M.buildPylonPair = function (color) {
+    var g = new THREE.Group();
+    [-2.6, 2.6].forEach(function (x) {
+      var p = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.32, 3.4, 5), mat(0x555a62));
+      p.position.set(x, 1.7, 0);
+      var lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.3),
+        mat(color, { emissive: color, emissiveIntensity: 0.7 }));
+      lamp.position.set(x, 3.6, 0);
+      g.add(p, lamp);
+    });
+    return g;
+  };
+
+  M.buildWreckSite = function () {
+    var g = new THREE.Group();
+    var hull = box(1.6, 0.7, 2.4, 0x4a4a50);
+    hull.position.y = 0.35;
+    hull.rotation.z = 0.3;
+    var smoke = new THREE.Mesh(new THREE.SphereGeometry(0.4, 5, 4),
+      GH.assets.basic(0x333333, { transparent: true, opacity: 0.5 }));
+    smoke.position.y = 1.2;
+    g.add(hull, smoke);
+    g.userData.smoke = smoke;
+    blobShadow(g, 3);
+    return g;
+  };
+
+  // transformed frame: a folded speeder / skimmer form
+  M.buildSpeeder = function (cfg) {
+    var g = new THREE.Group();
+    var body = cfg.body, accent = cfg.accent, dark = cfg.dark || 0x30343a;
+    var hull = box(0.9, 0.4, 2.4, body); hull.position.y = 0.75;
+    var nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.1, 4), mat(accent));
+    nose.rotation.x = Math.PI / 2;
+    nose.position.set(0, 0.75, 1.6);
+    var canopy = box(0.5, 0.28, 0.8, 0x202830); canopy.position.set(0, 1.05, 0.2);
+    var finL = box(0.1, 0.5, 0.9, dark); finL.position.set(-0.55, 0.95, -0.8); finL.rotation.z = 0.5;
+    var finR = box(0.1, 0.5, 0.9, dark); finR.position.set(0.55, 0.95, -0.8); finR.rotation.z = -0.5;
+    g.add(hull, nose, canopy, finL, finR);
+    var flames = [];
+    [-0.28, 0.28].forEach(function (x) {
+      var flame = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.9, 4),
+        new THREE.MeshBasicMaterial({ color: 0x70c0ff, transparent: true, opacity: 0.85 }));
+      flame.rotation.x = -Math.PI / 2;
+      flame.position.set(x, 0.75, -1.5);
+      g.add(flame);
+      flames.push(flame);
+    });
+    g.userData.flames = flames;
+    blobShadow(g, 2.2);
+    return g;
+  };
+
+  // ---------------------------------------------------------------
   // Props
   // ---------------------------------------------------------------
   M.buildPillar = function () {

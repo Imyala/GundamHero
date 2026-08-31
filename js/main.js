@@ -138,6 +138,8 @@
         var wn = { Digit1: 1, Digit2: 2, Digit3: 3 }[e.code];
         if (wn) input.wardPressed = wn;
         if (e.code === 'KeyQ') input.wardCycle = true;
+        if (e.code === 'KeyE') input.interactPressed = true;
+        if (e.code === 'KeyT') input.transformPressed = true;
       }
       if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
       if (e.code === 'KeyF') {
@@ -252,6 +254,11 @@
     });
     specBtn.addEventListener('pointerup', function () { input.special = false; });
     specBtn.addEventListener('pointercancel', function () { input.special = false; });
+    // tapping the interact prompt works like pressing E
+    document.getElementById('interact-line').addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      if (GH.game.state === 'play') input.interactPressed = true;
+    });
   }
 
   // ----------------------------------------------------------------
@@ -277,6 +284,14 @@
       '  ·  SEASON: ' + s.pts + ' PTS';
     var prof = GH.meta.PROFILES[GH.meta.profile];
     document.getElementById('btn-profile').textContent = 'PILOT: ' + prof.name;
+    // expedition button reflects the persistent world
+    var w = GH.meta.data.world;
+    var nestsDead = Object.keys(w.nests).length;
+    var lairsDown = Object.keys(w.lairsDown).length;
+    document.getElementById('btn-expedition').textContent =
+      w.exp ? 'THE SHATTERED REACH — RESUME' :
+      (nestsDead || lairsDown) ? 'THE SHATTERED REACH (' + nestsDead + ' nests · ' + lairsDown + ' lairs)' :
+      'THE SHATTERED REACH';
     var memEl = document.getElementById('title-memorial');
     var mem = GH.meta.memorial();
     if (GH.meta.isHardcore() && mem.length) {
@@ -303,6 +318,8 @@
     GH.game.mode = mode;
     show('select-screen');
     document.getElementById('hud').classList.add('hidden');
+    document.getElementById('btn-launch').textContent =
+      mode === 'expedition' ? 'DEPLOY TO THE REACH' : 'SELECT STAGE';
     GH.game.onSelectChange = renderSelectExtras;
     GH.game.enterSelect();
     renderP2Row();
@@ -382,6 +399,13 @@
 
   function openStageSelect() {
     if (!GH.game.selectedUnlocked()) return;
+    if (GH.game.mode === 'expedition') {
+      // no stage picker: the Reach is one place
+      GH.audio.wave();
+      show(null);
+      GH.game.startExpedition(GH.game.getSelectedMech());
+      return;
+    }
     GH.audio.card();
     GH.game.state = 'stageselect';
     renderStageList();
@@ -831,8 +855,30 @@
         '<div class="lc-name">' + m.name + '</div>' +
         '<div class="lc-count">Lv ' + lvl + (lvl >= 50 ? ' ★' : '') + '</div></div>';
     });
+    var wArt = GH.meta.data.world;
+    var artHave = Object.keys(wArt.artifacts).length;
+    html += '</div><div class="log-section">NAMED ARTIFACTS (' + artHave + '/' +
+      GH.progress.artifacts.length + ' · one equipped at a time)</div><div class="log-grid">';
+    GH.progress.artifacts.forEach(function (a) {
+      var got = !!wArt.artifacts[a.id];
+      var on = wArt.equipped === a.id;
+      html += '<div class="log-cell' + (got ? ' seen art-cell' : '') + (on ? ' art-on' : '') + '"' +
+        (got ? ' data-art="' + a.id + '" title="' + a.desc + '"' : '') + '>' +
+        '<div class="lc-name">' + (got ? a.name : '???') + '</div>' +
+        '<div class="lc-count">' + (got ? (on ? '◆ EQUIPPED' : 'equip') : a.source) + '</div></div>';
+    });
     html += '</div>';
     body.innerHTML = html;
+    // artifact cells equip on click (click again to unequip)
+    body.querySelectorAll('[data-art]').forEach(function (cell) {
+      cell.onclick = function () {
+        var id = cell.getAttribute('data-art');
+        wArt.equipped = wArt.equipped === id ? null : id;
+        GH.meta.save();
+        GH.audio.card();
+        openCollection();
+      };
+    });
     show('collection-screen');
   }
 
@@ -921,6 +967,7 @@
 
   // ----------------------------------------------------------------
   function togglePause() {
+    if (GH.game.state === 'race') { GH.game.abortRace(); return; }
     if (GH.game.state === 'play') {
       GH.game.state = 'pause';
       document.getElementById('pause-stats').textContent = GH.game.pauseInfo();
@@ -933,25 +980,62 @@
 
   function toTitle() {
     GH.meta.save(); // abandoned runs still keep their tracking
+    expEntry = null;
     GH.game.state = 'title';
     document.getElementById('hud').classList.add('hidden');
     refreshTitle();
     show('title-screen');
   }
 
+  // ----------------------------------------------------------------
+  // Expedition camp stations open the meta screens in place; backing
+  // out drops you straight back into the world, not the title.
+  var expEntry = null; // which screen the camp station opened
+
+  function resumeExpedition() {
+    expEntry = null;
+    GH.game.state = 'play';
+    show(null);
+    GH.audio.card();
+  }
+
+  function metaBack(entryKind, fallback) {
+    return function () {
+      if (expEntry === entryKind) resumeExpedition();
+      else fallback();
+    };
+  }
+
+  function startOrResumeExpedition() {
+    GH.audio.card();
+    if (GH.meta.data.world.exp) {
+      show(null);
+      GH.game.startExpedition(0); // saved character carries its own frame
+    } else {
+      enterSelect('expedition');
+    }
+  }
+
   function bindUI() {
+    GH.game.onInteract = function (kind) {
+      if (kind === 'broker') { expEntry = 'broker'; openBroker(); }
+      else if (kind === 'shrine') { expEntry = 'hangar'; openHangar(); }
+      else if (kind === 'memorial') { expEntry = 'collection'; openCollection(); }
+      else { expEntry = 'hub'; openHub(); }
+    };
+    document.getElementById('btn-expedition').onclick = startOrResumeExpedition;
     document.getElementById('btn-start').onclick = function () { enterSelect('classic'); };
     document.getElementById('btn-arena').onclick = function () { enterSelect('arena'); };
     document.getElementById('btn-weekly').onclick = openWeekly;
     document.getElementById('btn-hub').onclick = openHub;
-    document.getElementById('btn-hub-back').onclick = toTitle;
+    document.getElementById('btn-hub-back').onclick = metaBack('hub', toTitle);
     document.getElementById('btn-profile').onclick = cycleProfile;
-    // meta screens live under the hub now
+    // meta screens live under the hub now (or under a camp station)
     document.getElementById('btn-season-back').onclick = openHub;
-    document.getElementById('btn-broker-back').onclick = openHub;
-    document.getElementById('btn-collection-back').onclick = openHub;
+    document.getElementById('btn-broker-back').onclick = metaBack('broker', openHub);
+    document.getElementById('btn-collection-back').onclick = metaBack('collection', openHub);
     document.getElementById('btn-trials-back').onclick = openHub;
-    document.getElementById('btn-hangar-back').onclick = openHub;
+    document.getElementById('btn-hangar-back').onclick = metaBack('hangar', openHub);
     document.getElementById('btn-save-back').onclick = openHub;
     document.getElementById('btn-save-copy').onclick = function () {
       var ta = document.getElementById('save-export');
@@ -998,7 +1082,6 @@
     document.getElementById('btn-launch').onclick = openStageSelect;
     document.getElementById('btn-select-back').onclick = toTitle;
     document.getElementById('btn-stage-back').onclick = function () { enterSelect(GH.game.mode); };
-    document.getElementById('btn-hangar-back').onclick = toTitle;
     document.getElementById('btn-resume').onclick = togglePause;
     document.getElementById('btn-quit').onclick = toTitle;
     document.getElementById('btn-retry').onclick = function () {
@@ -1022,7 +1105,8 @@
     last = now;
     pollPads();
     if (touchCapable) {
-      document.getElementById('touch-ui').classList.toggle('hidden', GH.game.state !== 'play');
+      document.getElementById('touch-ui').classList.toggle('hidden',
+        GH.game.state !== 'play' && GH.game.state !== 'race');
     }
     GH.game.update(dt, input, window.innerWidth, window.innerHeight);
     renderer.render(GH.game.scene(), GH.game.camera());

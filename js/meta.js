@@ -45,6 +45,18 @@ GH.meta = (function () {
       // signal ciphers: dry-streak pity + owned chase cosmetics
       cipher: { dry: 0, caches: 0 },
       style: { trail: null, paint: null, drone: null, owned: {} },
+      // THE SHATTERED REACH — persistent world scars & expedition save
+      world: {
+        nests: {},          // nest id -> true (core broken, stays broken)
+        lairsDown: {},      // zone id -> true (corrupt frame defeated)
+        relaysHeld: {},     // relay id -> true (siege won)
+        artifacts: {},      // artifact id -> owned
+        equipped: null,     // one artifact slot
+        exp: null,          // serialized expedition character
+        wreck: null,        // {x, z, salvage} where you last fell
+        raceBest: 0,        // best circuit time in ms (0 = none)
+        duelWins: 0
+      },
       // one-time onboarding hints already shown
       seenHints: {},
       // reward-trait pick counts (for diminishing card weights)

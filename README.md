@@ -1,8 +1,10 @@
 # HERO FRAME
 
-A single-player, top-down **mech arena survivor** in the browser — low-poly PS1-style
-3D, fantasy-archetype mechs, auto-firing weapons, gem-socketed builds, and six
-stages of escalating waves guarded by corrupted rival frames.
+A single-player, top-down **mech action-RPG** in the browser — low-poly PS1-style
+3D, fantasy-archetype mechs, auto-firing weapons, gem-socketed builds, and one
+persistent open continent (**THE SHATTERED REACH**) where everything you break
+stays broken — plus six classic survivor arenas, transforming skimmer frames,
+and two racing disciplines.
 Built from scratch with Three.js and zero build tooling: clone it, open it, play it.
 
 Inspired by the wave-survivor / action-roguelite genre; all names, art, code, and
@@ -34,6 +36,8 @@ or move between browsers.
 | Shift / Right-click | Special (per frame: Block, Overdrive, Nova, Lunge, Shade, Frenzy, Blink, Bulwark) |
 | 1 / 2 / 3 (in combat) | Toggle KINETIC / BALLISTIC / ARC ward |
 | Q (or gamepad LB, touch WARD) | Cycle wards |
+| E (expedition) | Interact — camp stations, relays, race starts |
+| T (expedition) | Transform between frame and skimmer form |
 | 1–6 | Pick a wave-reward card / socket target |
 | F | Toggle CRT scanlines |
 | Esc / P | Pause |
@@ -46,6 +50,53 @@ Dev shortcuts: `?wave=N` starts at wave N with catch-up levels; `?unlock=all`
 opens every shell and stage; `?salvage=500` grants test salvage.
 
 ## The game
+
+### THE SHATTERED REACH — one persistent continent
+The headline mode. Instead of an arena, deploy onto a six-territory open
+continent (Tide Wreckage, Glacier Hollow, Verdant Cloister, Ember Core,
+Stormspire, Null Sanctum) with **fixed danger ratings I–IV** — the world
+doesn't scale to you; you grow into it. There are no waves and no timer:
+
+- **Husk Nests** (28 of them) spawn enemies endlessly until you crack their
+  cores — and a broken nest **stays broken forever**, across sessions. The
+  title screen counts your scars.
+- **Corrupt-frame lairs** — one per territory. Walk into one and its boss
+  wakes; defeating it unlocks that shell *and* drops a **named artifact**.
+- **Siege relays** — hold ground through three spawn bursts to claim a relay
+  permanently for banked salvage and a gem.
+- **The survivor camp** is a real place you walk around: bank salvage at the
+  fire (heals you, purges pursuers), talk to the Broker at his table, pray at
+  the shrine (Devotions), read the Memorial wall (Collection Log), run sim
+  missions at the console — every meta screen opens in-world and drops you
+  straight back in.
+- **Death is an ARPG death**: you wake at camp at 60% hull, and 60% of your
+  unbanked salvage stays out there in a **wreck** you can walk back to and
+  recover. (IRON CORE keeps its one-death rule even here.)
+- Your expedition **character persists**: level, weapons, sockets, and
+  position autosave; the title button becomes RESUME. Level-ups pop
+  field-upgrade card picks right where you stand.
+- A **minimap** tracks territories, nests (live/broken), lairs, relays, your
+  wreck, and you.
+
+### Skimmer transform & racing
+Every frame can fold into an anti-grav **skimmer** (T) — ~2.6× speed, weapons
+stowed, and your hull becomes a ram. Two race sites use the transformed form:
+
+- **TRACE DUEL** (at the camp pit) — a hard-light trail survival duel against
+  three rival riders: your thrusters cut a wall behind you, touching any wall
+  derezzes you, last rider standing wins. Winning engraves the **Trace
+  Emblem** artifact.
+- **SUNSPIRE CIRCUIT** (east of camp) — a 3-lap anti-grav gate race against
+  three rivals with throttle, brake, and a boost meter; best time is recorded
+  and first place earns the **Circuit Laurel** artifact. ESC abandons a race.
+
+### Named artifacts
+Eight handcrafted relics from specific places — one equipped at a time (from
+the Collection Log): Bulwark Fragment (ward collapses detonate), Glacier Core
+(attackers are flash-chilled), Harvest Coil (kill salvage), Cinder Heart
+(+50% burns, boosting leaves fire), Stormcap (boosts chain lightning), Null
+Lens (shielded elites take full damage, +10% crit), Circuit Laurel (+8%
+speed), Trace Emblem (boosts leave a cutting light-wall).
 
 ### Eight playable frames
 Fantasy archetypes as war machines, each with its own primary, special, passive,
@@ -191,6 +242,7 @@ matching the gem affinities; the *active* path also grows a little on every
 level-up during a run.
 
 ### Modes
+- **The Shattered Reach** — the persistent open-world expedition (see above).
 - **Classic** — pick a frame and stage, survive 20 waves, claim the corrupted frame.
 - **Arena** — endless, infinitely scaling waves on any unlocked stage; best wave
   saved. Before deploying, pick a **loadout preset**: Standard Issue, Gun
@@ -236,18 +288,20 @@ js/gems.js        gem affinities, sockets, resonance rules
 js/stages.js      six stage defs + wave plans
 js/models.js      low-poly mesh builders (mechs, enemies, pickups, props)
 js/mechs.js       eight frame definitions
-js/meta.js        persistence: pilot profiles, unlocks, salvage, devotions
-js/progress.js    hunt contracts, stage trials, collection log
+js/meta.js        persistence: pilot profiles, unlocks, salvage, world scars
+js/progress.js    hunt contracts, stage trials, collection log, artifacts
 js/upgrades.js    reward card pool (weapons/traits/protocols/gems)
 js/enemies.js     enemy + midboss + corrupted boss definitions
 js/audio.js       WebAudio procedural SFX
-js/game.js        core loop: combat, waves, resonances, screens
+js/world.js       THE SHATTERED REACH: continent layout, camp, circuit
+js/race.js        TRACE DUEL + SUNSPIRE CIRCUIT
+js/game.js        core loop: combat, waves, expedition, resonances, screens
 js/main.js        renderer, input, screen wiring
 ```
 
 ## Roadmap ideas
 
 - Seeded custom runs (share a seed string with a friend)
-- More resonance hybrids and stage hazards
-- Online leaderboards for Weekly and Arena
-- A third playable pilot slot
+- More Reach content: roaming world bosses, weather fronts, hidden vaults
+- Online leaderboards for Weekly, Arena, and the Sunspire Circuit
+- Co-op expeditions and split-screen racing

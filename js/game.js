@@ -352,6 +352,8 @@ GH.game = (function () {
     if (player.protocols.thorns && srcE && !srcE.dead) {
       damageEnemy(srcE, s.armor * 2, { canCrit: false, noRes: true });
     }
+    // GLACIER CORE: whatever wounds you is frostbitten in return
+    if (srcE && !srcE.dead && artOn('glacier_core')) srcE.slowT = 2.5;
     if (player.hp <= 0) {
       // PHOENIX hybrid: cheat death once per run
       if (!player.phoenixUsed && anyHybrid('phoenix')) {
@@ -387,6 +389,7 @@ GH.game = (function () {
       applyLevelUp();
       GH.audio.levelup();
       announce('LVL ' + player.level, 22);
+      if (expActive) expLevelUps++; // expedition: card picks happen field-side
     }
   }
 
@@ -416,11 +419,14 @@ GH.game = (function () {
   // =================================================================
   // ELEMENTS
   // =================================================================
+  // equipped named artifact (lair trophies from THE SHATTERED REACH)
+  function artOn(id) { return GH.progress.artifactActive(id); }
+
   function applyElement(e, elem, power) {
     if (!elem || e.dead) return;
     power = (power || 1) * player.stats.elemMult;
     if (elem === 'burn') {
-      e.burn = { dps: 4 * power, t: 3 };
+      e.burn = { dps: 4 * power * (artOn('cinder_heart') ? 1.5 : 1), t: 3 };
     } else if (elem === 'shock') {
       if (Math.random() < 0.4) e.stun = Math.max(e.stun || 0, 0.5);
     } else if (elem === 'frost') {
@@ -501,14 +507,14 @@ GH.game = (function () {
     var inst = opts.inst;
     if (opts.canCrit !== false) {
       var chance = player.stats.crit + (inst ? inst.mods.crit : 0) +
-        (player.edgeT > 0 ? 12 : 0);
+        (player.edgeT > 0 ? 12 : 0) + (artOn('null_lens') ? 10 : 0);
       if (Math.random() * 100 < chance) {
         dmg *= player.stats.critMult + (inst ? inst.mods.critMult : 0);
         crit = true;
       }
     }
     dmg *= GH.progress.contractDamageBonus(e.id);
-    if (e.elite === 'shielded') dmg *= 0.5;
+    if (e.elite === 'shielded' && !artOn('null_lens')) dmg *= 0.5;
     if (inst && inst.hybridId === 'executioner' && e.hp < e.maxHp * 0.2) dmg *= 2;
     dmg = Math.max(1, Math.round(dmg));
     hitCount++;
@@ -554,6 +560,39 @@ GH.game = (function () {
     if (e.def.boss) G.hitStop(0.14);
     else if (e.def.mass >= 3) G.hitStop(0.06);
     scene.remove(e.mesh);
+
+    // expedition world scars: broken nests stay broken, lairs fall once
+    if (expActive) {
+      if (e.nestId) {
+        GH.meta.data.world.nests[e.nestId] = true;
+        // the live core is a child of the world group, not the scene
+        if (e.mesh.parent) e.mesh.parent.remove(e.mesh);
+        // swap the structure for its dead husk
+        var deadNest = GH.models.buildNest(true);
+        deadNest.position.set(e.x, 0, e.z);
+        worldH.group.add(deadNest);
+        var cc = cleanseCount();
+        queueAnnounce('NEST BROKEN — ' + cc.dead + '/' + cc.total + ' CLEANSED', 24);
+        GH.audio.win();
+        coinsRun += 25;
+        saveExpedition();
+      }
+      if (e.def.corrupt && e.lairZone) {
+        GH.meta.data.world.lairsDown[e.lairZone] = true;
+        var shellId = GH.world.stageFor(e.lairZone).unlocks;
+        if (GH.meta.unlockShell(shellId)) {
+          queueAnnounce(GH.mechById(shellId).name + ' FRAME RECOVERED', 30);
+        }
+        var lairArtifacts = {
+          wreck: 'bulwark_fragment', glacier: 'glacier_core', cloister: 'harvest_coil',
+          ember: 'cinder_heart', storm: 'stormcap', null: 'null_lens'
+        };
+        if (GH.progress.grantArtifact(lairArtifacts[e.lairZone])) {
+          queueAnnounce('ARTIFACT — ' + GH.progress.artifactById(lairArtifacts[e.lairZone]).name.toUpperCase(), 28);
+        }
+        saveExpedition();
+      }
+    }
 
     // progression hooks: collection log, contracts, trials, season, ciphers
     GH.progress.logKill(e.id);
@@ -612,7 +651,8 @@ GH.game = (function () {
       if (bossRef === e) { bossRef = null; GH.music.setBoss(false); }
       GH.audio.explode();
     } else {
-      if (Math.random() < 0.10) spawnPickup('coin', e.x, e.z);
+      var coinChance = 0.10 + (artOn('harvest_coil') ? 0.12 : 0);
+      if (Math.random() < coinChance) spawnPickup('coin', e.x, e.z);
       if (Math.random() < 0.045) spawnPickup('heart', e.x, e.z);
     }
     // protocols & resonances that trigger on kill
@@ -678,6 +718,9 @@ GH.game = (function () {
         }
         if (e.burn.t <= 0) e.burn = null;
       }
+      // static structures (husk nests): damage ticks only — no AI, no
+      // movement, no contact. Their spawning runs in updateExpedition.
+      if (def.behavior === 'static') continue;
       if (e.stun > 0) {
         e.stun -= dt;
         e.mesh.position.set(e.x, Math.sin(runTime * 30) * 0.03, e.z);
@@ -767,8 +810,13 @@ GH.game = (function () {
       e.z += (mz * spd + sepZ * 4 + e.vz) * dt;
       e.vx *= Math.pow(0.02, dt);
       e.vz *= Math.pow(0.02, dt);
-      e.x = GH.clamp(e.x, -ARENA_R - 3, ARENA_R + 3);
-      e.z = GH.clamp(e.z, -ARENA_R - 3, ARENA_R + 3);
+      if (expActive) {
+        e.x = GH.clamp(e.x, -GH.world.BOUNDS.x, GH.world.BOUNDS.x);
+        e.z = GH.clamp(e.z, -GH.world.BOUNDS.z, GH.world.BOUNDS.z);
+      } else {
+        e.x = GH.clamp(e.x, -ARENA_R - 3, ARENA_R + 3);
+        e.z = GH.clamp(e.z, -ARENA_R - 3, ARENA_R + 3);
+      }
 
       // never overlap a pilot: hold attackers on a contact ring
       var ringTargets = mate && !mate.down ? [player, mate] : [player];
@@ -1149,6 +1197,7 @@ GH.game = (function () {
   }
 
   function updateWeapons(dt, input) {
+    if (player.speederOn) return; // skimmer form: weapons folded away
     // null rifts suppress every weapon while you stand inside one
     if (inHazard('rifts', player.x, player.z)) {
       player.suppressed = true;
@@ -1824,6 +1873,21 @@ GH.game = (function () {
           fx.tick = (fx.tick || 0) - dt;
           if (fx.tick <= 0) { fx.tick = 0.5; playerDamage(fx.dps * 0.5 + player.stats.armor, null, 'arc'); }
         }
+      } else if (fx.kind === 'friendPatch') {
+        // artifact trails: scorch the swarm, never the pilot
+        fx.mesh.material.opacity = 0.2 + Math.sin(runTime * 10) * 0.08;
+        fx.tick = (fx.tick || 0) - dt;
+        if (fx.tick <= 0) {
+          fx.tick = 0.4;
+          for (var fpi = 0; fpi < enemies.length; fpi++) {
+            var fpe = enemies[fpi];
+            if (fpe.dead) continue;
+            if (GH.dist2(fx.x, fx.z, fpe.x, fpe.z) < (fx.radius + fpe.def.radius) * (fx.radius + fpe.def.radius)) {
+              damageEnemy(fpe, fx.dps * 0.4 * player.stats.damageMult,
+                { canCrit: false, noRes: true, isDot: true, elem: fx.elem });
+            }
+          }
+        }
       } else if (fx.kind === 'ringwaveFx') {
         var rk = 1 - fx.t / fx.total;
         var rr2 = 0.8 + rk * fx.maxR;
@@ -1967,6 +2031,7 @@ GH.game = (function () {
   function showRewards() {
     G.state = 'reward';
     rewardQueue = [];
+    document.getElementById('reward-heading').innerHTML = 'WAVE&nbsp;REWARD';
     // pending boss gems first, then the card pick
     player.pendingGems.forEach(function (t) { rewardQueue.push({ gemType: t }); });
     player.pendingGems = [];
@@ -1980,6 +2045,12 @@ GH.game = (function () {
     if (!step) {
       document.getElementById('reward-screen').classList.add('hidden');
       G.state = 'play';
+      if (expActive) {
+        // back into the open world — no wave restart
+        saveExpedition();
+        updateHUDStatic();
+        return;
+      }
       startWave(waveNum + 1);
       updateHUDStatic();
       return;
@@ -2138,6 +2209,30 @@ GH.game = (function () {
     GH.audio.dash();
     spawnBurst(player.x, 0.6, player.z, player.trailColor || 0xa0c8ff, 6);
     if (cipherRun) cipherRun.boosts++;
+    // artifact-charged boosts
+    if (artOn('stormcap')) {
+      var zapped = 0;
+      for (var zi = 0; zi < enemies.length && zapped < 3; zi++) {
+        var ze = enemies[zi];
+        if (ze.dead) continue;
+        if (GH.dist2(player.x, player.z, ze.x, ze.z) < 64) {
+          drawLightning(player.x, 1.6, player.z, ze.x, 1.2, ze.z);
+          damageEnemy(ze, 9 * player.stats.damageMult, { canCrit: false, elem: 'shock' });
+          zapped++;
+        }
+      }
+      if (zapped) GH.audio.zap();
+    }
+    if (artOn('cinder_heart')) {
+      effects.push({ kind: 'friendPatch', x: player.x, z: player.z, t: 2.5,
+        radius: 1.4, dps: 8, elem: 'burn',
+        mesh: groundDisc(player.x, player.z, 1.4, 0xff6020, 0.28) });
+    }
+    if (artOn('trace_emblem')) {
+      effects.push({ kind: 'friendPatch', x: player.x, z: player.z, t: 3.5,
+        radius: 1.1, dps: 12, elem: 'shock',
+        mesh: groundDisc(player.x, player.z, 1.1, 0x60c8ff, 0.34) });
+    }
     // FANG frenzy stacks / VIPER edge
     if (player.def.passive === 'frenzy') {
       player.frenzy.push(4);
@@ -2218,6 +2313,12 @@ GH.game = (function () {
     var s = player.stats;
     G._mouseNDC = input.mouseNDC;
 
+    // T: fold into skimmer form (expedition traversal — no weapons, ram hits)
+    if (input.transformPressed) {
+      input.transformPressed = false;
+      if (expActive && !siege) toggleSpeeder();
+    }
+
     // aim priority: right stick / touch aim > mouse
     if (input.padAimActive) {
       player.facing = Math.atan2(input.padAimX, input.padAimY);
@@ -2242,6 +2343,8 @@ GH.game = (function () {
 
     var spd = s.speed * (player.blocking ? 0.55 : 1);
     if (player.protocols.vents && player.hp < s.maxHP * 0.35) spd *= 1.2;
+    if (player.speederOn) spd *= 2.6;
+    if (artOn('circuit_laurel')) spd *= 1.08;
 
     // hazards underfoot: vines snare, ice steals traction
     if (inHazard('vines', player.x, player.z)) spd *= 0.65;
@@ -2282,8 +2385,13 @@ GH.game = (function () {
       player.x += player.velX * dt;
       player.z += player.velZ * dt;
     }
-    player.x = GH.clamp(player.x, -ARENA_R, ARENA_R);
-    player.z = GH.clamp(player.z, -ARENA_R, ARENA_R);
+    if (expActive) {
+      player.x = GH.clamp(player.x, -GH.world.BOUNDS.x, GH.world.BOUNDS.x);
+      player.z = GH.clamp(player.z, -GH.world.BOUNDS.z, GH.world.BOUNDS.z);
+    } else {
+      player.x = GH.clamp(player.x, -ARENA_R, ARENA_R);
+      player.z = GH.clamp(player.z, -ARENA_R, ARENA_R);
+    }
 
     player.boost = Math.min(1, player.boost + s.boostRegen * dt);
     if (input.boostPressed) { tryBoost(); input.boostPressed = false; }
@@ -2302,6 +2410,40 @@ GH.game = (function () {
     if (s.regen > 0) player.heal(s.regen * dt);
 
     // pose
+    if (player.speederOn) {
+      var sm = player.speederMesh;
+      sm.position.set(player.x, 0, player.z);
+      var movingS = player.moveX !== 0 || player.moveZ !== 0;
+      if (movingS) player.speederHeading = Math.atan2(player.moveX, player.moveZ);
+      sm.rotation.y = player.speederHeading || player.facing;
+      sm.rotation.z = GH.lerp(sm.rotation.z, movingS ? -player.moveX * 0.18 : 0, dt * 6);
+      sm.position.y = 0.12 + Math.sin(runTime * 6) * 0.06; // hover bob
+      if (sm.userData.flames) {
+        sm.userData.flames.forEach(function (fl) {
+          fl.visible = movingS || Math.floor(runTime * 16) % 2 === 0;
+          fl.scale.y = movingS ? 1.5 : 0.7;
+        });
+      }
+      // ram: the skimmer's mass is its weapon
+      if (movingS) {
+        for (var ri2 = 0; ri2 < enemies.length; ri2++) {
+          var re2 = enemies[ri2];
+          if (re2.dead || re2.def.behavior === 'static') continue;
+          var rr2b = 1.6 + re2.def.radius;
+          if (GH.dist2(player.x, player.z, re2.x, re2.z) < rr2b * rr2b &&
+            (!re2.ramT || re2.ramT < runTime)) {
+            re2.ramT = runTime + 0.8;
+            damageEnemy(re2, (8 + s.flatDamage) * s.damageMult, { canCrit: false, noRes: true });
+            var ra2 = GH.angleTo(player.x, player.z, re2.x, re2.z);
+            re2.vx += Math.sin(ra2) * 15 / re2.def.mass;
+            re2.vz += Math.cos(ra2) * 15 / re2.def.mass;
+          }
+        }
+      }
+      player.mesh.visible = false;
+      sm.visible = !(player.hurtCd > 0 && Math.floor(runTime * 24) % 2 === 0);
+      return;
+    }
     player.mesh.position.set(player.x, 0, player.z);
     player.mesh.rotation.y = player.facing;
     var parts = player.mesh.userData.parts;
@@ -2327,6 +2469,522 @@ GH.game = (function () {
       });
     }
     player.mesh.visible = !(player.hurtCd > 0 && Math.floor(runTime * 24) % 2 === 0);
+  }
+
+  // =================================================================
+  // THE SHATTERED REACH — expedition mode. One persistent continent:
+  // territory nests spawn until broken, lairs guard shells, the camp
+  // is home, and what you destroy stays destroyed.
+  // =================================================================
+  var expActive = false;
+  var worldH = null;          // {group, nestMeshes, layout}
+  var interactables = [];
+  var nearInteract = null;
+  var zoneNow = null;
+  var siege = null;           // {relay, phase, timer, burst}
+  var wreckMesh = null;
+  var expLevelUps = 0;
+
+  function expeditionPlan(zone) {
+    var st = GH.world.stageFor(zone.id);
+    return {
+      duration: 999, rate: 0,
+      types: st.roster(4 + zone.danger * 3),
+      boss: null, midboss: null,
+      hpMult: 0.8 + (zone.danger - 1) * 0.9,
+      dmgMult: 0.9 + (zone.danger - 1) * 0.45,
+      overrun: false
+    };
+  }
+
+  function serializeCharacter() {
+    return {
+      mech: GH.mechs.indexOf(player.def),
+      stats: JSON.parse(JSON.stringify(player.stats)),
+      hp: player.hp, xp: player.xp, level: player.level, xpNeed: player.xpNeed,
+      weapons: player.weapons.map(function (inst) {
+        return { id: inst.id, w: JSON.parse(JSON.stringify(inst.w)), sockets: inst.sockets.slice(), isPrimary: inst.isPrimary };
+      }),
+      weaponLevels: JSON.parse(JSON.stringify(player.weaponLevels)),
+      protocols: JSON.parse(JSON.stringify(player.protocols)),
+      phoenixUsed: !!player.phoenixUsed,
+      x: player.x, z: player.z
+    };
+  }
+
+  function saveExpedition() {
+    if (!expActive || !player) return;
+    GH.meta.data.world.exp = serializeCharacter();
+    GH.meta.save();
+  }
+
+  function restoreCharacter(saved) {
+    player = makePlayer(GH.mechs[saved.mech]);
+    for (var k in saved.stats) player.stats[k] = saved.stats[k];
+    player.hp = saved.hp;
+    player.xp = saved.xp; player.level = saved.level; player.xpNeed = saved.xpNeed;
+    player.weaponLevels = saved.weaponLevels || {};
+    player.protocols = saved.protocols || {};
+    player.phoenixUsed = saved.phoenixUsed;
+    player.weapons = saved.weapons.map(function (sw) {
+      var inst = makeWeaponInst(sw.id, sw.w, sw.isPrimary);
+      inst.sockets = sw.sockets.slice();
+      GH.gems.applySocketBonuses(inst);
+      return inst;
+    });
+    player.x = saved.x; player.z = saved.z;
+  }
+
+  G.startExpedition = function (mechIndex) {
+    clearWorld();
+    weekly = null;
+    G.mode = 'expedition';
+    expActive = true;
+    stage = GH.stages[0];
+    stageIndex = 0;
+    kills = 0; coinsRun = 0; runTime = 0; hitCount = 0; sparksRun = 0;
+    elitesSpawned = 0;
+    announceQueue.length = 0;
+    expLevelUps = 0;
+    document.getElementById('hint-line').classList.add('hidden');
+
+    var w = GH.meta.data.world;
+    worldH = GH.world.build(scene, w.nests, w.lairsDown);
+    interactables = GH.world.interactables(worldH.layout);
+    wallRing.visible = false;
+    floor.visible = false; // the continent brings its own ground
+
+    if (w.exp) {
+      restoreCharacter(w.exp);
+    } else {
+      player = makePlayer(GH.mechs[mechIndex]);
+      player.x = GH.world.CAMP.x;
+      player.z = GH.world.CAMP.z + 4;
+      var mb2 = GH.progress.masteryBonus(player.def.id);
+      player.stats.damageMult += mb2.damageMult;
+      player.stats.maxHP += mb2.maxHP;
+      player.hp = player.stats.maxHP;
+      player.stats.boostRegen += mb2.boostRegen;
+      player.fourthCard = mb2.fourthCard;
+      if (GH.devGrant) applyPreset({ weapons: GH.devGrant });
+      saveExpedition();
+    }
+
+    // recover-wreck marker from a previous fall
+    if (w.wreck) {
+      wreckMesh = GH.models.buildWreckSite();
+      wreckMesh.position.set(w.wreck.x, 0, w.wreck.z);
+      scene.add(wreckMesh);
+    }
+
+    zoneNow = null;
+    siege = null;
+    mate = null;
+    if (G.coop) spawnWingmate(mechIndex);
+    wavePlan = expeditionPlan(GH.world.zoneAt(player.x, player.z));
+    waveNum = 0;
+    G.state = 'play';
+    GH.music.play('wreck');
+    updateHUDStatic();
+    document.getElementById('hud').classList.remove('hidden');
+    var mm = document.getElementById('minimap');
+    if (mm) mm.classList.remove('hidden');
+    var cl = cleanseCount();
+    announce('THE SHATTERED REACH', 34);
+    queueAnnounce('NESTS CLEANSED ' + cl.dead + '/' + cl.total, 20);
+  };
+
+  function nestById(id) {
+    for (var i = 0; i < worldH.layout.nests.length; i++) {
+      if (worldH.layout.nests[i].id === id) return worldH.layout.nests[i];
+    }
+    return null;
+  }
+
+  // spawn a nest into the live enemy list as an attackable structure
+  function activateNest(n) {
+    if (n.live) return;
+    n.live = true;
+    var zone = GH.world.zoneAt(n.x, n.z);
+    var e = {
+      id: 'nest', nestId: n.id, def: {
+        name: 'Husk Nest', hp: n.hp, speed: 0, damage: 0,
+        radius: 1.7, xp: 8, mass: 99, behavior: 'static'
+      },
+      mesh: worldH.nestMeshes[n.id],
+      x: n.x, z: n.z, vx: 0, vz: 0,
+      hp: n.hp, maxHp: n.hp, damage: 0,
+      attackCd: 99, shootCd: 0, dashCd: 0, dashing: 0, telegraphing: 0,
+      abilityT: 99, summonT: 99,
+      burn: null, stun: 0, slowT: 0, burnAcc: 0, burnNumT: 0,
+      popT: 0, baseScale: 1, anim: 0,
+      lastOrbitHit: 0, lastDashId: -1, dead: false,
+      spawnT: GH.rand(1, 3), spawnZone: zone
+    };
+    enemies.push(e);
+  }
+
+  function cleanseCount() {
+    var dead = 0, total = worldH.layout.nests.length;
+    worldH.layout.nests.forEach(function (n) {
+      if (GH.meta.data.world.nests[n.id]) dead++;
+    });
+    return { dead: dead, total: total };
+  }
+
+  function updateExpedition(dt, input) {
+    var w = GH.meta.data.world;
+
+    // banked level-ups open the card screen (pauses the sim)
+    if (expLevelUps > 0) {
+      expLevelUps--;
+      showExpeditionRewards();
+      return;
+    }
+
+    // zone crossing: look, music, banner
+    var zone = GH.world.zoneAt(player.x, player.z);
+    wavePlan = expeditionPlan(zone);
+    if (!zoneNow || zone.id !== zoneNow.id) {
+      zoneNow = zone;
+      stage = GH.world.stageFor(zone.id);
+      applyStageLookLite(stage);
+      GH.music.play(stage.id);
+      announce(stage.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zone.danger - 1], 26);
+    }
+
+    // camp: safety, banking, healing
+    var inCamp = GH.dist2(player.x, player.z, GH.world.CAMP.x, GH.world.CAMP.z) < GH.world.CAMP.r * GH.world.CAMP.r;
+    if (inCamp) {
+      if (coinsRun > 0) {
+        GH.meta.data.world.expBankT = (GH.meta.data.world.expBankT || 0);
+        GH.meta.data.salvage += coinsRun;
+        queueAnnounce('BANKED ' + coinsRun + ' SALVAGE', 18);
+        coinsRun = 0;
+        saveExpedition();
+      }
+      player.heal(player.stats.maxHP * 0.1 * dt);
+      // enemies never press into the camp
+      for (var ci = enemies.length - 1; ci >= 0; ci--) {
+        var ce = enemies[ci];
+        if (ce.nestId) continue;
+        if (GH.dist2(ce.x, ce.z, GH.world.CAMP.x, GH.world.CAMP.z) < (GH.world.CAMP.r - 2) * (GH.world.CAMP.r - 2)) {
+          ce.dead = true;
+          scene.remove(ce.mesh);
+        }
+      }
+    }
+
+    // wreck recovery
+    if (w.wreck && GH.dist2(player.x, player.z, w.wreck.x, w.wreck.z) < 4) {
+      coinsRun += w.wreck.salvage;
+      queueAnnounce('WRECK RECOVERED — +' + w.wreck.salvage + ' SALVAGE', 22);
+      GH.audio.win();
+      w.wreck = null;
+      GH.meta.save();
+      if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
+    }
+
+    // nests: activate near, spawn from live ones
+    worldH.layout.nests.forEach(function (n) {
+      if (w.nests[n.id]) return;
+      var d2 = GH.dist2(player.x, player.z, n.x, n.z);
+      if (d2 < 60 * 60) activateNest(n);
+    });
+    var localCount = 0;
+    for (var li = 0; li < enemies.length; li++) {
+      if (!enemies[li].nestId && !enemies[li].def.boss) localCount++;
+    }
+    for (var ni = 0; ni < enemies.length; ni++) {
+      var ne = enemies[ni];
+      if (!ne.nestId || ne.dead) continue;
+      ne.spawnT -= dt;
+      var nd2 = GH.dist2(player.x, player.z, ne.x, ne.z);
+      if (ne.spawnT <= 0 && nd2 < 45 * 45 && localCount < 26) {
+        ne.spawnT = Math.max(1.2, 4.5 - ne.spawnZone.danger);
+        var pick = GH.weightedPick(expeditionPlan(ne.spawnZone).types);
+        var sa = Math.random() * Math.PI * 2;
+        spawnEnemy(pick.id, ne.x + Math.cos(sa) * 4, ne.z + Math.sin(sa) * 4);
+        localCount++;
+      }
+      // core pulse
+      if (ne.mesh.userData.core) {
+        ne.mesh.userData.core.rotation.y += dt;
+        ne.mesh.userData.core.scale.setScalar(1 + Math.sin(runTime * 4) * 0.12);
+      }
+    }
+
+    // lairs: crossing the threshold wakes the corrupted frame
+    worldH.layout.lairs.forEach(function (l) {
+      if (w.lairsDown[l.zone] || l.woke) return;
+      if (GH.dist2(player.x, player.z, l.x, l.z) < 13 * 13) {
+        l.woke = true;
+        wavePlan = expeditionPlan(GH.world.zoneAt(l.x, l.z));
+        var boss = spawnEnemy(l.boss, l.x, l.z + 3);
+        if (boss) boss.lairZone = l.zone;
+      }
+    });
+
+    // siege state machine
+    if (siege) updateSiege(dt);
+
+    // interact prompt
+    nearInteract = null;
+    for (var ii = 0; ii < interactables.length; ii++) {
+      var it = interactables[ii];
+      if (it.kind === 'relay' && w.relaysHeld[it.id]) continue;
+      if (GH.dist2(player.x, player.z, it.x, it.z) < 3.2 * 3.2) { nearInteract = it; break; }
+    }
+    var promptEl = document.getElementById('interact-line');
+    if (nearInteract && !siege) {
+      promptEl.textContent = '[E] ' + nearInteract.label;
+      promptEl.classList.remove('hidden');
+    } else {
+      promptEl.classList.add('hidden');
+    }
+    if (input.interactPressed) {
+      input.interactPressed = false;
+      if (nearInteract && !siege) {
+        if (nearInteract.kind === 'relay') startSiege(nearInteract);
+        else if (nearInteract.kind === 'duel' || nearInteract.kind === 'circuit') {
+          saveExpedition();
+          G.startRace(nearInteract.kind);
+        }
+        else if (G.onInteract) { saveExpedition(); G.onInteract(nearInteract.kind); }
+      }
+    }
+
+    // periodic autosave
+    G._expSaveT = (G._expSaveT || 0) - dt;
+    if (G._expSaveT <= 0) { G._expSaveT = 10; saveExpedition(); }
+
+    drawMinimap();
+  }
+
+  function showExpeditionRewards() {
+    G.state = 'reward';
+    rewardQueue = [];
+    document.getElementById('reward-heading').innerHTML = 'FIELD&nbsp;UPGRADE';
+    player.pendingGems.forEach(function (t) { rewardQueue.push({ gemType: t }); });
+    player.pendingGems = [];
+    var tier = Math.min(20, 2 + zoneNow.danger * 3 + Math.floor(player.level / 3));
+    rewardQueue.push({ cards: GH.rollRewards(player, tier, player.fourthCard ? 4 : 3) });
+    document.getElementById('reward-screen').classList.remove('hidden');
+    nextRewardStep();
+  }
+
+  // -------------------------------------------------------------
+  // Minimap: the whole continent on a small canvas — zones tinted,
+  // camp/circuit rings, nests (live vs broken), lairs, relays, you.
+  // -------------------------------------------------------------
+  var mmT = 0;
+  function drawMinimap() {
+    mmT -= 1;
+    if (mmT > 0) return; // every few frames is plenty
+    mmT = 5;
+    var cv = document.getElementById('minimap');
+    if (!cv) return;
+    var ctx = cv.getContext('2d');
+    var W2 = cv.width, H2 = cv.height;
+    var w = GH.meta.data.world;
+    var sx = function (x) { return (x + GH.world.BOUNDS.x) / (GH.world.BOUNDS.x * 2) * W2; };
+    var sz = function (z) { return (z + GH.world.BOUNDS.z) / (GH.world.BOUNDS.z * 2) * H2; };
+    ctx.clearRect(0, 0, W2, H2);
+    var tints = { glacier: '#1c3346', wreck: '#33301f', cloister: '#20321f', ember: '#3a2117', storm: '#211f38', null: '#2c1733' };
+    GH.world.ZONES.forEach(function (zn) {
+      ctx.fillStyle = tints[zn.id] || '#222';
+      ctx.fillRect(sx(zn.cx - 40), sz(zn.cz - 40), W2 / 3, H2 / 2);
+    });
+    // camp + circuit
+    ctx.strokeStyle = '#ffd050';
+    ctx.beginPath();
+    ctx.arc(sx(GH.world.CAMP.x), sz(GH.world.CAMP.z), 5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = '#60c8ff';
+    ctx.beginPath();
+    ctx.arc(sx(GH.world.CIRCUIT.x), sz(GH.world.CIRCUIT.z), 6, 0, Math.PI * 2);
+    ctx.stroke();
+    if (worldH) {
+      worldH.layout.nests.forEach(function (n) {
+        ctx.fillStyle = w.nests[n.id] ? '#4a5a4a' : '#ff5040';
+        ctx.fillRect(sx(n.x) - 1.5, sz(n.z) - 1.5, 3, 3);
+      });
+      worldH.layout.lairs.forEach(function (l) {
+        ctx.fillStyle = w.lairsDown[l.zone] ? '#4a5a4a' : '#c050ff';
+        ctx.beginPath();
+        ctx.moveTo(sx(l.x), sz(l.z) - 3);
+        ctx.lineTo(sx(l.x) + 3, sz(l.z) + 2);
+        ctx.lineTo(sx(l.x) - 3, sz(l.z) + 2);
+        ctx.fill();
+      });
+      worldH.layout.relays.forEach(function (r) {
+        ctx.fillStyle = w.relaysHeld[r.id] ? '#60ff90' : '#f0f0f0';
+        ctx.fillRect(sx(r.x) - 2, sz(r.z) - 2, 4, 4);
+      });
+    }
+    if (w.wreck) {
+      ctx.fillStyle = '#ffb040';
+      ctx.fillRect(sx(w.wreck.x) - 2, sz(w.wreck.z) - 2, 4, 4);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(sx(player.x), sz(player.z), 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ------------------------------------------------------------
+  // Races: hand control to GH.race, take it back when it reports
+  // ------------------------------------------------------------
+  var preRacePos = null;
+
+  G.startRace = function (kind) {
+    if (!expActive || !player) return;
+    preRacePos = { x: player.x, z: player.z };
+    if (!player.speederMesh) {
+      player.speederMesh = GH.models.buildSpeeder(player.def.model);
+      scene.add(player.speederMesh);
+    }
+    player.mesh.visible = false;
+    player.speederMesh.visible = true;
+    player.speederOn = true;
+    // clear combatants: the race sites are neutral ground
+    for (var i = enemies.length - 1; i >= 0; i--) {
+      if (!enemies[i].nestId) { scene.remove(enemies[i].mesh); enemies.splice(i, 1); }
+    }
+    for (i = enemyShots.length - 1; i >= 0; i--) scene.remove(enemyShots[i].mesh);
+    enemyShots.length = 0;
+    document.getElementById('interact-line').classList.add('hidden');
+    G.state = 'race';
+    announce(kind === 'duel' ? 'TRACE DUEL' : 'SUNSPIRE CIRCUIT', 30);
+    GH.race.start(kind, {
+      scene: scene, player: player, speeder: player.speederMesh, model: player.def.model,
+      onDone: function (res) { finishRace(kind, res); }
+    });
+  };
+
+  function finishRace(kind, res) {
+    G.state = 'play';
+    player.speederOn = false;
+    player.mesh.visible = true;
+    player.speederMesh.visible = false;
+    player.x = preRacePos.x;
+    player.z = preRacePos.z;
+    var w = GH.meta.data.world;
+    if (kind === 'duel') {
+      if (res.win) {
+        w.duelWins = (w.duelWins || 0) + 1;
+        coinsRun += 60;
+        queueAnnounce('TRACE DUEL WON — ' + res.label, 26);
+        if (GH.progress.grantArtifact('trace_emblem')) queueAnnounce('ARTIFACT — TRACE EMBLEM', 28);
+      } else {
+        queueAnnounce('DEREZZED — THE PIT KEEPS ITS PRIZE', 24);
+      }
+    } else {
+      if (res.time && (!w.raceBest || res.time * 1000 < w.raceBest)) {
+        w.raceBest = Math.round(res.time * 1000);
+        queueAnnounce('CIRCUIT RECORD — ' + GH.fmt1(res.time) + 's', 22);
+      }
+      if (res.win) {
+        coinsRun += 60;
+        queueAnnounce('SUNSPIRE CIRCUIT WON — ' + res.label, 26);
+        if (GH.progress.grantArtifact('circuit_laurel')) queueAnnounce('ARTIFACT — CIRCUIT LAUREL', 28);
+      } else {
+        queueAnnounce('FINISHED ' + res.label, 24);
+      }
+    }
+    if (res.win) GH.audio.win();
+    saveExpedition();
+    GH.meta.save();
+  }
+
+  G.raceBurst = function (x, z, color) { spawnBurst(x, 1, z, color, 20); };
+
+  // ESC during a race walks away from it (no reward, no penalty)
+  G.abortRace = function () {
+    if (G.state !== 'race') return;
+    GH.race.cleanup();
+    G.state = 'play';
+    player.speederOn = false;
+    player.mesh.visible = true;
+    if (player.speederMesh) player.speederMesh.visible = false;
+    if (preRacePos) { player.x = preRacePos.x; player.z = preRacePos.z; }
+    queueAnnounce('RACE ABANDONED', 20);
+  };
+
+  function toggleSpeeder() {
+    if (!player.speederMesh) {
+      player.speederMesh = GH.models.buildSpeeder(player.def.model);
+      scene.add(player.speederMesh);
+    }
+    player.speederOn = !player.speederOn;
+    player.mesh.visible = !player.speederOn;
+    player.speederMesh.visible = player.speederOn;
+    GH.audio.dash();
+    spawnBurst(player.x, 1, player.z, 0x70c0ff, 14);
+    announce(player.speederOn ? 'SKIMMER FORM — WEAPONS FOLDED' : 'FRAME FORM', 22);
+  }
+
+  function startSiege(relay) {
+    siege = { relay: relay, phase: 1, timer: 8, done: false };
+    announce('SIEGE — HOLD THE RELAY', 30);
+    GH.music.setBoss(true);
+    GH.audio.boss();
+  }
+
+  function updateSiege(dt) {
+    var zone = GH.world.zoneAt(siege.relay.x, siege.relay.z);
+    siege.timer -= dt;
+    // fail the siege by leaving the relay behind
+    if (GH.dist2(player.x, player.z, siege.relay.x, siege.relay.z) > 40 * 40) {
+      announce('SIEGE ABANDONED', 24);
+      GH.music.setBoss(false);
+      siege = null;
+      return;
+    }
+    if (siege.timer <= 0) {
+      if (siege.phase <= 3) {
+        wavePlan = expeditionPlan(zone);
+        var n = 5 + zone.danger * 2 + siege.phase * 2;
+        for (var i = 0; i < n; i++) {
+          var pick = GH.weightedPick(wavePlan.types);
+          var a = Math.random() * Math.PI * 2;
+          spawnEnemy(pick.id,
+            siege.relay.x + Math.cos(a) * GH.rand(16, 22),
+            siege.relay.z + Math.sin(a) * GH.rand(16, 22));
+        }
+        announce('SIEGE WAVE ' + siege.phase + '/3', 24);
+        siege.phase++;
+        siege.timer = 20;
+      } else {
+        // survived every burst: hold until the field is quiet
+        var living = 0;
+        for (var j = 0; j < enemies.length; j++) {
+          if (!enemies[j].dead && !enemies[j].nestId) living++;
+        }
+        if (living === 0) {
+          GH.meta.data.world.relaysHeld[siege.relay.id] = true;
+          GH.meta.data.salvage += 120;
+          GH.meta.save();
+          queueAnnounce('RELAY HELD — +120 SALVAGE BANKED', 26);
+          GH.audio.win();
+          spawnPickup('gem:' + GH.pick(GH.gems.typeIds), siege.relay.x, siege.relay.z);
+          GH.music.setBoss(false);
+          siege = null;
+        } else {
+          siege.timer = 1;
+        }
+      }
+    }
+  }
+
+  // lighter look-switch for zone crossings (no prop rescatter)
+  function applyStageLookLite(st) {
+    var tex = GH.assets.stageTex[st.id];
+    scene.background = tex.sky;
+    scene.fog.color.setHex(st.fog);
+    hemi.color.setHex(st.hemiSky);
+    hemi.groundColor.setHex(st.hemiGround);
+    sun.color.setHex(st.sun);
   }
 
   // =================================================================
@@ -2514,6 +3172,21 @@ GH.game = (function () {
         announce('WARD COLLAPSE', 20);
         GH.audio.hit();
         updateWardDome();
+        // BULWARK FRAGMENT: the collapse detonates outward
+        if (artOn('bulwark_fragment')) {
+          GH.audio.explode();
+          spawnBurst(player.x, 1.2, player.z, 0x80b0ff, 20);
+          for (var bi = 0; bi < enemies.length; bi++) {
+            var be = enemies[bi];
+            if (be.dead) continue;
+            if (GH.dist2(player.x, player.z, be.x, be.z) < 49) {
+              var ba = GH.angleTo(player.x, player.z, be.x, be.z);
+              be.vx += Math.sin(ba) * 18 / be.def.mass;
+              be.vz += Math.cos(ba) * 18 / be.def.mass;
+              damageEnemy(be, 18 * player.stats.damageMult, { canCrit: false, noRes: true });
+            }
+          }
+        }
       }
     } else {
       player.wardEnergy = Math.min(1, player.wardEnergy + dt * 0.16);
@@ -2927,8 +3600,9 @@ GH.game = (function () {
   }
 
   function updateHUDStatic() {
-    el['wave-label'].textContent = G.mode === 'arena'
-      ? 'Wave ' + waveNum : 'Wave ' + waveNum + '/20';
+    el['wave-label'].textContent =
+      expActive ? 'THE REACH' :
+      G.mode === 'arena' ? 'Wave ' + waveNum : 'Wave ' + waveNum + '/20';
     var s = player.stats;
     var vals = {
       block: Math.round(s.block) + '%', armor: Math.round(s.armor),
@@ -2950,7 +3624,11 @@ GH.game = (function () {
     el['hp-text'].textContent = Math.ceil(player.hp) + '/' + Math.round(s.maxHP);
     el['xp-fill'].style.width = GH.clamp(player.xp / player.xpNeed * 100, 0, 100) + '%';
     el['lvl-text'].textContent = 'LVL ' + player.level;
-    el['wave-timer'].textContent = GH.fmt1(Math.max(0, waveTimer));
+    if (expActive) {
+      el['wave-timer'].textContent = zoneNow ? 'DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] : '';
+    } else {
+      el['wave-timer'].textContent = GH.fmt1(Math.max(0, waveTimer));
+    }
     el['coin-count'].textContent = '×' + coinsRun;
     el['boost-fill'].style.width = (player.boost * 100) + '%';
     if (bossRef && !bossRef.dead) {
@@ -3052,6 +3730,7 @@ GH.game = (function () {
   // RUN LIFECYCLE
   // =================================================================
   function clearWorld() {
+    if (expActive && player) saveExpedition(); // leaving the Reach: flush the character
     [enemies, projectiles, enemyShots, pickups, mines].forEach(function (list) {
       for (var i = 0; i < list.length; i++) scene.remove(list[i].mesh);
       list.length = 0;
@@ -3071,6 +3750,7 @@ GH.game = (function () {
     }
     if (player) {
       if (wardDome && wardDome.parent === player.mesh) player.mesh.remove(wardDome);
+      if (player.speederMesh) scene.remove(player.speederMesh);
       scene.remove(player.mesh);
       player = null;
     }
@@ -3078,6 +3758,20 @@ GH.game = (function () {
     if (selPreview) { scene.remove(selPreview); selPreview = null; }
     bossRef = null;
     hideBossBar();
+    // expedition teardown: the continent, camp, and its UI
+    if (worldH) { scene.remove(worldH.group); worldH = null; }
+    if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
+    expActive = false;
+    siege = null;
+    zoneNow = null;
+    nearInteract = null;
+    interactables = [];
+    wallRing.visible = true;
+    floor.visible = true;
+    var il = document.getElementById('interact-line');
+    if (il) il.classList.add('hidden');
+    var mm = document.getElementById('minimap');
+    if (mm) mm.classList.add('hidden');
   }
 
   G.startRun = function (mechIndex, stageIdx, startAt, opts) {
@@ -3224,6 +3918,31 @@ GH.game = (function () {
   }
 
   function gameOver(won) {
+    // expedition deaths are ARPG deaths: drop a wreck, wake at camp
+    // (IRON CORE keeps its one-death rule even out in the Reach)
+    if (expActive && !won && !GH.meta.isHardcore()) {
+      GH.audio.die();
+      spawnBurst(player.x, 1.2, player.z, 0xff6030, 30);
+      var lost = Math.round(coinsRun * 0.6);
+      if (lost > 0) {
+        GH.meta.data.world.wreck = { x: player.x, z: player.z, salvage: lost };
+        if (wreckMesh) scene.remove(wreckMesh);
+        wreckMesh = GH.models.buildWreckSite();
+        wreckMesh.position.set(player.x, 0, player.z);
+        scene.add(wreckMesh);
+      }
+      coinsRun = 0;
+      player.x = GH.world.CAMP.x;
+      player.z = GH.world.CAMP.z + 4;
+      player.hp = Math.round(player.stats.maxHP * 0.6);
+      player.hurtCd = 1.2;
+      if (player.speederOn) toggleSpeeder(); // wake up back in frame form
+      siege = null;
+      GH.music.setBoss(false);
+      queueAnnounce('FRAME DOWN — RECOVERED AT CAMP' + (lost ? ' · WRECK HOLDS ' + lost + ' SALVAGE' : ''), 24);
+      saveExpedition();
+      return;
+    }
     G.state = won ? 'win' : 'over';
     if (won) GH.audio.win(); else GH.audio.die();
     if (!won) spawnBurst(player.x, 1.2, player.z, 0xff6030, 30);
@@ -3238,6 +3957,7 @@ GH.game = (function () {
 
     // IRON CORE: a death erases the profile and engraves the pilot
     if (!won && meta.isHardcore()) {
+      expActive = false; // the Reach save died with the pilot — never re-save it
       var mem = meta.hardcoreWipe(player.def.name, stage.name, waveNum);
       document.getElementById('end-title').innerHTML = 'CORE&nbsp;EXTINGUISHED';
       document.getElementById('end-stats').innerHTML =
@@ -3405,6 +4125,14 @@ GH.game = (function () {
       camera.lookAt(0, 1.8, 0);
       return;
     }
+    if (G.state === 'race') {
+      GH.race.update(dt, input);
+      GH.race.tick(dt);
+      updateCamera(dt);
+      updateHUD();
+      G.dmg.update(dt, viewW, viewH);
+      return;
+    }
     if (G.state !== 'play') {
       G.dmg.update(dt, viewW, viewH);
       return;
@@ -3417,7 +4145,12 @@ GH.game = (function () {
     runTime += dt;
     updatePlayer(dt, input);
     updateWingmate(dt, input);
-    updateWave(dt);
+    if (expActive) {
+      updateExpedition(dt, input);
+    } else {
+      updateWave(dt);
+      updateHazards(dt);
+    }
     updateEnemies(dt);
     updateWeapons(dt, input);
     updateOrbit(dt);
@@ -3426,7 +4159,6 @@ GH.game = (function () {
     updateMines(dt);
     updatePickups(dt);
     updateEffects(dt);
-    updateHazards(dt);
     updateCipher(dt);
     if (picoDrone) {
       picoAngle += dt * 2.2;
@@ -3481,8 +4213,30 @@ GH.game = (function () {
       cipherDry: GH.meta.data.cipher.dry,
       caches: GH.meta.data.cipher.caches,
       cosmetics: Object.keys(GH.meta.data.style.owned).length,
-      mate: mate ? { hp: Math.round(mate.hp), down: mate.down, x: Math.round(mate.x * 10) / 10, z: Math.round(mate.z * 10) / 10 } : null
+      mate: mate ? { hp: Math.round(mate.hp), down: mate.down, x: Math.round(mate.x * 10) / 10, z: Math.round(mate.z * 10) / 10 } : null,
+      exp: expActive,
+      zone: zoneNow ? zoneNow.id : null,
+      px: player ? Math.round(player.x * 10) / 10 : 0,
+      pz: player ? Math.round(player.z * 10) / 10 : 0,
+      nests: expActive && worldH ? cleanseCount() : null,
+      lairsDown: Object.keys(GH.meta.data.world.lairsDown).length,
+      relaysHeld: Object.keys(GH.meta.data.world.relaysHeld).length,
+      siege: siege ? siege.phase : 0,
+      near: nearInteract ? nearInteract.kind : null,
+      wreck: GH.meta.data.world.wreck,
+      artifacts: Object.keys(GH.meta.data.world.artifacts),
+      artifactOn: GH.meta.data.world.equipped,
+      coinsRun: coinsRun,
+      transformed: player ? !!player.speederOn : false,
+      race: G.state === 'race' ? { mode: GH.race.mode(), t: Math.round(GH.race.time() * 10) / 10, riders: GH.race.debug() } : null,
+      duelWins: GH.meta.data.world.duelWins,
+      raceBest: GH.meta.data.world.raceBest
     };
+  };
+
+  // dev/test helper: jump the pilot somewhere (harmless outside dev use)
+  G.teleport = function (x, z) {
+    if (player) { player.x = x; player.z = z; }
   };
 
   G.scene = function () { return scene; };
