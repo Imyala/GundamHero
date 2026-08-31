@@ -59,6 +59,11 @@ GH.meta = (function () {
         duelWins: 0,
         harrowDay: null     // date stamp of the last day THE HARROW fell
       },
+      // pilot skill tree: nodeId -> rank, plus unspent points and the
+      // persistent XP pool that pays them out
+      skills: {},
+      skillPoints: 0,
+      pilotXP: 0,
       // one-time onboarding hints already shown
       seenHints: {},
       // reward-trait pick counts (for diminishing card weights)

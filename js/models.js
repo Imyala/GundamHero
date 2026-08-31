@@ -116,18 +116,20 @@ GH.models = (function () {
       var guard = box(0.4, 0.1, 0.4, accent); guard.position.y = 0.18;
       var grip = box(0.1, 0.34, 0.1, 0x503820); grip.position.y = -0.04;
       sword.add(blade, edge, guard, grip);
-      sword.position.set(0, -0.88, 0.12);
+      sword.position.set(0.08, -0.88, 0.2);
+      sword.rotation.x = 0.35; // resting cant so the blade clears the pauldron
       armR.add(sword);
       parts.weapon = sword;
+      // forearm heater shield: small, outboard, riding the left forearm
       var shield = new THREE.Group();
-      var plate = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.1, 6), mat(0x14141a));
+      var plate = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.08, 6), mat(0x14141a));
       plate.rotation.x = Math.PI / 2;
-      var rim = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.06, 6), mat(0xd8b040));
+      var rim = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.05, 6), mat(0xd8b040));
       rim.rotation.x = Math.PI / 2; rim.position.z = -0.02;
-      var bossM = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.16, 6), mat(0xd8b040));
-      bossM.rotation.x = Math.PI / 2; bossM.position.z = 0.08;
+      var bossM = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.12, 6), mat(0xd8b040));
+      bossM.rotation.x = Math.PI / 2; bossM.position.z = 0.06;
       shield.add(rim, plate, bossM);
-      shield.position.set(0, -0.6, 0.3);
+      shield.position.set(-0.3, -0.72, 0.1);
       armL.add(shield);
       parts.shield = shield;
     } else if (prop === 'guns') {

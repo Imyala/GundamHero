@@ -326,7 +326,7 @@ GH.progress = (function () {
   P.masteryMilestones = [
     { lvl: 10, desc: 'Gilt paint scheme unlocked' },
     { lvl: 25, desc: '+15% boost recharge on this frame' },
-    { lvl: 40, desc: 'Wave rewards offer a 4th card on this frame' },
+    { lvl: 40, desc: '+10% ability energy regeneration on this frame' },
     { lvl: 50, desc: 'MASTER insignia' }
   ];
 
@@ -337,7 +337,8 @@ GH.progress = (function () {
       damageMult: lvl * 0.005,
       maxHP: lvl,
       boostRegen: lvl >= 25 ? 0.15 : 0,
-      fourthCard: lvl >= 40
+      energyBonus: lvl >= 40,
+      fourthCard: false // retired with the card system
     };
   };
 
@@ -527,7 +528,7 @@ GH.progress = (function () {
 
   P.cipherSteps = [
     { id: 'stand', desc: 'STAND in the marked signal circle' },
-    { id: 'burst', desc: 'DETONATE: destroy 5 hostiles within 8s' },
+    { id: 'burst', desc: 'DETONATE: destroy 4 hostiles within 14s' },
     { id: 'sprint', desc: 'SPRINT: boost 3 times within 10s' },
     { id: 'hold', desc: 'HOLD: take no damage for 10s' }
   ];

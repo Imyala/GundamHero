@@ -124,10 +124,11 @@ GH.stages = [
 GH.wavePlan = function (stage, wave, arena) {
   var plan = {
     duration: 22 + wave * 0.9,
-    rate: (0.7 + wave * 0.24) * (arena ? 1.15 : 1),
+    // deliberate-combat tuning: roughly half the bodies, half again the hull
+    rate: (0.7 + wave * 0.24) * 0.55 * (arena ? 1.15 : 1),
     types: stage.roster(wave),
     boss: null, midboss: null,
-    hpMult: stage.hpMult * (1 + (wave - 1) * 0.16),
+    hpMult: stage.hpMult * (1 + (wave - 1) * 0.16) * 1.4,
     // contact pressure ramps harder past wave 10, where builds have come online
     dmgMult: stage.dmgMult * (1 + (wave - 1) * 0.06 + Math.max(0, wave - 10) * 0.015),
     overrun: false
@@ -136,7 +137,7 @@ GH.wavePlan = function (stage, wave, arena) {
   if (stage.id === 'wreck' && wave <= 2) plan.rate *= 0.7;
   if (arena) {
     // endless: scale forever, corrupt shells appear as roaming bosses every 10
-    plan.hpMult = 1 + (wave - 1) * 0.24;
+    plan.hpMult = (1 + (wave - 1) * 0.24) * 1.4;
     plan.dmgMult = 1 + (wave - 1) * 0.07;
     plan.types = stage.roster(Math.min(wave, 12));
     if (wave % 10 === 0) plan.midboss = 'warden';

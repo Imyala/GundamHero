@@ -141,11 +141,22 @@
         if (GH.game.state === 'play') input.specialPressed = true;
       }
       if (GH.game.state === 'play') {
-        var wn = { Digit1: 1, Digit2: 2, Digit3: 3 }[e.code];
+        // abilities on 1-4, wards (protection stances) on Z/X/C
+        var an = { Digit1: 1, Digit2: 2, Digit3: 3, Digit4: 4 }[e.code];
+        if (an) {
+          if (!input.abilityPressed) input.abilityPressed = {};
+          input.abilityPressed[an] = true;
+        }
+        var wn = { KeyZ: 1, KeyX: 2, KeyC: 3 }[e.code];
         if (wn) input.wardPressed = wn;
         if (e.code === 'KeyQ') input.wardCycle = true;
         if (e.code === 'KeyE') input.interactPressed = true;
         if (e.code === 'KeyT') input.transformPressed = true;
+        if (e.code === 'Tab') { GH.game.tabTarget(); e.preventDefault(); }
+      }
+      if (e.code === 'KeyK' &&
+        (GH.game.state === 'play' || GH.game.state === 'title')) {
+        openSkills(GH.game.state === 'play');
       }
       if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
       if (e.code === 'KeyF') {
@@ -178,6 +189,13 @@
     window.addEventListener('mousedown', function (e) {
       GH.audio.unlock();
       if (!GH.music.mode()) GH.music.play('title');
+      if (e.button === 0 && GH.game.state === 'play') {
+        // left click marks a target (the OSRS way: pick your fight)
+        input.mouseNDC.set(
+          (e.clientX / window.innerWidth) * 2 - 1,
+          -(e.clientY / window.innerHeight) * 2 + 1);
+        GH.game.clickTarget(input.mouseNDC);
+      }
       if (e.button === 2 && GH.game.state === 'play') {
         input.special = true;
         input.specialPressed = true;
@@ -275,7 +293,7 @@
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
     'trials-screen', 'season-screen', 'hub-screen', 'save-screen',
-    'reward-screen', 'pause-screen', 'end-screen'];
+    'reward-screen', 'pause-screen', 'end-screen', 'skills-screen'];
 
   function show(id) {
     SCREENS.forEach(function (s) {
@@ -450,8 +468,8 @@
       if (unlocked) {
         div.onclick = function () {
           chosenStage = i;
-          if (arena) openPresetPicker(i);
-          else launch(i);
+          // loadout kits retired with the card system — deploy directly
+          launch(i);
         };
       }
       wrap.appendChild(div);
@@ -609,6 +627,10 @@
     var comp = GH.progress.completion();
     var b = GH.meta.data.broker;
     var cards = [
+      { id: 'hub-skills', glyph: '❈', name: 'PILOT TRAINING',
+        sub: 'Pilot Lv ' + GH.skills.pilotProgress().lvl +
+          (GH.meta.data.skillPoints > 0 ? ' · ' + GH.meta.data.skillPoints + ' POINTS READY' : ' · skill tree'),
+        open: function () { openSkills(false); } },
       { id: 'hub-season', glyph: '☄', name: 'RELIC SEASON',
         sub: GH.progress.seasonName(s.id) + ' · ' + s.pts + ' pts' +
           (GH.progress.relicPicksAvailable() > 0 ? ' · RELIC READY' : ''),
@@ -976,6 +998,63 @@
   }
 
   // ----------------------------------------------------------------
+  // PILOT TRAINING — the skill tree. Reached from play (K), the hub,
+  // or the title; backing out of an in-play open resumes the run.
+  function openSkills(fromPlay) {
+    GH.audio.card();
+    if (fromPlay) expEntry = 'skills';
+    if (GH.game.state !== 'play' || fromPlay) GH.game.state = 'hangar';
+    renderSkills();
+    show('skills-screen');
+  }
+
+  function renderSkills() {
+    var pp = GH.skills.pilotProgress();
+    document.getElementById('skills-head').innerHTML =
+      'PILOT LEVEL <b>' + pp.lvl + '</b> · ' +
+      Math.floor(pp.into) + '/' + Math.ceil(pp.need) + ' XP · ' +
+      'POINTS TO SPEND: <b class="sk-pts">' + GH.meta.data.skillPoints + '</b> · ' +
+      'SALVAGE: ' + GH.meta.data.salvage;
+    var wrap = document.getElementById('skills-tree');
+    wrap.innerHTML = '';
+    GH.skills.BRANCHES.forEach(function (br) {
+      var col = document.createElement('div');
+      col.className = 'sk-branch';
+      var spent = GH.skills.spentIn(br.id);
+      col.innerHTML = '<div class="sk-branch-name" style="color:' + br.css + '">' +
+        br.name + ' <span class="sk-spent">(' + spent + ' spent)</span></div>';
+      GH.skills.TREE.forEach(function (node) {
+        if (node.branch !== br.id) return;
+        var rank = GH.skills.rank(node.id);
+        var can = GH.skills.canSpend(node.id);
+        var gated = spent < node.req;
+        var div = document.createElement('div');
+        div.className = 'sk-node' + (rank >= node.max ? ' maxed' : '') +
+          (can ? ' can' : '') + (gated ? ' gated' : '');
+        var pips = '';
+        for (var i = 0; i < node.max; i++) {
+          pips += '<span class="sk-pip' + (i < rank ? ' on' : '') + '"></span>';
+        }
+        div.innerHTML =
+          '<div class="sk-name">' + node.name +
+          (node.req > 0 ? ' <span class="sk-req">req ' + node.req + '</span>' : '') + '</div>' +
+          '<div class="sk-desc">' + node.desc + '</div>' +
+          '<div class="sk-pips">' + pips + '</div>';
+        div.onclick = function () {
+          if (GH.skills.spend(node.id)) {
+            GH.audio.levelup();
+            renderSkills();
+          } else {
+            GH.audio.hit();
+          }
+        };
+        col.appendChild(div);
+      });
+      wrap.appendChild(col);
+    });
+  }
+
+  // ----------------------------------------------------------------
   function togglePause() {
     if (GH.game.state === 'race') { GH.game.abortRace(); return; }
     if (GH.game.state === 'play') {
@@ -1007,6 +1086,8 @@
     GH.game.state = 'play';
     show(null);
     GH.audio.card();
+    // camp training/purchases land on the live character immediately
+    if (GH.game.refreshPilot) GH.game.refreshPilot();
   }
 
   function metaBack(entryKind, fallback) {
@@ -1042,6 +1123,15 @@
     document.getElementById('btn-profile').onclick = cycleProfile;
     // meta screens live under the hub now (or under a camp station)
     document.getElementById('btn-season-back').onclick = openHub;
+    document.getElementById('btn-skills-back').onclick = metaBack('skills', openHub);
+    document.getElementById('btn-respec').onclick = function () {
+      if (GH.skills.respec()) {
+        GH.audio.win();
+        renderSkills();
+      } else {
+        GH.audio.hit();
+      }
+    };
     document.getElementById('btn-broker-back').onclick = metaBack('broker', openHub);
     document.getElementById('btn-collection-back').onclick = metaBack('collection', openHub);
     document.getElementById('btn-trials-back').onclick = openHub;

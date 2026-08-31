@@ -1,10 +1,12 @@
 # HERO FRAME
 
 A single-player, top-down **mech action-RPG** in the browser — low-poly PS1-style
-3D, fantasy-archetype mechs, auto-firing weapons, gem-socketed builds, and one
-persistent open continent (**THE SHATTERED REACH**) where everything you break
-stays broken — plus six classic survivor arenas, transforming skimmer frames,
-and two racing disciplines.
+3D, fantasy-archetype mechs, **deliberate target-based combat** (mark a hostile,
+your frame fights it on its own attack cycle while you steer, ward, and spend
+energy on abilities), a **persistent pilot skill tree**, gem-socketed builds,
+and one persistent open continent (**THE SHATTERED REACH**) where everything you
+break stays broken — plus six wave arenas, transforming skimmer frames, and two
+racing disciplines.
 Built from scratch with Three.js and zero build tooling: clone it, open it, play it.
 
 Inspired by the wave-survivor / action-roguelite genre; all names, art, code, and
@@ -31,14 +33,16 @@ or move between browsers.
 | Input | Action |
 |---|---|
 | WASD / arrows | Move |
-| Mouse | Aim (weapons fire automatically) |
+| Left click / Tab | **Mark a target** — your frame auto-attacks it while it's in reach |
+| 1 / 2 / 3 / 4 | Cast RUPTURE / SWEEP / SHACKLE / OVERLOAD (energy + cooldowns; 2–4 unlock in the tree) |
+| Z / X / C | Raise KINETIC / BALLISTIC / ARC ward (your "protection prayers") |
+| Q (or gamepad LB, touch WARD) | Cycle wards |
+| K | Open the pilot skill tree (works mid-run; camp training applies live) |
 | Space | Boost (dash — some frames weaponize it) |
 | Shift / Right-click | Special (per frame: Block, Overdrive, Nova, Lunge, Shade, Frenzy, Blink, Bulwark) |
-| 1 / 2 / 3 (in combat) | Toggle KINETIC / BALLISTIC / ARC ward |
-| Q (or gamepad LB, touch WARD) | Cycle wards |
 | E (expedition) | Interact — camp stations, relays, vaults, race starts |
 | T (gamepad Y, touch TRANS) | Transform between frame and skimmer combat forms — any mode |
-| 1–6 | Pick a wave-reward card / socket target |
+| 1–6 (gem screen) | Pick a socket target |
 | F | Toggle CRT scanlines |
 | Esc / P | Pause |
 | IJKL + O + U (or gamepad stick + A + B) | Player 2 in co-op: move, boost, special |
@@ -50,6 +54,34 @@ Dev shortcuts: `?wave=N` starts at wave N with catch-up levels; `?unlock=all`
 opens every shell and stage; `?salvage=500` grants test salvage.
 
 ## The game
+
+### Deliberate, target-based combat
+No bullet-hose, no auto-spray. In the spirit of the classic MMOs and
+ARPGs: **left-click (or Tab) marks a hostile**, and your frame works that
+target on its weapon's own attack cycle whenever it's in reach — melee
+frames swing when you close the gap, ranged frames fire aimed single
+shots. Around that auto-attack you make the real decisions:
+
+- **Abilities (1–4)** spend the blue **energy capacitor** and run
+  cooldowns: RUPTURE (a 2.2× focused strike), SWEEP (radial knockback),
+  SHACKLE (chain a cluster in place), OVERLOAD (detonate their footing).
+  All scale off your primary weapon, so gems and resonances still shape
+  every cast. Slots 2–4 are unlocked by training.
+- **Wards (Z/X/C)** are the reaction layer — match the stance to the
+  incoming damage type to cut it 75% and build COUNTER stacks.
+- Fights are tuned for it: roughly half the bodies of the old wave game,
+  each with half again the hull. Every enemy is a fight, not confetti.
+
+### The pilot skill tree (press K)
+Power-up cards are gone. Every spark you collect feeds a **persistent
+pilot level** on a slowing curve; each level pays one **skill point**,
+spent in a three-discipline tree: **ASSAULT** (damage, attack speed,
+crit, execute damage, a wider cleave capstone), **BULWARK** (hull, armor,
+ward efficiency, block, a COUNTER-cap capstone), **SYSTEMS** (energy,
+regeneration, cooldowns, boost, a skimmer capstone). Deeper nodes gate on
+points already spent in that discipline; ability slots 2–4 live in the
+tree. Training at the camp applies to your live expedition character on
+the spot, and a respec costs 200 salvage.
 
 ### THE SHATTERED REACH — one persistent continent
 The headline mode. Instead of an arena, deploy onto a six-territory open
@@ -170,12 +202,12 @@ bonus to that weapon. Fill all four and the *type counts* grant a **Resonance**:
   ROTBURST (kills burst in spores)
 - 4 distinct → **PRISM**, a periodic piercing knockback blast
 
-### Wave rewards
-After every wave, pick 1 of 3 cards: secondary weapons in four classes
-(LIGHT/HEAVY × PHYSICAL/ELEMENTAL — Flak Fan, Missile Rack, Orbit Blades,
-Arc Coil, Mine Layer, Gun Drone, Flame Projector, Mortar Pod, Frost Repeater),
-stat **traits**, passive **Protocols** (Afterburner Cell, Reclaimer, Spark
-Reactor, Thorn Plating, Emergency Vents), or gems to socket.
+### Progression between fights
+Levels inside a run still grow your frame's own stats (each frame has its
+own per-level growth, boosted by your active Devotion), while the
+persistent layers — the skill tree, Devotions, Mastery, Trials, gems —
+carry between every run. Boss-dropped gems open a socketing screen; the
+old pick-a-card wave rewards are retired.
 
 ### Elements
 Burn (stacking DoT), Shock (chance to stun), Frost (slow) — boosted by
@@ -271,9 +303,7 @@ level-up during a run.
 - **The Shattered Reach** — the persistent open-world expedition (see above).
 - **Classic** — pick a frame and stage, survive 20 waves, claim the corrupted frame.
 - **Arena** — endless, infinitely scaling waves on any unlocked stage; best wave
-  saved. Before deploying, pick a **loadout preset**: Standard Issue, Gun
-  Platform, Storm Cell, Sapper, or Pyre Cult — starting weapon/trait/gem kits
-  that seed different builds.
+  saved. Your build is the one you trained: tree, gems, devotions, mastery.
 - **Weekly Challenge** — a deterministic ISO-week seed issues everyone the same
   frame, stage, and modifier trio (two hazards like SWARM / IRONCLAD / GLASS
   FRAME / HASTE / FERAL plus one boon like BOUNTY or KEEN EYES); endless
@@ -316,6 +346,7 @@ js/models.js      low-poly mesh builders (mechs, enemies, pickups, props)
 js/mechs.js       eight frame definitions
 js/meta.js        persistence: pilot profiles, unlocks, salvage, world scars
 js/progress.js    hunt contracts, stage trials, collection log, artifacts
+js/skills.js      pilot skill tree, pilot level, ability definitions
 js/upgrades.js    reward card pool (weapons/traits/protocols/gems)
 js/enemies.js     enemy + midboss + corrupted boss definitions
 js/audio.js       WebAudio procedural SFX

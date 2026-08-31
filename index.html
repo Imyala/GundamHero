@@ -22,6 +22,9 @@
         <div class="bar-frame boost-frame">
           <div id="boost-fill" class="bar-fill boost-fill"></div>
         </div>
+        <div class="bar-frame energy-frame">
+          <div id="energy-fill" class="bar-fill energy-fill"></div>
+        </div>
         <div id="reload-line"></div>
         <div id="p2-row" class="hidden">
           <div class="bar-frame p2-frame"><div id="p2-fill" class="bar-fill p2-fill"></div></div>
@@ -35,6 +38,10 @@
       <div id="hud-center">
         <div id="wave-label">Wave 1/20</div>
         <div id="wave-timer">30.0</div>
+        <div id="target-panel" class="hidden">
+          <div id="target-name">???</div>
+          <div class="bar-frame target-frame"><div id="target-fill" class="bar-fill target-fill"></div></div>
+        </div>
       </div>
       <div id="hud-right">
         <div class="bar-frame xp-frame">
@@ -51,6 +58,7 @@
     <div id="announce" class="hidden"></div>
     <div id="hint-line" class="hidden"></div>
     <div id="interact-line" class="hidden"></div>
+    <div id="hotbar"></div>
     <canvas id="minimap" class="hidden" width="132" height="88"></canvas>
     <div id="race-hud" class="hidden">
       <div id="race-lap"></div>
@@ -76,7 +84,7 @@
     </div>
     <div id="title-salvage"></div>
     <div id="title-memorial"></div>
-    <div class="title-foot">WASD move &nbsp;·&nbsp; mouse aim &nbsp;·&nbsp; SPACE boost &nbsp;·&nbsp; SHIFT / RMB special &nbsp;·&nbsp; F scanlines &nbsp;·&nbsp; weapons fire automatically</div>
+    <div class="title-foot">WASD move &nbsp;·&nbsp; CLICK / TAB target &nbsp;·&nbsp; 1–4 abilities &nbsp;·&nbsp; Z X C wards &nbsp;·&nbsp; SPACE boost &nbsp;·&nbsp; SHIFT special &nbsp;·&nbsp; T transform &nbsp;·&nbsp; K skill tree</div>
   </div>
 
   <!-- ===================== PLAYER SELECT ===================== -->
@@ -175,6 +183,17 @@
     <button id="btn-collection-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
+  <!-- ===================== SKILL TREE ===================== -->
+  <div id="skills-screen" class="screen hidden">
+    <h2 class="select-title">PILOT&nbsp;TRAINING</h2>
+    <div id="skills-head"></div>
+    <div id="skills-tree"></div>
+    <div class="title-row">
+      <button id="btn-respec" class="menu-btn tiny">RESPEC · 200 SALVAGE</button>
+      <button id="btn-skills-back" class="menu-btn tiny back-btn">◄ BACK</button>
+    </div>
+  </div>
+
   <!-- ===================== STAGE TRIALS ===================== -->
   <div id="trials-screen" class="screen hidden">
     <h2 class="select-title">STAGE&nbsp;TRIALS</h2>
@@ -229,6 +248,7 @@
 <script src="js/upgrades.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/progress.js"></script>
+<script src="js/skills.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/music.js"></script>
 <script src="js/world.js"></script>

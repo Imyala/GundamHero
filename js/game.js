@@ -59,13 +59,13 @@ GH.game = (function () {
     }
     if (seen.__done) return;
     if (waveNum === 1) {
-      if (runTime > 0.5) showHint('move', 'WASD to move · aim with the mouse — your weapons fire on their own');
-      if (runTime > 7) showHint('boost', 'SPACE to boost — a short dash that dodges through danger');
-      if (sparksRun > 0) showHint('sparks', 'Gems are SPARKS — collect them to level up your frame');
+      if (runTime > 0.5) showHint('move', 'WASD to move · CLICK a hostile (or TAB) to mark it — your frame fights your marked target on its own cycle');
+      if (runTime > 8) showHint('ability', 'Press 1 to cast RUPTURE on your target — abilities spend the blue ENERGY bar');
+      if (sparksRun > 0) showHint('sparks', 'SPARKS feed your level AND your persistent PILOT LEVEL — skill points are spent in the tree [K]');
     }
     if (waveNum === 2) {
       if (waveTimer < wavePlan.duration - 2) {
-        showHint('wards', 'Press 1 / 2 / 3 to raise a WARD — match it to the incoming damage to cut it 75%');
+        showHint('wards', 'Press Z / X / C to raise a WARD — match it to the incoming damage to cut it 75%');
       }
     }
     if (waveNum === 3) {
@@ -279,19 +279,28 @@ GH.game = (function () {
   function makePlayer(mechDef) {
     var s = mechDef.stats;
     var dev = GH.meta.devotionBonus();
+    var skl = GH.skills.bonuses(); // the pilot's trained tree
     var p = {
       def: mechDef,
       mesh: GH.models.buildMech(mechDef.model),
       x: 0, z: 0, facing: 0, moveX: 0, moveZ: 0,
       stats: {
-        maxHP: s.maxHP + dev.maxHP, speed: s.speed * 0.42, armor: s.armor,
-        block: s.block, crit: s.crit + dev.crit, critMult: 1.6 + dev.critMult,
+        maxHP: s.maxHP + dev.maxHP + skl.maxHP, speed: s.speed * 0.42,
+        armor: s.armor + skl.armor,
+        block: s.block + skl.block, crit: s.crit + dev.crit + skl.crit,
+        critMult: 1.6 + dev.critMult,
         lifesteal: s.lifesteal,
-        damageMult: 1 + dev.damageMult, atkSpdMult: 1 + dev.atkSpdMult, flatDamage: 0,
+        damageMult: 1 + dev.damageMult + skl.damageMult,
+        atkSpdMult: 1 + dev.atkSpdMult + skl.atkSpdMult, flatDamage: 0,
         regen: dev.regen, magnet: 3.2 * (1 + dev.magnet), xpGain: 1 + dev.xpGain,
-        bonusProj: 0, boostRegen: 0.35 + dev.boostRegen, boostCost: 0.34,
-        elemMult: mechDef.id === 'hexen' ? 1.15 : 1
+        bonusProj: skl.cleave ? 1 : 0,
+        boostRegen: 0.35 + dev.boostRegen + skl.boostRegen, boostCost: 0.34,
+        elemMult: mechDef.id === 'hexen' ? 1.15 : 1,
+        energyMax: skl.energyMax, energyRegen: skl.energyRegen
       },
+      skillBon: skl,
+      energy: skl.energyMax,
+      abilityCds: { 1: 0, 2: 0, 3: 0, 4: 0 },
       hp: 0,
       xp: 0, level: 1, xpNeed: 6,
       weapons: [],
@@ -335,7 +344,7 @@ GH.game = (function () {
       raw *= 0.25;
       player.wardEnergy = Math.max(0, player.wardEnergy - 0.06);
       player.counter.push(4);
-      if (player.counter.length > 5) player.counter.shift();
+      if (player.counter.length > player.skillBon.counterCap) player.counter.shift();
       G.dmg.spawn(player.x, 3.0, player.z, 'WARDED', 'elem', 13);
       GH.audio.block();
     }
@@ -386,6 +395,13 @@ GH.game = (function () {
 
   function gainXP(amount) {
     player.xp += amount * player.stats.xpGain;
+    // every spark also feeds the persistent pilot level → skill points
+    var gained = GH.skills.gainPilotXP(amount);
+    if (gained > 0) {
+      var pl = GH.skills.pilotProgress().lvl;
+      queueAnnounce('PILOT LEVEL ' + pl + ' — SKILL POINT EARNED [K]', 26);
+      GH.audio.win();
+    }
     while (player.xp >= player.xpNeed) {
       player.xp -= player.xpNeed;
       player.level++;
@@ -393,7 +409,6 @@ GH.game = (function () {
       applyLevelUp();
       GH.audio.levelup();
       announce('LVL ' + player.level, 22);
-      if (expActive) expLevelUps++; // expedition: card picks happen field-side
     }
   }
 
@@ -518,6 +533,10 @@ GH.game = (function () {
       }
     }
     dmg *= GH.progress.contractDamageBonus(e.id);
+    // EXECUTIONER LOGIC (skill tree): finish wounded targets harder
+    if (player.skillBon.execute > 0 && e.hp < e.maxHp * 0.35) {
+      dmg *= 1 + player.skillBon.execute;
+    }
     if (e.elite === 'shielded' && !artOn('null_lens')) dmg *= 0.5;
     if (inst && inst.hybridId === 'executioner' && e.hp < e.maxHp * 0.2) dmg *= 2;
     dmg = Math.max(1, Math.round(dmg));
@@ -1231,20 +1250,184 @@ GH.game = (function () {
     size: 0.18, color: 0x70c0ff, spread: 0.16, count: 2
   };
 
+  // =================================================================
+  // TARGET-BASED COMBAT — pick a fight, don't hose the room.
+  // Click (or Tab) selects a target; your primary auto-attacks it on
+  // its own cycle while it's in range; abilities spend energy on it.
+  // =================================================================
+  var target = null;
+  var reticle = null;
+
+  function setTarget(e) {
+    target = e || null;
+    if (!reticle) {
+      reticle = new THREE.Mesh(new THREE.TorusGeometry(1, 0.07, 4, 20),
+        new THREE.MeshBasicMaterial({ color: 0xffd050, transparent: true, opacity: 0.85, depthWrite: false }));
+      reticle.rotation.x = Math.PI / 2;
+      scene.add(reticle);
+    }
+    reticle.visible = !!target;
+    if (target) {
+      reticle.scale.setScalar(target.def.radius + 0.5);
+      GH.audio.card();
+    }
+  }
+
+  function maintainTarget() {
+    if (target && (target.dead ||
+      GH.dist2(player.x, player.z, target.x, target.z) > 45 * 45)) {
+      setTarget(null);
+    }
+    // soft acquire: something already in your face is fair game
+    if (!target) {
+      var e = nearestEnemy(player.x, player.z, 9);
+      if (e) setTarget(e);
+    }
+    if (reticle && target) {
+      reticle.position.set(target.x, 0.12, target.z);
+      reticle.rotation.z += 0.02;
+    }
+  }
+
+  G.clickTarget = function (ndc) {
+    if (G.state !== 'play' || !player) return false;
+    raycaster.setFromCamera(ndc, camera);
+    var meshes = [];
+    for (var i = 0; i < enemies.length; i++) {
+      if (!enemies[i].dead) meshes.push(enemies[i].mesh);
+    }
+    var hits = raycaster.intersectObjects(meshes, true);
+    if (hits.length) {
+      var obj = hits[0].object;
+      while (obj && meshes.indexOf(obj) === -1) obj = obj.parent;
+      for (i = 0; i < enemies.length; i++) {
+        if (enemies[i].mesh === obj) { setTarget(enemies[i]); return true; }
+      }
+    }
+    // near-miss: pick whatever stands close to the clicked ground point
+    if (raycaster.ray.intersectPlane(groundPlane, tmpV3)) {
+      var e = nearestEnemy(tmpV3.x, tmpV3.z, 3);
+      if (e) { setTarget(e); return true; }
+    }
+    return false;
+  };
+
+  G.tabTarget = function () {
+    if (!player) return;
+    var e = nearestEnemy(player.x, player.z, 32, target ? [target] : null);
+    if (e) setTarget(e);
+  };
+
+  function attackRange(inst) {
+    var t = inst.w.type;
+    if (t === 'melee') return inst.w.range + 0.8;
+    if (t === 'aura') return inst.w.range + 0.5;
+    return 20;
+  }
+
+  // ---------------- abilities: the hotbar ----------------
+  function castAbility(slot) {
+    var ab = GH.skills.ABILITIES[slot];
+    var bon = player.skillBon;
+    if (!ab) return;
+    if (!bon.slots[slot]) {
+      announce(ab.name + ' — LOCKED (TRAIN IT · K)', 18);
+      return;
+    }
+    if (player.abilityCds[slot] > 0) return;
+    if (player.energy < ab.cost) {
+      announce('LOW ENERGY', 16);
+      GH.audio.hit();
+      return;
+    }
+    var needsTarget = slot !== 2;
+    if (needsTarget && (!target || target.dead)) {
+      announce('NO TARGET — CLICK A HOSTILE', 16);
+      return;
+    }
+    var inst = player.weapons[0];
+    var dmg = weaponDamage(inst);
+    var range = slot === 1 ? attackRange(inst) : 20;
+    if (needsTarget && GH.dist2(player.x, player.z, target.x, target.z) > range * range) {
+      announce('OUT OF RANGE', 16);
+      return;
+    }
+    player.energy -= ab.cost;
+    player.abilityCds[slot] = ab.cd * bon.cdMult;
+
+    if (slot === 1) {          // RUPTURE — focused strike
+      player.facing = GH.angleTo(player.x, player.z, target.x, target.z);
+      damageEnemy(target, dmg * 2.2, { inst: inst });
+      spawnBurst(target.x, 1.4, target.z, 0xfff0c0, 12);
+      var ra = GH.angleTo(player.x, player.z, target.x, target.z);
+      target.vx += Math.sin(ra) * 8 / target.def.mass;
+      target.vz += Math.cos(ra) * 8 / target.def.mass;
+      GH.audio.crit();
+      G.hitStop(0.05);
+    } else if (slot === 2) {   // SWEEP — radial blowout
+      GH.audio.explode();
+      var m = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.9, 24),
+        new THREE.MeshBasicMaterial({ color: 0xffb050, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(player.x, 0.3, player.z);
+      scene.add(m);
+      effects.push({ kind: 'boom', mesh: m, t: 0.3, total: 0.3, grow: 6 });
+      for (var si2 = 0; si2 < enemies.length; si2++) {
+        var se = enemies[si2];
+        if (se.dead) continue;
+        var rr = 4.5 + se.def.radius;
+        if (GH.dist2(player.x, player.z, se.x, se.z) <= rr * rr) {
+          damageEnemy(se, dmg * 1.3, { inst: inst });
+          var sa = GH.angleTo(player.x, player.z, se.x, se.z);
+          se.vx += Math.sin(sa) * 18 / se.def.mass;
+          se.vz += Math.cos(sa) * 18 / se.def.mass;
+        }
+      }
+    } else if (slot === 3) {   // SHACKLE — chain the cluster down
+      GH.audio.zap();
+      drawLightning(player.x, 1.6, player.z, target.x, 1.2, target.z);
+      for (var ci2 = 0; ci2 < enemies.length; ci2++) {
+        var ce2 = enemies[ci2];
+        if (ce2.dead) continue;
+        if (ce2 === target || GH.dist2(target.x, target.z, ce2.x, ce2.z) < 2.5 * 2.5) {
+          damageEnemy(ce2, dmg * 1.0, { inst: inst, elem: 'shock' });
+          ce2.slowT = 3.5;
+          if (Math.random() < 0.5) ce2.stun = Math.max(ce2.stun || 0, 0.8);
+        }
+      }
+    } else if (slot === 4) {   // OVERLOAD — detonate their footing
+      explode(target.x, target.z, 3.5, dmg * 2.8, { inst: inst, elem: 'burn' });
+      G.hitStop(0.08);
+    }
+  }
+
   function updateWeapons(dt, input) {
+    var s = player.stats;
+    // the capacitor always refills; cooldowns always tick
+    player.energy = Math.min(s.energyMax, player.energy + s.energyRegen * dt);
+    for (var c = 1; c <= 4; c++) {
+      if (player.abilityCds[c] > 0) player.abilityCds[c] -= dt;
+    }
+    maintainTarget();
+
     if (player.speederOn) {
-      // null rifts still ground the cannons
+      // skimmer cannons fire only at a marked target — no hosing
       if (inHazard('rifts', player.x, player.z)) { player.suppressed = true; return; }
       player.suppressed = false;
       if (!player.strafeInst) player.strafeInst = makeWeaponInst('strafe', STRAFE_DEF, false);
       var si = player.strafeInst;
-      si.timer -= dt * (player.stats.atkSpdMult || 1);
-      if (si.timer <= 0) {
+      si.timer -= dt * (s.atkSpdMult || 1);
+      if (si.timer <= 0 && target &&
+        GH.dist2(player.x, player.z, target.x, target.z) < 22 * 22) {
         si.timer = si.w.interval;
-        var sAim = player.facing;
+        var sAim = GH.angleTo(player.x, player.z, target.x, target.z);
+        var surge = player.skillBon.surge ? 1.4 : 1;
+        var keep = si.w.damage;
+        si.w.damage = keep * surge;
         fireShot(si, player.x + Math.sin(sAim) * 0.7, player.z + Math.cos(sAim) * 0.7, sAim);
+        si.w.damage = keep;
       }
-      return; // the rest of the suite stays folded
+      return; // the main suite stays folded
     }
     // null rifts suppress every weapon while you stand inside one
     if (inHazard('rifts', player.x, player.z)) {
@@ -1252,51 +1435,63 @@ GH.game = (function () {
       return;
     }
     player.suppressed = false;
-    var aim = player.facing;
-    var spdBase = player.stats.atkSpdMult * frenzyMult() *
-      (player.special.active > 0 && player.def.special === 'overdrive' ? 2 : 1);
 
-    for (var i = 0; i < player.weapons.length; i++) {
-      var inst = player.weapons[i];
-      var w = inst.w;
-      var spdMult = spdBase * inst.mods.atkSpdMult;
-
-      // burst continuation
-      if (inst.burstLeft > 0) {
-        inst.burstTimer -= dt;
-        if (inst.burstTimer <= 0) {
-          inst.burstLeft--;
-          inst.burstTimer = 0.05;
-          fireShot(inst, player.x + Math.sin(inst.burstAngle) * 0.8,
-            player.z + Math.cos(inst.burstAngle) * 0.8, inst.burstAngle);
+    // hotbar casts
+    if (input.abilityPressed) {
+      for (c = 1; c <= 4; c++) {
+        if (input.abilityPressed[c]) {
+          input.abilityPressed[c] = false;
+          castAbility(c);
         }
       }
+    }
 
-      // reload
-      if (inst.reloading > 0) {
-        inst.reloading -= dt * spdMult;
-        if (inst.reloading <= 0) {
-          inst.clip = w.clip;
-          onReload(inst);
-        }
-        continue;
-      }
+    var inst = player.weapons[0];
+    var w = inst.w;
+    var spdMult = s.atkSpdMult * frenzyMult() *
+      (player.special.active > 0 && player.def.special === 'overdrive' ? 2 : 1) *
+      inst.mods.atkSpdMult;
 
-      // sanctity pulse for clipless weapons
-      if (resHas(inst, 'sol') > 0 && !w.clip) {
-        inst.sanctityT -= dt;
-        if (inst.sanctityT <= 0) { inst.sanctityT = 8; sanctitySmite(inst); }
+    // burst continuation (already aimed)
+    if (inst.burstLeft > 0) {
+      inst.burstTimer -= dt;
+      if (inst.burstTimer <= 0) {
+        inst.burstLeft--;
+        inst.burstTimer = 0.05;
+        fireShot(inst, player.x + Math.sin(inst.burstAngle) * 0.8,
+          player.z + Math.cos(inst.burstAngle) * 0.8, inst.burstAngle);
       }
-      // prism resonance
-      if (inst.resonance && inst.resonance.kind === 'prism') {
-        inst.prismT -= dt;
-        if (inst.prismT <= 0) { inst.prismT = 6; prismBlast(inst); }
-      }
-      if (w.type === 'orbit') continue; // continuous, handled below
+    }
 
-      inst.timer -= dt * spdMult;
-      if (inst.timer <= 0) {
+    // reload
+    if (inst.reloading > 0) {
+      inst.reloading -= dt * spdMult;
+      if (inst.reloading <= 0) {
+        inst.clip = w.clip;
+        onReload(inst);
+      }
+      return;
+    }
+
+    // resonance pulses keep their own clocks
+    if (resHas(inst, 'sol') > 0 && !w.clip) {
+      inst.sanctityT -= dt;
+      if (inst.sanctityT <= 0) { inst.sanctityT = 8; sanctitySmite(inst); }
+    }
+    if (inst.resonance && inst.resonance.kind === 'prism') {
+      inst.prismT -= dt;
+      if (inst.prismT <= 0) { inst.prismT = 6; prismBlast(inst); }
+    }
+
+    // auto-attack: the cycle winds regardless, but only lands on a
+    // marked target inside the weapon's reach
+    inst.timer = Math.max(0, inst.timer - dt * spdMult);
+    if (inst.timer <= 0 && target && !target.dead) {
+      var range = attackRange(inst);
+      if (GH.dist2(player.x, player.z, target.x, target.z) <= range * range) {
         inst.timer = w.interval;
+        var aim = GH.angleTo(player.x, player.z, target.x, target.z);
+        player.facing = aim; // square up like you mean it
         fireWeaponOnce(inst, aim);
         if (w.clip) {
           inst.clip--;
@@ -1372,6 +1567,8 @@ GH.game = (function () {
     if (parts && parts.armR) parts.armR.rotation.x = -2.2;
 
     var dmg = weaponDamage(inst, a2);
+    // RESONANT EDGE capstone: primary swings carve a wider arc
+    var arcW = w.arc * (a2 === player && inst.isPrimary && player.skillBon.cleave ? 1.35 : 1);
     for (var i = 0; i < enemies.length; i++) {
       var e = enemies[i];
       if (e.dead) continue;
@@ -1379,7 +1576,7 @@ GH.game = (function () {
       if (GH.dist2(a2.x, a2.z, e.x, e.z) > rr * rr) continue;
       var angTo = GH.angleTo(a2.x, a2.z, e.x, e.z);
       var diff = Math.abs(((angTo - aim + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-      if (diff <= w.arc / 2 + 0.25) {
+      if (diff <= arcW / 2 + 0.25) {
         damageEnemy(e, dmg, { inst: inst });
         var kb = w.knockback / e.def.mass;
         e.vx += Math.sin(angTo) * kb;
@@ -2081,13 +2278,17 @@ GH.game = (function () {
   var rewardQueue = [];
 
   function showRewards() {
+    // no more power-up cards — only dropped gems still need socketing
+    if (player.pendingGems.length === 0) {
+      startWave(waveNum + 1);
+      updateHUDStatic();
+      return;
+    }
     G.state = 'reward';
     rewardQueue = [];
-    document.getElementById('reward-heading').innerHTML = 'WAVE&nbsp;REWARD';
-    // pending boss gems first, then the card pick
+    document.getElementById('reward-heading').innerHTML = 'SOCKET&nbsp;GEM';
     player.pendingGems.forEach(function (t) { rewardQueue.push({ gemType: t }); });
     player.pendingGems = [];
-    rewardQueue.push({ cards: GH.rollRewards(player, waveNum, player.fourthCard ? 4 : 3) });
     document.getElementById('reward-screen').classList.remove('hidden');
     nextRewardStep();
   }
@@ -2547,11 +2748,12 @@ GH.game = (function () {
 
   function expeditionPlan(zone) {
     var st = GH.world.stageFor(zone.id);
+    // deliberate-combat tuning: fewer bodies, each one worth fighting
     return {
       duration: 999, rate: 0,
       types: st.roster(4 + zone.danger * 3),
       boss: null, midboss: null,
-      hpMult: 0.8 + (zone.danger - 1) * 0.9,
+      hpMult: (0.8 + (zone.danger - 1) * 0.9) * 1.5,
       dmgMult: 0.9 + (zone.danger - 1) * 0.45,
       overrun: false
     };
@@ -2579,21 +2781,43 @@ GH.game = (function () {
   }
 
   function restoreCharacter(saved) {
+    // stats are re-derived, never copied: base frame + devotions + the
+    // CURRENT skill tree + mastery + per-level growth. That way training
+    // or respeccing at camp reaches a live character immediately.
     player = makePlayer(GH.mechs[saved.mech]);
-    for (var k in saved.stats) player.stats[k] = saved.stats[k];
-    player.hp = saved.hp;
+    var mbr = GH.progress.masteryBonus(player.def.id);
+    player.stats.damageMult += mbr.damageMult;
+    player.stats.maxHP += mbr.maxHP;
+    player.stats.boostRegen += mbr.boostRegen;
+    if (mbr.energyBonus) player.stats.energyRegen *= 1.1;
     player.xp = saved.xp; player.level = saved.level; player.xpNeed = saved.xpNeed;
+    for (var lv = 1; lv < saved.level; lv++) applyLevelUp();
+    player.hp = Math.min(saved.hp, player.stats.maxHP);
     player.weaponLevels = saved.weaponLevels || {};
     player.protocols = saved.protocols || {};
     player.phoenixUsed = saved.phoenixUsed;
-    player.weapons = saved.weapons.map(function (sw) {
-      var inst = makeWeaponInst(sw.id, sw.w, sw.isPrimary);
+    // the combat rework keeps one weapon: the frame's primary (older
+    // saves may carry retired secondaries — drop them, keep the sockets)
+    player.weapons = saved.weapons.slice(0, 1).map(function (sw) {
+      var inst = makeWeaponInst(sw.id, sw.w, true);
       inst.sockets = sw.sockets.slice();
       GH.gems.applySocketBonuses(inst);
       return inst;
     });
     player.x = saved.x; player.z = saved.z;
   }
+
+  // rebuild the live expedition character so fresh training/respec lands now
+  G.refreshPilot = function () {
+    if (!player || !expActive || G.state === 'race') return;
+    var snap = serializeCharacter();
+    if (wardDome && wardDome.parent === player.mesh) player.mesh.remove(wardDome);
+    if (player.speederMesh) scene.remove(player.speederMesh);
+    scene.remove(player.mesh);
+    restoreCharacter(snap);
+    updateHUDStatic();
+    saveExpedition();
+  };
 
   G.startExpedition = function (mechIndex) {
     clearWorld();
@@ -2638,8 +2862,7 @@ GH.game = (function () {
       player.stats.maxHP += mb2.maxHP;
       player.hp = player.stats.maxHP;
       player.stats.boostRegen += mb2.boostRegen;
-      player.fourthCard = mb2.fourthCard;
-      if (GH.devGrant) applyPreset({ weapons: GH.devGrant });
+      if (mb2.energyBonus) player.stats.energyRegen *= 1.1;
       saveExpedition();
     }
 
@@ -2711,9 +2934,8 @@ GH.game = (function () {
   function updateExpedition(dt, input) {
     var w = GH.meta.data.world;
 
-    // banked level-ups open the card screen (pauses the sim)
-    if (expLevelUps > 0) {
-      expLevelUps--;
+    // dropped gems open the socketing screen (pauses the sim)
+    if (player.pendingGems.length > 0) {
       showExpeditionRewards();
       return;
     }
@@ -2779,8 +3001,8 @@ GH.game = (function () {
       if (!ne.nestId || ne.dead) continue;
       ne.spawnT -= dt;
       var nd2 = GH.dist2(player.x, player.z, ne.x, ne.z);
-      if (ne.spawnT <= 0 && nd2 < 45 * 45 && localCount < 26) {
-        ne.spawnT = Math.max(1.2, 4.5 - ne.spawnZone.danger);
+      if (ne.spawnT <= 0 && nd2 < 45 * 45 && localCount < 12) {
+        ne.spawnT = Math.max(2.2, 7 - ne.spawnZone.danger);
         var pick = GH.weightedPick(expeditionPlan(ne.spawnZone).types);
         var sa = Math.random() * Math.PI * 2;
         spawnEnemy(pick.id, ne.x + Math.cos(sa) * 4, ne.z + Math.sin(sa) * 4);
@@ -2845,11 +3067,9 @@ GH.game = (function () {
   function showExpeditionRewards() {
     G.state = 'reward';
     rewardQueue = [];
-    document.getElementById('reward-heading').innerHTML = 'FIELD&nbsp;UPGRADE';
+    document.getElementById('reward-heading').innerHTML = 'SOCKET&nbsp;GEM';
     player.pendingGems.forEach(function (t) { rewardQueue.push({ gemType: t }); });
     player.pendingGems = [];
-    var tier = Math.min(20, 2 + zoneNow.danger * 3 + Math.floor(player.level / 3));
-    rewardQueue.push({ cards: GH.rollRewards(player, tier, player.fourthCard ? 4 : 3) });
     document.getElementById('reward-screen').classList.remove('hidden');
     nextRewardStep();
   }
@@ -3410,7 +3630,7 @@ GH.game = (function () {
     }
     player.wardCd = Math.max(0, player.wardCd - dt);
     if (player.ward) {
-      player.wardEnergy -= dt * 0.2;
+      player.wardEnergy -= dt * 0.2 * player.skillBon.wardDrainMult;
       if (player.wardEnergy <= 0) {
         player.wardEnergy = 0;
         player.ward = null;
@@ -3541,8 +3761,8 @@ GH.game = (function () {
         cipherRun.prog = Math.max(0, cipherRun.prog - dt * 0.5);
       }
     } else if (step.id === 'burst') {
-      if (kills - cipherRun.killsAt >= 5) cipherStepDone();
-      else if (cipherRun.t > 8) { cipherRun.t = 0; cipherRun.killsAt = kills; } // retry window
+      if (kills - cipherRun.killsAt >= 4) cipherStepDone();
+      else if (cipherRun.t > 14) { cipherRun.t = 0; cipherRun.killsAt = kills; } // retry window
     } else if (step.id === 'sprint') {
       if (cipherRun.boosts >= 3) cipherStepDone();
       else if (cipherRun.t > 10) { cipherRun.t = 0; cipherRun.boosts = 0; }
@@ -3556,7 +3776,7 @@ GH.game = (function () {
     var step = cipherRun.steps[cipherRun.idx];
     var extra = '';
     if (step.id === 'stand') extra = ' (' + GH.fmt1(Math.max(0, 2.5 - cipherRun.prog)) + 's)';
-    else if (step.id === 'burst') extra = ' (' + (kills - cipherRun.killsAt) + '/5, ' + GH.fmt1(Math.max(0, 8 - cipherRun.t)) + 's)';
+    else if (step.id === 'burst') extra = ' (' + (kills - cipherRun.killsAt) + '/4, ' + GH.fmt1(Math.max(0, 14 - cipherRun.t)) + 's)';
     else if (step.id === 'sprint') extra = ' (' + cipherRun.boosts + '/3)';
     else if (step.id === 'hold') extra = ' (' + GH.fmt1(Math.max(0, 10 - cipherRun.t)) + 's)';
     return (cipherRun.vault ? 'VAULT TRIAL: ' : 'CIPHER: ') + step.desc + extra;
@@ -3889,6 +4109,38 @@ GH.game = (function () {
     }
     el['coin-count'].textContent = '×' + coinsRun;
     el['boost-fill'].style.width = (player.boost * 100) + '%';
+    // energy capacitor + ability hotbar
+    var enEl = document.getElementById('energy-fill');
+    if (enEl) enEl.style.width = GH.clamp(player.energy / player.stats.energyMax * 100, 0, 100) + '%';
+    var hb = document.getElementById('hotbar');
+    if (hb) {
+      var hh = '';
+      for (var hn = 1; hn <= 4; hn++) {
+        var ab = GH.skills.ABILITIES[hn];
+        var known = player.skillBon.slots[hn];
+        var cd = Math.max(0, player.abilityCds[hn]);
+        var ready = known && cd <= 0 && player.energy >= ab.cost;
+        hh += '<div class="hb-slot' + (known ? '' : ' locked') + (ready ? ' ready' : '') + '" title="' +
+          ab.name + ' — ' + ab.desc + ' (' + ab.cost + ' energy)">' +
+          '<div class="hb-glyph">' + (known ? ab.glyph : '✕') + '</div>' +
+          '<div class="hb-key">' + hn + '</div>' +
+          (known && cd > 0 ? '<div class="hb-cd">' + Math.ceil(cd) + '</div>' : '') +
+          '</div>';
+      }
+      hb.innerHTML = hh;
+    }
+    // target readout
+    var tp = document.getElementById('target-panel');
+    if (tp) {
+      if (target && !target.dead) {
+        tp.classList.remove('hidden');
+        document.getElementById('target-name').textContent = target.def.name;
+        document.getElementById('target-fill').style.width =
+          GH.clamp(target.hp / target.maxHp * 100, 0, 100) + '%';
+      } else {
+        tp.classList.add('hidden');
+      }
+    }
     if (bossRef && !bossRef.dead) {
       el['boss-fill'].style.width = GH.clamp(bossRef.hp / bossRef.maxHp * 100, 0, 100) + '%';
     }
@@ -3896,11 +4148,12 @@ GH.game = (function () {
     // ward row: three stances + energy
     var wardEl = document.getElementById('ward-row');
     var wh = '';
+    var wardKeys = ['Z', 'X', 'C'];
     WARD_ORDER.forEach(function (w, i) {
       var on = player.ward === w;
       wh += '<span class="ward-chip' + (on ? ' on' : '') + '" style="' +
         (on ? 'border-color:#' + WARDS[w].color.toString(16) + ';color:#fff' : '') + '">' +
-        (i + 1) + ' ' + WARDS[w].name + '</span>';
+        wardKeys[i] + ' ' + WARDS[w].name + '</span>';
     });
     wh += '<span class="ward-energy"><span class="ward-energy-fill" style="width:' +
       Math.round(player.wardEnergy * 100) + '%"></span></span>';
@@ -4017,6 +4270,8 @@ GH.game = (function () {
     }
     if (mate) { scene.remove(mate.mesh); mate = null; }
     if (selPreview) { scene.remove(selPreview); selPreview = null; }
+    target = null;
+    if (reticle) reticle.visible = false;
     bossRef = null;
     hideBossBar();
     // expedition teardown: the continent, camp, and its UI
@@ -4056,7 +4311,7 @@ GH.game = (function () {
     player.stats.maxHP += mb.maxHP;
     player.hp = player.stats.maxHP;
     player.stats.boostRegen += mb.boostRegen;
-    player.fourthCard = mb.fourthCard;
+    if (mb.energyBonus) player.stats.energyRegen *= 1.1;
 
     // chase cosmetics: paint, trail, pico-drone
     var style = GH.meta.data.style;
@@ -4156,30 +4411,15 @@ GH.game = (function () {
   }
 
   function devCatchUp(startAt) {
-    // dev skip (?wave=N): rough catch-up levels + auto-picked cards
+    // dev skip (?wave=N): rough catch-up — levels plus a few sockets,
+    // matching the post-card-system progression model
     wavePlan = GH.wavePlan(stage, 1, false);
+    var prim = player.weapons[0];
     for (var i = 1; i < startAt; i++) {
       gainXP(6 + player.level * 3);
-      var cards = GH.rollRewards(player, i);
-      var c = cards[0];
-      if (c.kind === 'trait' || c.kind === 'protocol') c.apply(player);
-      else if (c.kind === 'gem') {
-        for (var wi = 0; wi < player.weapons.length; wi++) {
-          if (player.weapons[wi].sockets.length < 4) {
-            player.weapons[wi].sockets.push(c.gemType);
-            GH.gems.applySocketBonuses(player.weapons[wi]);
-            break;
-          }
-        }
-      } else {
-        var lvl0 = player.weaponLevels[c.id] || 0;
-        if (lvl0 === 0) player.weapons.push(makeWeaponInst(c.id, c.weapon));
-        else {
-          for (var j = 0; j < player.weapons.length; j++) {
-            if (player.weapons[j].id === c.id) c.perLevel(player.weapons[j].w);
-          }
-        }
-        player.weaponLevels[c.id] = lvl0 + 1;
+      if (i % 5 === 0 && prim.sockets.length < 4) {
+        prim.sockets.push(GH.pick(GH.gems.typeIds));
+        GH.gems.applySocketBonuses(prim);
       }
     }
   }
@@ -4504,7 +4744,13 @@ GH.game = (function () {
       harrow: harrowSpot ? { zone: harrowSpot.zone, x: Math.round(harrowSpot.x), z: Math.round(harrowSpot.z), up: harrowUp } : null,
       harrowDay: GH.meta.data.world.harrowDay,
       vaultsOpen: Object.keys(GH.meta.data.world.vaults),
-      strafe: player && player.strafeInst ? Math.round(player.strafeInst.timer * 1000) : null
+      strafe: player && player.strafeInst ? Math.round(player.strafeInst.timer * 1000) : null,
+      target: target ? { id: target.id, hp: Math.round(target.hp) } : null,
+      energy: player ? Math.round(player.energy) : 0,
+      cds: player ? [1, 2, 3, 4].map(function (n) { return Math.round(Math.max(0, player.abilityCds[n]) * 10) / 10; }) : null,
+      skillPoints: GH.meta.data.skillPoints,
+      pilot: GH.skills.pilotProgress().lvl,
+      skillRanks: GH.skills.spentTotal()
     };
   };
 
