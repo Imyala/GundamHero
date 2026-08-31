@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HERO FRAME — a mech arena survivor</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="game-root">
+  <canvas id="game-canvas"></canvas>
+
+  <!-- ===================== HUD (during play) ===================== -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div id="hud-left">
+        <div class="bar-frame hp-frame">
+          <div id="hp-fill" class="bar-fill hp-fill"></div>
+          <div id="hp-text" class="bar-text">100/100</div>
+        </div>
+        <div class="bar-frame boost-frame">
+          <div id="boost-fill" class="bar-fill boost-fill"></div>
+        </div>
+        <div id="coin-row"><span class="coin-icon">S</span><span id="coin-count">×0</span></div>
+      </div>
+      <div id="hud-center">
+        <div id="wave-label">Wave 1/20</div>
+        <div id="wave-timer">30.0</div>
+      </div>
+      <div id="hud-right">
+        <div class="bar-frame xp-frame">
+          <div id="xp-fill" class="bar-fill xp-fill"></div>
+          <div id="lvl-text" class="bar-text">LVL 1</div>
+        </div>
+        <div id="stat-icons"></div>
+      </div>
+    </div>
+    <div id="boss-bar-wrap" class="hidden">
+      <div id="boss-name">???</div>
+      <div class="bar-frame boss-frame"><div id="boss-fill" class="bar-fill boss-fill"></div></div>
+    </div>
+    <div id="announce" class="hidden"></div>
+  </div>
+
+  <div id="damage-layer"></div>
+
+  <!-- ===================== TITLE ===================== -->
+  <div id="title-screen" class="screen">
+    <div class="title-grid"></div>
+    <h1 class="game-title">HERO&nbsp;FRAME</h1>
+    <div class="title-sub">A MECH ARENA SURVIVOR</div>
+    <button id="btn-start" class="menu-btn">PRESS START</button>
+    <div class="title-foot">WASD move &nbsp;·&nbsp; mouse aim &nbsp;·&nbsp; SPACE boost &nbsp;·&nbsp; SHIFT / RMB special &nbsp;·&nbsp; weapons fire automatically</div>
+  </div>
+
+  <!-- ===================== PLAYER SELECT ===================== -->
+  <div id="select-screen" class="screen hidden">
+    <h2 class="select-title">PLAYER&nbsp;&nbsp;SELECT</h2>
+    <div id="select-panel">
+      <div id="select-name">FRAME</div>
+      <div id="select-desc"></div>
+      <div id="select-stats"></div>
+    </div>
+    <div id="select-icons"></div>
+    <button id="btn-launch" class="menu-btn">LAUNCH</button>
+  </div>
+
+  <!-- ===================== WAVE REWARD ===================== -->
+  <div id="reward-screen" class="screen hidden">
+    <h2 class="reward-title">WAVE&nbsp;REWARD</h2>
+    <div id="reward-sub">Choose one upgrade</div>
+    <div id="reward-cards"></div>
+  </div>
+
+  <!-- ===================== PAUSE ===================== -->
+  <div id="pause-screen" class="screen hidden">
+    <h2 class="reward-title">PAUSED</h2>
+    <div id="pause-stats"></div>
+    <button id="btn-resume" class="menu-btn">RESUME</button>
+    <button id="btn-quit" class="menu-btn small">ABANDON RUN</button>
+  </div>
+
+  <!-- ===================== GAME OVER / VICTORY ===================== -->
+  <div id="end-screen" class="screen hidden">
+    <h2 id="end-title" class="game-title small">FRAME&nbsp;DESTROYED</h2>
+    <div id="end-stats"></div>
+    <button id="btn-retry" class="menu-btn">RETRY</button>
+    <button id="btn-menu" class="menu-btn small">MAIN MENU</button>
+  </div>
+
+  <div id="mute-btn" title="toggle sound">♪</div>
+</div>
+
+<script src="lib/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/models.js"></script>
+<script src="js/mechs.js"></script>
+<script src="js/upgrades.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
