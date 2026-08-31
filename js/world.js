@@ -7,21 +7,22 @@
 GH.world = (function () {
   var W = {};
 
-  // continent grid: 3×2 cells of 80×80, centered on origin
-  W.CELL = 80;
-  W.BOUNDS = { x: 120, z: 80 };
+  // continent grid: 3×2 cells of 200×200, centered on origin — real
+  // territory, crossed on foot or (faster) folded into skimmer form
+  W.CELL = 200;
+  W.BOUNDS = { x: 300, z: 200 };
   W.ZONES = [
-    { id: 'glacier', cx: -80, cz: -40, danger: 2 },
-    { id: 'wreck', cx: 0, cz: -40, danger: 1 },     // camp lives here
-    { id: 'cloister', cx: 80, cz: -40, danger: 2 },
-    { id: 'ember', cx: -80, cz: 40, danger: 3 },
-    { id: 'storm', cx: 0, cz: 40, danger: 3 },
-    { id: 'null', cx: 80, cz: 40, danger: 4 }
+    { id: 'glacier', cx: -200, cz: -100, danger: 2 },
+    { id: 'wreck', cx: 0, cz: -100, danger: 1 },     // camp lives here
+    { id: 'cloister', cx: 200, cz: -100, danger: 2 },
+    { id: 'ember', cx: -200, cz: 100, danger: 3 },
+    { id: 'storm', cx: 0, cz: 100, danger: 3 },
+    { id: 'null', cx: 200, cz: 100, danger: 4 }
   ];
 
-  W.CAMP = { x: 0, z: -52, r: 14 };
-  W.CIRCUIT = { x: 80, z: -45, r: 18, gates: 10 };
-  W.DUEL_PIT = { x: -14, z: -60 };
+  W.CAMP = { x: 0, z: -130, r: 16 };
+  W.CIRCUIT = { x: 200, z: -112, r: 26, gates: 10 };
+  W.DUEL_PIT = { x: -35, z: -150 };
 
   W.zoneAt = function (x, z) {
     var best = W.ZONES[1], bd = 1e9;
@@ -58,13 +59,13 @@ GH.world = (function () {
     var nests = [], lairs = [], relays = [], vaults = [];
     W.ZONES.forEach(function (zn) {
       var rnd = zrng('reach:' + zn.id);
-      var count = zn.id === 'wreck' ? 3 : 5;
+      var count = zn.id === 'wreck' ? 4 : 8;
       for (var i = 0; i < count; i++) {
-        var nx = zn.cx + (rnd() - 0.5) * (W.CELL - 22);
-        var nz = zn.cz + (rnd() - 0.5) * (W.CELL - 22);
+        var nx = zn.cx + (rnd() - 0.5) * (W.CELL - 30);
+        var nz = zn.cz + (rnd() - 0.5) * (W.CELL - 30);
         // keep clear of the camp and the circuit
-        if (GH.dist2(nx, nz, W.CAMP.x, W.CAMP.z) < 26 * 26) { nx += 30; }
-        if (GH.dist2(nx, nz, W.CIRCUIT.x, W.CIRCUIT.z) < 26 * 26) { nz += 30; }
+        if (GH.dist2(nx, nz, W.CAMP.x, W.CAMP.z) < 34 * 34) { nx += 50; }
+        if (GH.dist2(nx, nz, W.CIRCUIT.x, W.CIRCUIT.z) < 40 * 40) { nz += 55; }
         nests.push({
           id: zn.id + '_n' + i, zone: zn.id, x: nx, z: nz,
           hp: 120 * zn.danger, maxHp: 120 * zn.danger
@@ -80,12 +81,12 @@ GH.world = (function () {
       // one sealed vault per territory, tucked in the corner opposite the lair
       var vx = zn.cx - (zn.cx >= 0 ? 1 : -1) * (W.CELL / 2 - 14);
       var vz = zn.cz - (zn.cz >= 0 ? 1 : -1) * (W.CELL / 2 - 14);
-      if (GH.dist2(vx, vz, W.CAMP.x, W.CAMP.z) < 22 * 22) vx += 26;
-      if (GH.dist2(vx, vz, W.CIRCUIT.x, W.CIRCUIT.z) < 24 * 24) vz -= 26;
+      if (GH.dist2(vx, vz, W.CAMP.x, W.CAMP.z) < 34 * 34) vx += 50;
+      if (GH.dist2(vx, vz, W.CIRCUIT.x, W.CIRCUIT.z) < 40 * 40) vz -= 55;
       vaults.push({ id: 'vault_' + zn.id, zone: zn.id, x: vx, z: vz });
     });
-    relays.push({ id: 'relay_wreck', zone: 'wreck', x: 28, z: -18 });
-    relays.push({ id: 'relay_storm', zone: 'storm', x: -8, z: 52 });
+    relays.push({ id: 'relay_wreck', zone: 'wreck', x: 70, z: -45 });
+    relays.push({ id: 'relay_storm', zone: 'storm', x: -20, z: 130 });
     return { nests: nests, lairs: lairs, relays: relays, vaults: vaults };
   };
 
@@ -123,8 +124,8 @@ GH.world = (function () {
     var zn = candidates[Math.floor(rnd() * candidates.length)];
     return {
       zone: zn.id,
-      x: zn.cx + (rnd() - 0.5) * 30,
-      z: zn.cz + (rnd() - 0.5) * 30
+      x: zn.cx + (rnd() - 0.5) * 120,
+      z: zn.cz + (rnd() - 0.5) * 120
     };
   };
 
@@ -151,12 +152,16 @@ GH.world = (function () {
     vaultsOpen = vaultsOpen || {};
     var mat = GH.assets.mat;
 
-    // biome ground tiles
+    // biome ground tiles (texture repeat scaled so tiles stay chunky,
+    // not stretched, at continental cell size)
     W.ZONES.forEach(function (zn) {
       var tex = GH.assets.stageTex[zn.id];
+      var floorTex = tex.floor.clone();
+      floorTex.repeat.set(20 * W.CELL / 80, 20 * W.CELL / 80);
+      floorTex.needsUpdate = true;
       var ground = new THREE.Mesh(
         new THREE.PlaneGeometry(W.CELL + 0.5, W.CELL + 0.5),
-        GH.assets.lambert({ map: tex.floor })
+        GH.assets.lambert({ map: floorTex })
       );
       ground.rotation.x = -Math.PI / 2;
       ground.position.set(zn.cx, 0, zn.cz);
@@ -165,13 +170,13 @@ GH.world = (function () {
       // props per zone
       var st = W.stageFor(zn.id);
       var rnd = zrng('props:' + zn.id);
-      for (var i = 0; i < 14; i++) {
+      for (var i = 0; i < 40; i++) {
         var kind = st.props[Math.floor(rnd() * st.props.length)];
         var p = GH.models.props[kind]();
         var px = zn.cx + (rnd() - 0.5) * (W.CELL - 10);
         var pz = zn.cz + (rnd() - 0.5) * (W.CELL - 10);
-        if (GH.dist2(px, pz, W.CAMP.x, W.CAMP.z) < 20 * 20) continue;
-        if (GH.dist2(px, pz, W.CIRCUIT.x, W.CIRCUIT.z) < 24 * 24) continue;
+        if (GH.dist2(px, pz, W.CAMP.x, W.CAMP.z) < 24 * 24) continue;
+        if (GH.dist2(px, pz, W.CIRCUIT.x, W.CIRCUIT.z) < (W.CIRCUIT.r + 12) * (W.CIRCUIT.r + 12)) continue;
         p.position.set(px, 0, pz);
         group.add(p);
       }

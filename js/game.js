@@ -488,7 +488,11 @@ GH.game = (function () {
       popT: 0, baseScale: mesh.scale.x,
       anim: Math.random() * 10,
       lastOrbitHit: 0, lastDashId: -1,
-      dead: false
+      dead: false,
+      // territorial AI (expedition): guard home ground until provoked
+      homeX: x, homeZ: z,
+      aggro: !expActive, // arena waves stay all-out; the Reach is territorial
+      wanderT: 0, wanderA: Math.random() * Math.PI * 2
     };
     // elites: from wave 6, one in ten spawns carries a modifier
     if (!def.boss && atX === undefined && waveNum >= 6 && Math.random() < 0.10) {
@@ -783,6 +787,52 @@ GH.game = (function () {
       }
       var mx = 0, mz = 0;
 
+      // territorial AI: out in the Reach, hostiles hold their ground.
+      // They wake when you close in (or wound them), give chase, and
+      // walk home when you leave their hunting range.
+      if (expActive && !def.boss) {
+        var aggroR = def.behavior === 'ranged' ? 16 : 11;
+        if (!e.aggro) {
+          if (dist < aggroR || e.hp < e.maxHp) {
+            e.aggro = true;
+            e.popT = Math.max(e.popT, 0.15); // a startle pop when they notice you
+          }
+        } else if (dist > 32) {
+          e.aggro = false;
+        }
+        if (!e.aggro) {
+          // idle: drift near the nest, amble back if wandered far
+          var hdx = e.homeX - e.x, hdz = e.homeZ - e.z;
+          var hd2 = hdx * hdx + hdz * hdz;
+          e.wanderT -= dt;
+          if (e.wanderT <= 0) {
+            e.wanderT = GH.rand(2, 5);
+            e.wanderA = Math.random() * Math.PI * 2;
+          }
+          if (hd2 > 8 * 8) {
+            var hd = Math.sqrt(hd2);
+            mx = hdx / hd; mz = hdz / hd;
+            spd *= 0.55;
+          } else {
+            mx = Math.sin(e.wanderA); mz = Math.cos(e.wanderA);
+            spd *= 0.3;
+          }
+          // face where it walks, keep the walk-cycle math alive
+          nx = mx; nz = mz;
+          e.x += (mx * spd) * dt;
+          e.z += (mz * spd) * dt;
+          e.mesh.position.set(e.x, 0, e.z);
+          e.mesh.rotation.y = Math.atan2(nx, nz);
+          var idleLimbs = e.mesh.userData.limbs;
+          if (idleLimbs) {
+            var isw = Math.sin(e.anim) * 0.3;
+            idleLimbs.legL.rotation.x = isw;
+            idleLimbs.legR.rotation.x = -isw;
+          }
+          continue; // no attacks, no dashes, no shots while at peace
+        }
+      }
+
       if (def.behavior === 'chase') {
         mx = nx; mz = nz;
       } else if (def.behavior === 'ranged') {
@@ -827,7 +877,8 @@ GH.game = (function () {
           e.summonT = (def.summonInterval || 10) * (frantic ? 0.6 : 1);
           var sid = def.summons || GH.weightedPick(wavePlan.types).id;
           for (var s2 = 0; s2 < (def.summonCount || 3) + (frantic ? 1 : 0); s2++) {
-            spawnEnemy(sid, e.x + GH.rand(-2.5, 2.5), e.z + GH.rand(-2.5, 2.5));
+            var smn = spawnEnemy(sid, e.x + GH.rand(-2.5, 2.5), e.z + GH.rand(-2.5, 2.5));
+            if (smn) smn.aggro = true; // summons arrive angry
           }
         }
       } else if (def.behavior === 'corrupt') {
@@ -2796,14 +2847,12 @@ GH.game = (function () {
     player.weaponLevels = saved.weaponLevels || {};
     player.protocols = saved.protocols || {};
     player.phoenixUsed = saved.phoenixUsed;
-    // the combat rework keeps one weapon: the frame's primary (older
-    // saves may carry retired secondaries — drop them, keep the sockets)
-    player.weapons = saved.weapons.slice(0, 1).map(function (sw) {
-      var inst = makeWeaponInst(sw.id, sw.w, true);
-      inst.sockets = sw.sockets.slice();
-      GH.gems.applySocketBonuses(inst);
-      return inst;
-    });
+    // one weapon: the frame's CURRENT primary definition (weapon defs
+    // evolve between patches — only the sockets carry over from the save)
+    var savedSockets = (saved.weapons[0] && saved.weapons[0].sockets) || [];
+    var prim = player.weapons[0];
+    prim.sockets = savedSockets.slice();
+    GH.gems.applySocketBonuses(prim);
     player.x = saved.x; player.z = saved.z;
   }
 
@@ -3268,9 +3317,10 @@ GH.game = (function () {
         for (var i = 0; i < n; i++) {
           var pick = GH.weightedPick(wavePlan.types);
           var a = Math.random() * Math.PI * 2;
-          spawnEnemy(pick.id,
+          var sgE = spawnEnemy(pick.id,
             siege.relay.x + Math.cos(a) * GH.rand(16, 22),
             siege.relay.z + Math.sin(a) * GH.rand(16, 22));
+          if (sgE) sgE.aggro = true; // siege attackers press the relay
         }
         announce('SIEGE WAVE ' + siege.phase + '/3', 24);
         siege.phase++;
@@ -3419,8 +3469,9 @@ GH.game = (function () {
     var plan = expeditionPlan(GH.world.zoneAt(v.x, v.z));
     for (var i = 0; i < 7; i++) {
       var a = Math.random() * Math.PI * 2;
-      spawnEnemy(GH.weightedPick(plan.types).id,
+      var vgE = spawnEnemy(GH.weightedPick(plan.types).id,
         v.x + Math.cos(a) * GH.rand(9, 14), v.z + Math.sin(a) * GH.rand(9, 14));
+      if (vgE) vgE.aggro = true; // the guardians wake hostile
     }
     beginCipherStep();
   }
@@ -3793,7 +3844,8 @@ GH.game = (function () {
     mate = {
       def: def,
       mesh: GH.models.buildMech(cfg),
-      x: 2.2, z: 1.5, facing: 0, moveX: 0, moveZ: 0,
+      x: (player ? player.x : 0) + 2.2, z: (player ? player.z : 0) + 1.5,
+      facing: 0, moveX: 0, moveZ: 0,
       hp: 0, boost: 1, dashTime: 0, dashX: 0, dashZ: 0, dashKind: 'boost', dashId: 0,
       down: false, reviveT: 0, hurtCd: 0,
       blocking: false,
@@ -4057,12 +4109,17 @@ GH.game = (function () {
       var sep = Math.sqrt(GH.dist2(player.x, player.z, mate.x, mate.z));
       zoomTarget = 1 + GH.clamp((sep - 6) / 14, 0, 0.65);
     }
+    // skimmer form and races see farther — speed needs sightlines
+    if (player && player.speederOn) zoomTarget *= 1.35;
+    if (G.state === 'race') zoomTarget = Math.max(zoomTarget, 1.3);
     camZoom = GH.lerp(camZoom, zoomTarget, dt * 3);
     var sx = (Math.random() - 0.5) * shake;
     var sz = (Math.random() - 0.5) * shake;
     shake = Math.max(0, shake - dt * 1.4);
-    camera.position.set(tx + sx, 13.5 * camZoom, tz + 11.5 * camZoom + sz);
-    camera.lookAt(tx + sx, 0, tz + 2.0 + sz);
+    // higher and farther back, with the pilot sitting low in frame so
+    // the world ahead gets the screen space
+    camera.position.set(tx + sx, 18 * camZoom, tz + 14.5 * camZoom + sz);
+    camera.lookAt(tx + sx, 0, tz - 1.6 + sz);
   }
 
   // =================================================================
@@ -4746,6 +4803,7 @@ GH.game = (function () {
       vaultsOpen: Object.keys(GH.meta.data.world.vaults),
       strafe: player && player.strafeInst ? Math.round(player.strafeInst.timer * 1000) : null,
       target: target ? { id: target.id, hp: Math.round(target.hp) } : null,
+      aggroed: enemies.filter(function (e2) { return !e2.dead && e2.aggro && !e2.nestId; }).length,
       energy: player ? Math.round(player.energy) : 0,
       cds: player ? [1, 2, 3, 4].map(function (n) { return Math.round(Math.max(0, player.abilityCds[n]) * 10) / 10; }) : null,
       skillPoints: GH.meta.data.skillPoints,

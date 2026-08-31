@@ -98,7 +98,8 @@ html, body {
 .stat-icon .si-v { font-size: 12px; color: #101010; }
 
 #boss-bar-wrap {
-  position: absolute; bottom: 34px; left: 50%;
+  /* riding above the ability hotbar so neither hides the other */
+  position: absolute; bottom: calc(3.5vh + 74px); left: 50%;
   width: 46%; min-width: 300px;
   transform: translateX(-50%);
 }

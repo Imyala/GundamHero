@@ -9,7 +9,7 @@ GH.mechs = [
     name: 'AEGIS',
     role: 'Paladin frame · starter',
     icon: '⚔',
-    desc: 'Built for survivability. Blocking restores HP. Boosting rams enemies for force damage that scales with Block and Armor. The greatblade throws a cutting wave with every swing.',
+    desc: 'Built for survivability. Blocking restores HP. Boosting rams enemies for force damage that scales with Block and Armor. The greatblade is pure steel — close the distance and swing.',
     model: { body: 0x9aa09a, accent: 0xd8b040, dark: 0x30342e, trim: 0x787e76, prop: 'sword' },
     stats: { maxHP: 125, speed: 16, armor: 5, block: 8, crit: 5, lifesteal: 0 },
     levelUp: { armor: 1, maxHP: 2, block: 1 },
@@ -17,8 +17,7 @@ GH.mechs = [
     baseText: '+16 Speed\n+5 Armor Rating\n+25 Max Health',
     weapon: {
       type: 'melee', name: 'Greatblade', cls: 'HEAVY · PHYSICAL',
-      damage: 24, interval: 0.62, range: 3.4, arc: 2.1, knockback: 7,
-      wave: { damage: 14, speed: 16, life: 0.8, size: 0.34, color: 0xe8f0ff }
+      damage: 26, interval: 0.62, range: 3.4, arc: 2.1, knockback: 7
     },
     special: 'block', specialText: 'BLOCK — hold to brace: 70% damage cut, blocked hits mend the frame',
     hudStats: ['block', 'armor', 'crit']
@@ -47,16 +46,15 @@ GH.mechs = [
     name: 'FANG',
     role: 'Striker frame',
     icon: '≡',
-    desc: 'A light-weapons predator. Claw bursts shred at close range, and every boost feeds FRENZY — stacking attack speed. Stay moving, stay untouchable.',
+    desc: 'A light-weapons predator. Claws shred in fast, close swings, and every boost feeds FRENZY — stacking attack speed. Stay moving, stay untouchable.',
     model: { body: 0x6a2a34, accent: 0xff5040, dark: 0x2a1014, trim: 0x8a4040, prop: 'claws' },
     stats: { maxHP: 90, speed: 19, armor: 1, block: 0, crit: 12, lifesteal: 4 },
     levelUp: { atkSpd: 3, speed: 0.2, maxHP: 1 },
     levelText: '+3% Attack Speed\n+0.2 Speed\n+1 Max Health',
     baseText: '+19 Speed\n+1 Armor Rating\n-10 Max Health\nBoost feeds Frenzy',
     weapon: {
-      type: 'shot', name: 'Talon Burst', cls: 'LIGHT · PHYSICAL',
-      damage: 6, interval: 0.11, speed: 26, life: 0.34, size: 0.18,
-      color: 0xff7060, spread: 0.3, count: 2, clip: 18, reload: 0.8
+      type: 'melee', name: 'Talon Rake', cls: 'LIGHT · PHYSICAL',
+      damage: 8, interval: 0.24, range: 2.5, arc: 1.6, knockback: 2
     },
     special: 'lunge', specialText: 'LUNGE — a second short dash that slashes through enemies',
     passive: 'frenzy',
@@ -87,16 +85,15 @@ GH.mechs = [
     name: 'VIPER',
     role: 'Rogue frame',
     icon: '⌁',
-    desc: 'A knife in mech armor. Fans of daggers fly in three-round flurries and crit viciously; boosting sharpens your edge (+crit for 2s). Special: SHADE — vanish and reappear behind the fight.',
+    desc: 'A knife in mech armor. Twin daggers land vicious close-in flurries that crit hard; boosting sharpens your edge (+crit for 2s). Special: SHADE — vanish and reappear behind the fight.',
     model: { body: 0x3a4448, accent: 0x9ae848, dark: 0x161c1e, trim: 0x5a686e, prop: 'daggers' },
     stats: { maxHP: 80, speed: 18, armor: 1, block: 0, crit: 16, lifesteal: 0 },
     levelUp: { crit: 1, damage: 1, atkSpd: 1 },
     levelText: '+1% Critical\n+1 Damage\n+1% Attack Speed',
     baseText: '+18 Speed\n+1 Armor Rating\n-20 Max Health\nBoost sharpens crit',
     weapon: {
-      type: 'shot', name: 'Dagger Flurry', cls: 'LIGHT · PHYSICAL',
-      damage: 7, interval: 0.09, speed: 32, life: 0.7, size: 0.16,
-      color: 0xc0f070, spread: 0.22, count: 1, clip: 9, reload: 0.9, burst: 3
+      type: 'melee', name: 'Dagger Flurry', cls: 'LIGHT · PHYSICAL',
+      damage: 9, interval: 0.2, range: 2.6, arc: 1.3, knockback: 1
     },
     special: 'blink', specialText: 'SHADE — teleport through danger, untouchable for a breath',
     passive: 'edge',

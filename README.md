@@ -62,6 +62,11 @@ target on its weapon's own attack cycle whenever it's in reach — melee
 frames swing when you close the gap, ranged frames fire aimed single
 shots. Around that auto-attack you make the real decisions:
 
+- **Weapon reach is real**: melee frames (AEGIS greatblade, FANG claws,
+  VIPER daggers, MORROW scythe) only land hits in actual melee range —
+  no thrown blades, no sword-waves. Ranged frames (VULCAN, HEXEN, STRIX,
+  TITAN) fire aimed shots at distance. The same is true of the enemy:
+  bruisers have to reach you, only shooters shoot.
 - **Abilities (1–4)** spend the blue **energy capacitor** and run
   cooldowns: RUPTURE (a 2.2× focused strike), SWEEP (radial knockback),
   SHACKLE (chain a cluster in place), OVERLOAD (detonate their footing).
@@ -85,9 +90,14 @@ the spot, and a respec costs 200 salvage.
 
 ### THE SHATTERED REACH — one persistent continent
 The headline mode. Instead of an arena, deploy onto a six-territory open
-continent (Tide Wreckage, Glacier Hollow, Verdant Cloister, Ember Core,
-Stormspire, Null Sanctum) with **fixed danger ratings I–IV** — the world
-doesn't scale to you; you grow into it. There are no waves and no timer:
+continent — **600 × 400 units of walkable world**, each territory a
+200 × 200 region (Tide Wreckage, Glacier Hollow, Verdant Cloister, Ember
+Core, Stormspire, Null Sanctum) with **fixed danger ratings I–IV** — the
+world doesn't scale to you; you grow into it. Hostiles are **territorial**:
+they idle and wander around their nests until you come close enough to be
+noticed (or wound one), chase while you're in their hunting range, and
+walk home when you slip away — pulling a pack is a choice, not a default.
+There are no waves and no timer:
 
 - **Husk Nests** (28 of them) spawn enemies endlessly until you crack their
   cores — and a broken nest **stays broken forever**, across sessions. The
