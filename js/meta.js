@@ -215,6 +215,7 @@ GH.meta = (function () {
       if (p.get('weakboss') === '1') GH.devWeakBoss = true;
       if (p.get('phaseboss') === '1') GH.devPhaseBoss = true;
       if (p.get('god') === '1') GH.devGod = true;
+      if (p.get('grant')) GH.devGrant = p.get('grant').split(',');
     } catch (e) { /* ignore */ }
   };
 

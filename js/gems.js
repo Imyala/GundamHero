@@ -43,6 +43,37 @@ GH.gems = (function () {
     }
   };
 
+  // 2+2 hybrid resonances: each pair has its own identity instead of a
+  // watered-down blend. Keys are the two type ids sorted alphabetically.
+  G.hybrids = {
+    'pyre+sol': { id: 'phoenix', name: 'PHOENIX',
+      short: 'Once per run, a killing blow leaves you at 30% hull instead.' },
+    'keen+sol': { id: 'lucent', name: 'LUCENT EDGE',
+      short: "This weapon's critical hits mend 2 hull." },
+    'sol+verd': { id: 'grace', name: 'VERDANT GRACE',
+      short: "This weapon's kills drop hearts far more often." },
+    'ruin+sol': { id: 'martyr', name: 'MARTYR',
+      short: 'Kills with this weapon below 35% hull mend 3.' },
+    'keen+pyre': { id: 'wildfire', name: 'WILDFIRE',
+      short: "This weapon's critical hits set enemies ablaze." },
+    'pyre+verd': { id: 'ashbloom', name: 'ASHBLOOM',
+      short: 'Burning enemies killed by this weapon shed a bonus spark.' },
+    'pyre+ruin': { id: 'cataclysm', name: 'CATACLYSM',
+      short: '12% of hits detonate, igniting the target.' },
+    'keen+verd': { id: 'quicksilver', name: 'QUICKSILVER',
+      short: '+12% attack speed; collected sparks feed a sliver of boost.' },
+    'keen+ruin': { id: 'executioner', name: 'EXECUTIONER',
+      short: 'This weapon strikes enemies below 20% hull twice as hard.' },
+    'ruin+verd': { id: 'rotburst', name: 'ROTBURST',
+      short: "This weapon's kills burst in spores for 20% of the victim's hull." }
+  };
+
+  G.hybridFor = function (cls) {
+    if (!cls || cls.kind !== 'hybrid') return null;
+    var key = cls.types.slice().sort().join('+');
+    return G.hybrids[key] || null;
+  };
+
   // classify 4 socketed gem type ids -> {kind:'pure'|'hybrid'|'prism'|'mixed', types:[...]}
   G.classify = function (sockets) {
     if (sockets.length < 4) return null;
@@ -61,7 +92,8 @@ GH.gems = (function () {
     if (!cls) return '';
     if (cls.kind === 'prism') return G.resonances.prism.name;
     if (cls.kind === 'hybrid') {
-      return G.resonances[cls.types[0]].name + ' + ' + G.resonances[cls.types[1]].name;
+      var h = G.hybridFor(cls);
+      return h ? h.name : G.resonances[cls.types[0]].name + ' + ' + G.resonances[cls.types[1]].name;
     }
     return G.resonances[cls.types[0]].name + (cls.kind === 'mixed' ? ' (minor)' : '');
   };
@@ -78,6 +110,9 @@ GH.gems = (function () {
     });
     inst.mods = m;
     inst.resonance = G.classify(inst.sockets);
+    var h = G.hybridFor(inst.resonance);
+    inst.hybridId = h ? h.id : null;
+    if (inst.hybridId === 'quicksilver') m.atkSpdMult *= 1.12;
   };
 
   return G;

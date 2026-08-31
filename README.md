@@ -85,7 +85,12 @@ bonus to that weapon. Fill all four and the *type counts* grant a **Resonance**:
 - 4-of-a-kind → **SANCTITY** (smite + heal on reload), **IMMOLATE** (burns scale
   with crit), **FRAGMENT** (triple spreadshot), **SPOREBLOOM** (kills sprout
   spark-shrubs), or **DETONATE** (hits explode)
-- 2 + 2 → both resonances at reduced strength
+- 2 + 2 → one of ten **named hybrids** with its own identity: PHOENIX (cheat
+  death once per run), LUCENT EDGE (crits heal), VERDANT GRACE (heart drops),
+  MARTYR (low-hull kills mend), WILDFIRE (crits ignite), ASHBLOOM (burning
+  kills shed sparks), CATACLYSM (hits detonate and ignite), QUICKSILVER
+  (attack speed + sparks feed boost), EXECUTIONER (double damage below 20%),
+  ROTBURST (kills burst in spores)
 - 4 distinct → **PRISM**, a periodic piercing knockback blast
 
 ### Wave rewards
@@ -98,6 +103,19 @@ Reactor, Thorn Plating, Emergency Vents), or gems to socket.
 ### Elements
 Burn (stacking DoT), Shock (chance to stun), Frost (slow) — boosted by
 elemental-damage traits and HEXEN's passive.
+
+### Stage hazards
+Every arena past the first fights back: **Glacier Hollow** has ice sheets that
+steal your traction, **Verdant Cloister** grows snare vines that slow both
+sides, **Ember Core**'s vents erupt on a telegraph and scald everything,
+**Stormspire** calls down sky lightning (bias: toward you), and **Null
+Sanctum**'s drifting rifts suppress your weapons while you stand inside.
+
+### Elites
+From wave 6, one spawn in ten arrives as an elite — bigger, tougher, ringed by
+a colored aura naming its modifier: BLAZING (burning ground on death),
+SHIELDED (half damage), SWIFT, VOLATILE (death blast — raise your ARC ward),
+or VAMPIRIC (regenerates). Elites pay triple XP plus bonus salvage.
 
 ### Ward stances
 Every frame carries three toggleable defensive shells, one active at a time:

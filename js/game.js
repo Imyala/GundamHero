@@ -15,7 +15,7 @@ GH.game = (function () {
   var orbitGroup = null, droneMesh = null, droneAngle = 0;
   var waveNum = 0, waveTimer = 0, wavePlan = null, spawnAcc = 0, bossRef = null;
   var kills = 0, coinsRun = 0, runTime = 0, hitCount = 0;
-  var sparksRun = 0;
+  var sparksRun = 0, elitesSpawned = 0;
   var announceTimer = 0, shake = 0, hitStopT = 0;
   var announceQueue = [];
   var selMechIndex = 0, selPreview = null, selSpin = 0;
@@ -248,12 +248,21 @@ GH.game = (function () {
   }
 
   function resHas(inst, type) {
-    // returns potency 1 (pure), 0.6 (hybrid/minor half), 0 (none)
+    // potency 1 (pure) or 0.6 (3+1 dominant); hybrids have their own
+    // named identities and never grant diluted pure effects
     var r = inst.resonance;
     if (!r) return 0;
-    if (r.kind === 'prism') return 0;
+    if (r.kind === 'prism' || r.kind === 'hybrid') return 0;
     if (r.types.indexOf(type) === -1) return 0;
     return r.kind === 'pure' ? 1 : 0.6;
+  }
+
+  function anyHybrid(id) {
+    if (!player) return false;
+    for (var i = 0; i < player.weapons.length; i++) {
+      if (player.weapons[i].hybridId === id) return true;
+    }
+    return false;
   }
 
   function currentElement(inst) {
@@ -344,6 +353,26 @@ GH.game = (function () {
       damageEnemy(srcE, s.armor * 2, { canCrit: false, noRes: true });
     }
     if (player.hp <= 0) {
+      // PHOENIX hybrid: cheat death once per run
+      if (!player.phoenixUsed && anyHybrid('phoenix')) {
+        player.phoenixUsed = true;
+        player.hp = Math.round(s.maxHP * 0.3);
+        announce('PHOENIX — REBORN', 30);
+        GH.audio.win();
+        G.hitStop(0.12);
+        spawnBurst(player.x, 1.4, player.z, 0xff9040, 26);
+        for (var pi = 0; pi < enemies.length; pi++) {
+          var pe = enemies[pi];
+          if (pe.dead) continue;
+          if (GH.dist2(player.x, player.z, pe.x, pe.z) < 36) {
+            damageEnemy(pe, 30 * s.damageMult, { canCrit: false, noRes: true, elem: 'burn' });
+            var pa = GH.angleTo(player.x, player.z, pe.x, pe.z);
+            pe.vx += Math.sin(pa) * 16 / pe.def.mass;
+            pe.vz += Math.cos(pa) * 16 / pe.def.mass;
+          }
+        }
+        return;
+      }
       player.hp = 0;
       gameOver(false);
     }
@@ -436,6 +465,23 @@ GH.game = (function () {
       lastOrbitHit: 0, lastDashId: -1,
       dead: false
     };
+    // elites: from wave 6, one in ten spawns carries a modifier
+    if (!def.boss && atX === undefined && waveNum >= 6 && Math.random() < 0.10) {
+      var mods2 = ['blazing', 'shielded', 'swift', 'volatile', 'vampiric'];
+      e.elite = GH.pick(mods2);
+      e.hp *= 2.5; e.maxHp *= 2.5;
+      e.damage *= 1.4;
+      e.baseScale *= 1.35;
+      mesh.scale.setScalar(e.baseScale);
+      if (e.elite === 'swift') e.speedMult = 1.6;
+      var auraColors = { blazing: 0xff7030, shielded: 0x80b0ff, swift: 0xd0ff60, volatile: 0xff40a0, vampiric: 0xc060ff };
+      var aura = new THREE.Mesh(new THREE.TorusGeometry(def.radius + 0.45, 0.06, 4, 12),
+        GH.assets.basic(auraColors[e.elite], { transparent: true, opacity: 0.7 }));
+      aura.rotation.x = Math.PI / 2;
+      aura.position.y = 0.25;
+      mesh.add(aura);
+      elitesSpawned++;
+    }
     enemies.push(e);
     if (def.boss) {
       bossRef = e;
@@ -462,6 +508,8 @@ GH.game = (function () {
       }
     }
     dmg *= GH.progress.contractDamageBonus(e.id);
+    if (e.elite === 'shielded') dmg *= 0.5;
+    if (inst && inst.hybridId === 'executioner' && e.hp < e.maxHp * 0.2) dmg *= 2;
     dmg = Math.max(1, Math.round(dmg));
     hitCount++;
     e.hp -= dmg;
@@ -485,6 +533,13 @@ GH.game = (function () {
       pot = resHas(inst, 'ruin');
       if (pot > 0 && Math.random() < 0.2 * pot) {
         explode(e.x, e.z, 1.7, dmg * 0.5, { noRes: true });
+      }
+      // hybrid identities
+      if (crit && inst.hybridId === 'lucent') player.heal(2);
+      if (crit && inst.hybridId === 'wildfire') applyElement(e, 'burn', 1);
+      if (inst.hybridId === 'cataclysm' && Math.random() < 0.12) {
+        explode(e.x, e.z, 1.7, dmg * 0.5, { noRes: true });
+        applyElement(e, 'burn', 1);
       }
     }
     if (opts.elem && !opts.isDot) applyElement(e, opts.elem, 1);
@@ -531,9 +586,19 @@ GH.game = (function () {
       spawnPickup('spark' + size, e.x + GH.rand(-0.6, 0.6), e.z + GH.rand(-0.6, 0.6));
       xp -= val;
     }
-    if (e.def.deathBurn) {
+    if (e.def.deathBurn || e.elite === 'blazing') {
       effects.push({ kind: 'patch', x: e.x, z: e.z, t: 3, radius: 1.3, dps: 5,
         mesh: groundDisc(e.x, e.z, 1.3, 0xff5020, 0.3) });
+    }
+    if (e.elite === 'volatile') {
+      // detonates on death — respect the ARC ward
+      spawnBurst(e.x, 1, e.z, 0xff40a0, 14);
+      GH.audio.explode();
+      if (GH.dist2(e.x, e.z, player.x, player.z) < 6.25) playerDamage(e.damage, null, 'arc');
+    }
+    if (e.elite) {
+      spawnPickup('coin', e.x, e.z);
+      spawnPickup('spark1', e.x + 0.5, e.z);
     }
     if (e.def.boss) {
       for (var c = 0; c < (e.def.corrupt ? 24 : 12); c++) {
@@ -557,6 +622,13 @@ GH.game = (function () {
       if (pot > 0 && Math.random() < 0.15 * pot) {
         effects.push({ kind: 'shrub', x: e.x, z: e.z, t: 4, emitT: 0.5,
           mesh: addAt(GH.models.buildShrub(), e.x, e.z) });
+      }
+      // hybrid identities
+      if (inst.hybridId === 'grace' && Math.random() < 0.12) spawnPickup('heart', e.x, e.z);
+      if (inst.hybridId === 'martyr' && player.hp < player.stats.maxHP * 0.35) player.heal(3);
+      if (inst.hybridId === 'ashbloom' && e.burn) spawnPickup('spark1', e.x, e.z);
+      if (inst.hybridId === 'rotburst') {
+        explode(e.x, e.z, 1.6, e.maxHp * 0.2, { noRes: true });
       }
     }
   }
@@ -611,11 +683,16 @@ GH.game = (function () {
         e.mesh.position.set(e.x, Math.sin(runTime * 30) * 0.03, e.z);
         continue;
       }
-      var spd = def.speed * (e.slowT > 0 ? 0.6 : 1) * (weekly ? weekly.mods.espd : 1);
+      var spd = def.speed * (e.slowT > 0 ? 0.6 : 1) * (weekly ? weekly.mods.espd : 1) *
+        (e.speedMult || 1);
+      if (inHazard('vines', e.x, e.z)) spd *= 0.65;
       if (e.slowT > 0) e.slowT -= dt;
       if (def.boss && e.hp < e.maxHp * 0.35) spd *= 1.35; // enrage
 
       e.anim += dt * (4 + def.speed);
+      if (e.elite === 'vampiric' && e.hp < e.maxHp) {
+        e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.02 * dt);
+      }
       var mx = 0, mz = 0;
 
       if (def.behavior === 'chase') {
@@ -772,13 +849,48 @@ GH.game = (function () {
       e.mesh.add(aura);
       e.abilityT = Math.min(e.abilityT, 1.2);
     }
+    // TERMINAL phase for the last two frames' corrupt doubles
+    if (!e.phase3 && e.phase2 && e.hp < e.maxHp * 0.25 &&
+      (e.id === 'strix' || e.id === 'titan')) {
+      e.phase3 = true;
+      announce(e.def.name + ' — TERMINAL', 32);
+      GH.audio.boss();
+      G.hitStop(0.12);
+      spawnBurst(e.x, 2.5, e.z, 0xffffff, 34);
+      e.abilityT = Math.min(e.abilityT, 0.8);
+    }
     e.abilityT -= dt;
     e.summonT -= dt;
     if (e.summonT <= 0) {
-      e.summonT = e.phase2 ? 9 : 12;
+      e.summonT = e.phase3 ? 7 : (e.phase2 ? 9 : 12);
       for (var s = 0; s < (e.phase2 ? 5 : 4); s++) {
         spawnEnemy(GH.weightedPick(wavePlan.types).id,
           e.x + GH.rand(-3, 3), e.z + GH.rand(-3, 3));
+      }
+      if (e.phase3 && e.id === 'titan') {
+        spawnEnemy('brute', e.x + GH.rand(-3, 3), e.z + GH.rand(-3, 3));
+      }
+    }
+    if (e.phase3) {
+      e.terminalT = (e.terminalT || 0) - dt;
+      if (e.terminalT <= 0) {
+        if (e.id === 'strix') {
+          // blink beside the player, then a fanned triple rail volley
+          e.terminalT = 3.4;
+          spawnBurst(e.x, 1.5, e.z, 0xff6070, 10);
+          var ba = Math.random() * Math.PI * 2;
+          e.x = GH.clamp(player.x + Math.cos(ba) * 9, -ARENA_R, ARENA_R);
+          e.z = GH.clamp(player.z + Math.sin(ba) * 9, -ARENA_R, ARENA_R);
+          spawnBurst(e.x, 1.5, e.z, 0xff6070, 10);
+          var fa = GH.angleTo(e.x, e.z, player.x, player.z);
+          for (var fi = -1; fi <= 1; fi++) {
+            spawnLineTelegraph(e.x, e.z, fa + fi * 0.28, 26, 1.0, 1.0, e.damage * 1.2);
+          }
+        } else {
+          // titan: rolling mortar rain
+          e.terminalT = 1.3;
+          spawnTelegraph(player.x + GH.rand(-3, 3), player.z + GH.rand(-3, 3), 2.4, 1.0, e.damage);
+        }
       }
     }
     if (e.dashing > 0) {
@@ -933,6 +1045,7 @@ GH.game = (function () {
         speed: w.speed * inst.mods.projSpd, life: w.life,
         damage: dmg, inst: inst, elem: elem,
         pierce: w.pierce || 0, homing: w.homing || 0, aoe: w.aoe || 0,
+        returning: w.type === 'boomerang', retAt: w.life * 0.45, returned: false,
         hitSet: []
       });
     }
@@ -967,7 +1080,7 @@ GH.game = (function () {
 
   function fireWeaponOnce(inst, aim) {
     var w = inst.w;
-    if (w.type === 'shot') {
+    if (w.type === 'shot' || w.type === 'boomerang') {
       var a = inst.isPrimary ? aim
         : (function () {
           var t = nearestEnemy(player.x, player.z, 26);
@@ -991,6 +1104,35 @@ GH.game = (function () {
       coneTick(inst, aim);
     } else if (w.type === 'mortar') {
       fireMortar(inst, aim);
+    } else if (w.type === 'ringwave') {
+      // an expanding shock ring rolling out from the frame
+      var rw = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.2, 24),
+        new THREE.MeshBasicMaterial({ color: 0x80d0ff, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
+      rw.rotation.x = -Math.PI / 2;
+      rw.position.set(player.x, 0.35, player.z);
+      scene.add(rw);
+      GH.audio.zap();
+      effects.push({
+        kind: 'ringwaveFx', mesh: rw, t: w.range / 9, total: w.range / 9,
+        x: player.x, z: player.z, maxR: w.range,
+        dmg: weaponDamage(inst), inst: inst, elem: w.element, hitSet: []
+      });
+    } else if (w.type === 'vortex') {
+      // hurl an anchor that drags the swarm together, then pops
+      var tgt3 = nearestEnemy(player.x, player.z, 22);
+      if (tgt3) {
+        var vm = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.1, 4, 14),
+          GH.assets.basic(0xc0a0ff, { transparent: true, opacity: 0.8 }));
+        vm.rotation.x = Math.PI / 2;
+        vm.position.set(tgt3.x, 0.4, tgt3.z);
+        scene.add(vm);
+        GH.audio.shoot();
+        effects.push({
+          kind: 'vortexFx', mesh: vm, t: 1.6, total: 1.6,
+          x: tgt3.x, z: tgt3.z, pull: w.pull,
+          dmg: weaponDamage(inst), aoe: w.aoe, inst: inst
+        });
+      }
     } else if (w.type === 'drone') {
       var t2 = nearestEnemy(droneMesh ? droneMesh.position.x : player.x,
         droneMesh ? droneMesh.position.z : player.z, 24);
@@ -1007,6 +1149,12 @@ GH.game = (function () {
   }
 
   function updateWeapons(dt, input) {
+    // null rifts suppress every weapon while you stand inside one
+    if (inHazard('rifts', player.x, player.z)) {
+      player.suppressed = true;
+      return;
+    }
+    player.suppressed = false;
     var aim = player.facing;
     var spdBase = player.stats.atkSpdMult * frenzyMult() *
       (player.special.active > 0 && player.def.special === 'overdrive' ? 2 : 1);
@@ -1406,6 +1554,19 @@ GH.game = (function () {
     for (i = projectiles.length - 1; i >= 0; i--) {
       p2 = projectiles[i];
       p2.life -= dt;
+      // boomerang javelins swing back through the swarm
+      if (p2.returning && !p2.returned && p2.life < p2.retAt) {
+        p2.returned = true;
+        p2.hitSet.length = 0;   // fresh hits on the way home
+        p2.pierce = 99;
+        var backA = GH.angleTo(p2.x, p2.z, player.x, player.z);
+        p2.dirX = Math.sin(backA); p2.dirZ = Math.cos(backA);
+      }
+      if (p2.returned) {
+        var homeA = GH.angleTo(p2.x, p2.z, player.x, player.z);
+        p2.dirX = Math.sin(homeA); p2.dirZ = Math.cos(homeA);
+        if (GH.dist2(p2.x, p2.z, player.x, player.z) < 1.2) p2.life = 0;
+      }
       if (p2.homing > 0) {
         var tgt = nearestEnemy(p2.x, p2.z, 14, p2.hitSet);
         if (tgt) {
@@ -1533,6 +1694,7 @@ GH.game = (function () {
 
   function sparkGain(v, silent) {
     if (G.mode !== 'weekly' && GH.progress.hasRelic('gravity')) v *= 1.15;
+    if (anyHybrid('quicksilver')) player.boost = Math.min(1, player.boost + 0.02);
     gainXP(v);
     sparksRun += v;
     if (sparksRun >= 40) awardTrial('sparks40');
@@ -1662,6 +1824,55 @@ GH.game = (function () {
           fx.tick = (fx.tick || 0) - dt;
           if (fx.tick <= 0) { fx.tick = 0.5; playerDamage(fx.dps * 0.5 + player.stats.armor, null, 'arc'); }
         }
+      } else if (fx.kind === 'ringwaveFx') {
+        var rk = 1 - fx.t / fx.total;
+        var rr2 = 0.8 + rk * fx.maxR;
+        fx.mesh.scale.setScalar(rr2);
+        fx.mesh.material.opacity = 0.7 * (1 - rk * 0.7);
+        for (var ri = 0; ri < enemies.length; ri++) {
+          var re = enemies[ri];
+          if (re.dead || fx.hitSet.indexOf(re) !== -1) continue;
+          var rd = Math.sqrt(GH.dist2(fx.x, fx.z, re.x, re.z));
+          if (Math.abs(rd - rr2) < 0.9 + re.def.radius) {
+            fx.hitSet.push(re);
+            damageEnemy(re, fx.dmg, { inst: fx.inst, elem: fx.elem });
+          }
+        }
+      } else if (fx.kind === 'vortexFx') {
+        fx.mesh.rotation.z += dt * 6;
+        fx.mesh.material.opacity = 0.5 + Math.sin(runTime * 12) * 0.2;
+        for (var vi = 0; vi < enemies.length; vi++) {
+          var ve = enemies[vi];
+          if (ve.dead) continue;
+          var vd2 = GH.dist2(fx.x, fx.z, ve.x, ve.z);
+          if (vd2 < fx.pull * fx.pull && vd2 > 0.2) {
+            var vd = Math.sqrt(vd2);
+            var vs = 7 / ve.def.mass;
+            ve.x += ((fx.x - ve.x) / vd) * vs * dt;
+            ve.z += ((fx.z - ve.z) / vd) * vs * dt;
+          }
+        }
+        if (fx.t <= 0) {
+          explode(fx.x, fx.z, fx.aoe, fx.dmg, { inst: fx.inst });
+        }
+      } else if (fx.kind === 'ventEnemies' || fx.kind === 'boltStrike') {
+        if (fx.t <= 0) {
+          // environmental damage scalds the swarm too
+          for (var ei = 0; ei < enemies.length; ei++) {
+            var ee = enemies[ei];
+            if (ee.dead) continue;
+            if (GH.dist2(fx.x, fx.z, ee.x, ee.z) < (fx.r + ee.def.radius) * (fx.r + ee.def.radius)) {
+              damageEnemy(ee, fx.dmg, { canCrit: false, noRes: true });
+            }
+          }
+          if (fx.kind === 'boltStrike') {
+            drawLightning(fx.x, 14, fx.z, fx.x, 0.3, fx.z);
+            GH.audio.zap();
+            shake = Math.min(0.5, shake + 0.15);
+          } else {
+            spawnBurst(fx.x, 0.6, fx.z, 0xff7030, 10);
+          }
+        }
       } else if (fx.kind === 'shrub') {
         fx.emitT -= dt;
         if (fx.emitT <= 0) {
@@ -1696,6 +1907,7 @@ GH.game = (function () {
     }
     waveTimer = wavePlan.duration;
     spawnAcc = 0;
+    spawnStageHazards(n);
     if (n >= 5) awardTrial('wave5');
     if (n >= 10) awardTrial('wave10');
     if (mate && mate.down) reviveWingmate(0.5);
@@ -2031,6 +2243,10 @@ GH.game = (function () {
     var spd = s.speed * (player.blocking ? 0.55 : 1);
     if (player.protocols.vents && player.hp < s.maxHP * 0.35) spd *= 1.2;
 
+    // hazards underfoot: vines snare, ice steals traction
+    if (inHazard('vines', player.x, player.z)) spd *= 0.65;
+    var onIce = !!inHazard('ice', player.x, player.z);
+
     if (player.dashTime > 0) {
       player.dashTime -= dt;
       player.x += player.dashX * 26 * dt;
@@ -2054,8 +2270,17 @@ GH.game = (function () {
         }
       }
     } else {
-      player.x += player.moveX * spd * dt;
-      player.z += player.moveZ * spd * dt;
+      // ice sheets carry momentum: velocity eases toward intent
+      var wantX = player.moveX * spd, wantZ = player.moveZ * spd;
+      if (onIce) {
+        player.velX = GH.lerp(player.velX || 0, wantX, dt * 2.2);
+        player.velZ = GH.lerp(player.velZ || 0, wantZ, dt * 2.2);
+      } else {
+        player.velX = wantX;
+        player.velZ = wantZ;
+      }
+      player.x += player.velX * dt;
+      player.z += player.velZ * dt;
     }
     player.x = GH.clamp(player.x, -ARENA_R, ARENA_R);
     player.z = GH.clamp(player.z, -ARENA_R, ARENA_R);
@@ -2102,6 +2327,120 @@ GH.game = (function () {
       });
     }
     player.mesh.visible = !(player.hurtCd > 0 && Math.floor(runTime * 24) % 2 === 0);
+  }
+
+  // =================================================================
+  // STAGE HAZARDS — each arena past the first has an environmental
+  // mechanic: ice sheets, snare vines, eruption vents, sky lightning,
+  // and null rifts that suppress your weapons.
+  // =================================================================
+  var hazards = [];
+
+  function clearHazards() {
+    hazards.forEach(function (h) {
+      if (h.mesh) scene.remove(h.mesh);
+      if (h.warn) scene.remove(h.warn);
+    });
+    hazards.length = 0;
+  }
+
+  function hazardSpot(minR) {
+    for (var t = 0; t < 10; t++) {
+      var x = GH.rand(-ARENA_R + 5, ARENA_R - 5);
+      var z = GH.rand(-ARENA_R + 5, ARENA_R - 5);
+      if (GH.dist2(x, z, player.x, player.z) > (minR || 8) * (minR || 8)) return { x: x, z: z };
+    }
+    return { x: 0, z: 0 };
+  }
+
+  function spawnStageHazards(wave) {
+    clearHazards();
+    var kind = stage.hazard;
+    if (!kind) return;
+    if (kind === 'lightning') {
+      hazards.push({ kind: 'lightning', t: GH.rand(3, 6) });
+      return;
+    }
+    var n = Math.min(3, 1 + Math.floor(wave / 6));
+    for (var i = 0; i < n; i++) {
+      var p = hazardSpot(9);
+      var h = { kind: kind, x: p.x, z: p.z, t: GH.rand(2, 5) };
+      if (kind === 'ice') {
+        h.r = GH.rand(4, 5.5);
+        h.mesh = groundDisc(p.x, p.z, h.r, 0xa0e0ff, 0.22);
+      } else if (kind === 'vines') {
+        h.r = GH.rand(3, 4);
+        h.mesh = groundDisc(p.x, p.z, h.r, 0x3aa040, 0.3);
+      } else if (kind === 'vents') {
+        h.r = 2.4;
+        h.mesh = groundDisc(p.x, p.z, 0.9, 0x803020, 0.5);
+        h.t = GH.rand(3, 7);
+      } else if (kind === 'rifts') {
+        h.r = 3;
+        h.mesh = groundDisc(p.x, p.z, h.r, 0x9040d0, 0.25);
+        h.vx = GH.rand(-1, 1); h.vz = GH.rand(-1, 1);
+      }
+      hazards.push(h);
+    }
+  }
+
+  function inHazard(kind, x, z) {
+    for (var i = 0; i < hazards.length; i++) {
+      var h = hazards[i];
+      if (h.kind !== kind || !h.r) continue;
+      if (GH.dist2(x, z, h.x, h.z) < h.r * h.r) return h;
+    }
+    return null;
+  }
+
+  function updateHazards(dt) {
+    for (var i = 0; i < hazards.length; i++) {
+      var h = hazards[i];
+      if (h.kind === 'ice') {
+        h.mesh.material.opacity = 0.18 + Math.sin(runTime * 2 + i) * 0.06;
+      } else if (h.kind === 'vines') {
+        h.mesh.material.opacity = 0.26 + Math.sin(runTime * 3 + i) * 0.06;
+      } else if (h.kind === 'vents') {
+        h.t -= dt;
+        h.mesh.material.opacity = 0.4 + Math.sin(runTime * 8) * 0.15;
+        if (h.t <= 0) {
+          h.t = GH.rand(4, 8);
+          // telegraphed eruption that scalds both sides
+          var hx = h.x, hz = h.z, hr = h.r;
+          spawnTelegraph(hx, hz, hr, 0.9, 14 * wavePlan.dmgMult);
+          effects.push({
+            kind: 'ventEnemies', mesh: groundDisc(hx, hz, 0.1, 0x000000, 0),
+            t: 0.9, x: hx, z: hz, r: hr, dmg: 40 + waveNum * 3
+          });
+        }
+      } else if (h.kind === 'lightning') {
+        h.t -= dt;
+        if (h.t <= 0) {
+          h.t = GH.rand(3.5, 6.5);
+          // strikes bias toward the player but threaten everything
+          var sx, sz;
+          if (Math.random() < 0.6) {
+            sx = GH.clamp(player.x + GH.rand(-5, 5), -ARENA_R, ARENA_R);
+            sz = GH.clamp(player.z + GH.rand(-5, 5), -ARENA_R, ARENA_R);
+          } else {
+            var sp = hazardSpot(0);
+            sx = sp.x; sz = sp.z;
+          }
+          spawnTelegraph(sx, sz, 2.2, 0.8, 16 * wavePlan.dmgMult);
+          effects.push({
+            kind: 'boltStrike', mesh: groundDisc(sx, sz, 0.1, 0x000000, 0),
+            t: 0.8, x: sx, z: sz, r: 2.2, dmg: 60 + waveNum * 4
+          });
+        }
+      } else if (h.kind === 'rifts') {
+        h.x += h.vx * dt;
+        h.z += h.vz * dt;
+        if (Math.abs(h.x) > ARENA_R - 4) h.vx *= -1;
+        if (Math.abs(h.z) > ARENA_R - 4) h.vz *= -1;
+        h.mesh.position.set(h.x, 0.04, h.z);
+        h.mesh.material.opacity = 0.2 + Math.sin(runTime * 4 + i * 2) * 0.08;
+      }
+    }
   }
 
   // =================================================================
@@ -2647,8 +2986,9 @@ GH.game = (function () {
     if (player.edgeT > 0) buffs.push('EDGE');
     if (player.special.active > 0) buffs.push(player.def.special.toUpperCase());
     el['buff-line'].innerHTML = buffs.join(' · ');
-    el['reload-line'].textContent = prim.reloading > 0 ? 'RELOADING' :
-      (prim.w.clip ? prim.clip + '/' + prim.w.clip : '');
+    el['reload-line'].textContent = player.suppressed ? 'SIGNAL LOST — LEAVE THE RIFT' :
+      (prim.reloading > 0 ? 'RELOADING' :
+        (prim.w.clip ? prim.clip + '/' + prim.w.clip : ''));
     var p2wrap = document.getElementById('p2-row');
     if (mate) {
       p2wrap.classList.remove('hidden');
@@ -2721,6 +3061,7 @@ GH.game = (function () {
       if (effects[i].disc) scene.remove(effects[i].disc);
     }
     effects.length = 0;
+    clearHazards();
     while (orbitGroup.children.length) orbitGroup.remove(orbitGroup.children[0]);
     if (droneMesh) { scene.remove(droneMesh); droneMesh = null; }
     if (picoDrone) { scene.remove(picoDrone); picoDrone = null; }
@@ -2804,11 +3145,13 @@ GH.game = (function () {
       spawnWingmate(p2Idx);
     }
     if (opts.preset && !GH.meta.isIron()) applyPreset(opts.preset);
+    if (GH.devGrant) applyPreset({ weapons: GH.devGrant });
     // stage-trial perks (permanent, stage-scoped)
     var trialTier = GH.progress.trialTier(stage.id);
     if (trialTier >= 2) player.stats.xpGain += 0.10;
     if (trialTier >= 3) player.stats.damageMult += 0.05;
     kills = 0; coinsRun = 0; runTime = 0; hitCount = 0; sparksRun = 0;
+    elitesSpawned = 0;
     announceQueue.length = 0;
     activeHint = null;
     hintTimer = 0;
@@ -3083,6 +3426,7 @@ GH.game = (function () {
     updateMines(dt);
     updatePickups(dt);
     updateEffects(dt);
+    updateHazards(dt);
     updateCipher(dt);
     if (picoDrone) {
       picoAngle += dt * 2.2;
@@ -3109,7 +3453,11 @@ GH.game = (function () {
         return w2.id + ':' + w2.sockets.join('');
       }) : [],
       boss: bossRef ? bossRef.def.name + ' ' + Math.round(bossRef.hp) +
-        (bossRef.phase2 ? ' [UNBOUND]' : '') : null,
+        (bossRef.phase3 ? ' [TERMINAL]' : (bossRef.phase2 ? ' [UNBOUND]' : '')) : null,
+      hazards: hazards.length,
+      hazardKind: stage ? stage.hazard : null,
+      elites: elitesSpawned,
+      suppressed: player ? !!player.suppressed : false,
       salvage: GH.meta.data.salvage,
       shells: Object.keys(GH.meta.data.shells).length,
       music: GH.music.mode(),

@@ -67,6 +67,28 @@ GH.upgrades = [
     perLevel: function (w) { w.count += 1; w.damage += 4; }
   },
 
+  {
+    id: 'javelin', kind: 'weapon', name: 'Javelin Cycler', glyph: '↹', w: 6, rarity: 'rare',
+    cls: 'LIGHT · PHYSICAL',
+    desc: 'Hurls a returning javelin that cuts through the swarm twice.',
+    weapon: { type: 'boomerang', damage: 14, interval: 1.1, speed: 24, life: 1.6, size: 0.26, color: 0xc0e8ff, spread: 0.15, count: 1, pierce: 99 },
+    perLevel: function (w) { w.damage += 6; w.count += 1; w.spread = 0.4; }
+  },
+  {
+    id: 'halo', kind: 'weapon', name: 'Storm Halo', glyph: '◌', w: 6, rarity: 'rare',
+    cls: 'HEAVY · ELEMENTAL',
+    desc: 'A shock ring rolls out from your frame, stunning what it crosses.',
+    weapon: { type: 'ringwave', damage: 11, interval: 2.8, range: 7, element: 'shock' },
+    perLevel: function (w) { w.damage += 5; w.range += 1.5; }
+  },
+  {
+    id: 'anchor', kind: 'weapon', name: 'Grav Anchor', glyph: '☍', w: 5, rarity: 'epic',
+    cls: 'HEAVY · PHYSICAL',
+    desc: 'Anchors the nearest pack, drags it together, then pops.',
+    weapon: { type: 'vortex', damage: 26, interval: 4.2, pull: 5, aoe: 2.4 },
+    perLevel: function (w) { w.damage += 12; w.interval = Math.max(2.6, w.interval - 0.4); }
+  },
+
   // ======== TRAITS ========
   { id: 't_dmg', kind: 'trait', name: 'Overcharged Servos', glyph: '⚔', w: 10, rarity: 'common',
     desc: '+15% damage to all weapons.', apply: function (p) { p.stats.damageMult += 0.15; } },
