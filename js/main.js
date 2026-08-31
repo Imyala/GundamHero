@@ -945,5 +945,9 @@
     renderer.render(GH.game.scene(), GH.game.camera());
   }
 
-  window.addEventListener('DOMContentLoaded', boot);
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot(); // scripts injected after parse (e.g. single-file bundle hosts)
+  }
 })();
