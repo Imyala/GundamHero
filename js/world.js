@@ -160,6 +160,24 @@ GH.world = (function () {
           hp: 120 * info.danger, maxHp: 120 * info.danger
         });
       }
+      // roaming packs: hostiles holding ground between the nests, so
+      // the territory reads populated instead of empty road. They wake
+      // lazily as the pilot draws near (see updateExpedition).
+      var packCount = (zoneId === 'wreck' ? 10 : 16) + info.danger * 4;
+      for (var pk = 0; pk < packCount; pk++) {
+        var pkx = (rnd() - 0.5) * (size - 70);
+        var pkz = (rnd() - 0.5) * (size - 70);
+        if (zoneId === 'wreck') {
+          if (GH.dist2(pkx, pkz, W.CAMP.x, W.CAMP.z) < 40 * 40) pkx -= 90;
+          if (GH.dist2(pkx, pkz, W.CIRCUIT.x, W.CIRCUIT.z) < 45 * 45) pkz -= 90;
+        }
+        lay.packs.push({
+          x: pkx, z: pkz,
+          n: 2 + Math.floor(rnd() * 3),
+          roam: true
+        });
+      }
+
       // siege relays hold the middle of two territories
       if (zoneId === 'wreck') lay.relay = { id: 'relay_wreck', zone: zoneId, x: 110, z: -80 };
       if (zoneId === 'storm') lay.relay = { id: 'relay_storm', zone: zoneId, x: -90, z: 100 };
@@ -363,7 +381,7 @@ GH.world = (function () {
     floorTex.needsUpdate = true;
     var ground = new THREE.Mesh(
       new THREE.PlaneGeometry(size + 1, size + 1),
-      GH.assets.lambert({ map: floorTex, color: info.dungeon ? 0x777788 : 0xffffff })
+      GH.assets.lambert({ map: floorTex, color: info.dungeon ? 0x777788 : 0xffffff }, { nosnap: true })
     );
     ground.rotation.x = -Math.PI / 2;
     group.add(ground);
@@ -372,7 +390,7 @@ GH.world = (function () {
     if (info.dungeon) {
       var collar = new THREE.Mesh(
         new THREE.CylinderGeometry(size * 0.74, size * 0.7, 26, 28, 1, true),
-        GH.assets.lambert({ map: tex.wall, side: THREE.BackSide })
+        GH.assets.lambert({ map: tex.wall, side: THREE.BackSide }, { nosnap: true })
       );
       collar.position.y = 12;
       group.add(collar);

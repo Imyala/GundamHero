@@ -6,6 +6,8 @@
     keys: {},
     mouseNDC: new THREE.Vector2(0, 0),
     special: false,
+    attackPressed: false,
+    attackHeld: false,
     boostPressed: false,
     boostHeld: false,
     specialPressed: false,
@@ -197,11 +199,14 @@
       GH.audio.unlock();
       if (!GH.music.mode()) GH.music.play('title');
       if (e.button === 0 && GH.game.state === 'play') {
-        // left click marks a target (the OSRS way: pick your fight)
+        // left click attacks with the equipped weapon; clicking a
+        // hostile also marks it as the target (pick your fight)
         input.mouseNDC.set(
           (e.clientX / window.innerWidth) * 2 - 1,
           -(e.clientY / window.innerHeight) * 2 + 1);
         GH.game.clickTarget(input.mouseNDC);
+        input.attackPressed = true;
+        input.attackHeld = true;
       }
       if (e.button === 2 && GH.game.state === 'play') {
         input.special = true;
@@ -209,12 +214,14 @@
       }
     });
     window.addEventListener('mouseup', function (e) {
+      if (e.button === 0) input.attackHeld = false;
       if (e.button === 2) input.special = false;
     });
     window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     window.addEventListener('blur', function () {
       input.keys = {};
       input.special = false;
+      input.attackHeld = false;
       if (GH.game.state === 'play') togglePause();
     });
   }

@@ -10,10 +10,12 @@ GH.assets = (function () {
     return c;
   }
 
-  function texFromCanvas(c, repeat) {
+  function texFromCanvas(c, repeat, mip) {
     var t = new THREE.CanvasTexture(c);
     t.magFilter = THREE.NearestFilter;
-    t.minFilter = THREE.NearestFilter;
+    // mipmapped minification (POT canvases only): distant ground stops
+    // shimmering and crawling as the camera tracks forward/back
+    t.minFilter = mip ? THREE.LinearMipmapLinearFilter : THREE.NearestFilter;
     t.wrapS = THREE.RepeatWrapping;
     t.wrapT = THREE.RepeatWrapping;
     if (repeat) t.repeat.set(repeat, repeat);
@@ -138,7 +140,7 @@ GH.assets = (function () {
     A.stageTex = {};
     GH.stages.forEach(function (st) {
       A.stageTex[st.id] = {
-        floor: texFromCanvas(cobbleCanvas(160, st.floor.base, st.floor.mortar, st.floor.dark), 20),
+        floor: texFromCanvas(cobbleCanvas(128, st.floor.base, st.floor.mortar, st.floor.dark), 20, true),
         wall: texFromCanvas(wallCanvas(128, st.wall.base, st.wall.top)),
         sky: skyCanvas(st.sky)
       };
@@ -214,7 +216,14 @@ GH.assets = (function () {
     return A._mats[key];
   };
 
-  A.lambert = function (params) { return psxPatch(new THREE.MeshLambertMaterial(params)); };
+  // opts.nosnap skips the PSX vertex quantizer — required for huge
+  // surfaces like the ground plane, where snapping the few far-flung
+  // corners makes the whole world lurch in steps whenever the camera
+  // tracks toward or away from them (vertical movement judder)
+  A.lambert = function (params, opts) {
+    var m = new THREE.MeshLambertMaterial(params);
+    return (opts && opts.nosnap) ? m : psxPatch(m);
+  };
 
   // shared unit geometries for pooled short-lived meshes (scaled per use)
   A.geo = {
