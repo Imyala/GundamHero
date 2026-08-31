@@ -54,6 +54,9 @@ GH.game = (function () {
       }
     }
     var seen = GH.meta.data.seenHints;
+    if (expActive && runTime > 12) {
+      showHint('transform', 'Press T to TRANSFORM — the skimmer is fast and mounts strafe cannons, but its hull is thin');
+    }
     if (seen.__done) return;
     if (waveNum === 1) {
       if (runTime > 0.5) showHint('move', 'WASD to move · aim with the mouse — your weapons fire on their own');
@@ -318,6 +321,7 @@ GH.game = (function () {
   function playerDamage(raw, srcE, dmgType) {
     if (!player || player.hp <= 0 || player.dashTime > 0.12 || GH.devGod) return;
     var s = player.stats;
+    if (player.speederOn) raw *= 1.25; // skimmer hull is thin — speed is the armor
     var block = s.block + (player.protocols.vents && player.hp < s.maxHP * 0.35 ? 10 : 0);
     if (Math.random() * 100 < block) {
       G.dmg.spawn(player.x, 2.6, player.z, 'BLOCK', 'heal', 14);
@@ -577,6 +581,27 @@ GH.game = (function () {
         coinsRun += 25;
         saveExpedition();
       }
+      // THE HARROW falls — locked out until it re-roosts tomorrow
+      if (e.id === 'harrow') {
+        GH.meta.data.world.harrowDay = GH.world.dayStamp();
+        harrowSpot = null;
+        harrowUp = false;
+        coinsRun += 150;
+        queueAnnounce('THE HARROW HAS FALLEN — +150 SALVAGE', 30);
+        if (GH.progress.grantArtifact('harrow_brand')) {
+          queueAnnounce('ARTIFACT — HARROW BRAND', 28);
+        }
+        saveExpedition();
+      }
+      // weather windfalls
+      if (weatherNow && !e.def.boss) {
+        if (weatherNow.id === 'sporebloom' && Math.random() < 0.5) {
+          spawnPickup('spark1', e.x + GH.rand(-0.5, 0.5), e.z + GH.rand(-0.5, 0.5));
+        }
+        if (weatherNow.id === 'kingtide' && Math.random() < 0.18) {
+          spawnPickup('coin', e.x, e.z);
+        }
+      }
       if (e.def.corrupt && e.lairZone) {
         GH.meta.data.world.lairsDown[e.lairZone] = true;
         var shellId = GH.world.stageFor(e.lairZone).unlocks;
@@ -727,7 +752,8 @@ GH.game = (function () {
         continue;
       }
       var spd = def.speed * (e.slowT > 0 ? 0.6 : 1) * (weekly ? weekly.mods.espd : 1) *
-        (e.speedMult || 1);
+        (e.speedMult || 1) *
+        (expActive && weatherNow && weatherNow.id === 'whiteout' ? 0.85 : 1);
       if (inHazard('vines', e.x, e.z)) spd *= 0.65;
       if (e.slowT > 0) e.slowT -= dt;
       if (def.boss && e.hp < e.maxHp * 0.35) spd *= 1.35; // enrage
@@ -1071,7 +1097,9 @@ GH.game = (function () {
     var color = w.color;
     if (elem && GH.elements[elem] && w.cycle) color = GH.elements[elem].color;
 
-    var count = w.count + (inst.isPrimary ? player.stats.bonusProj : 0);
+    var count = w.count + (inst.isPrimary ? player.stats.bonusProj : 0) +
+      ((inst.isPrimary || inst.id === 'strafe') && artOn('harrow_brand') &&
+        player.hp > player.stats.maxHP * 0.7 ? 1 : 0);
     var dmgMult = 1;
     var frag = resHas(inst, 'keen');
     if (frag > 0) {
@@ -1196,8 +1224,28 @@ GH.game = (function () {
     }
   }
 
+  // skimmer-form armament: twin hull-mounted strafe cannons. Light, fast,
+  // mouse-aimed, no clip — the main suite stays folded until you transform back.
+  var STRAFE_DEF = {
+    type: 'shot', damage: 4, interval: 0.26, speed: 26, life: 0.95,
+    size: 0.18, color: 0x70c0ff, spread: 0.16, count: 2
+  };
+
   function updateWeapons(dt, input) {
-    if (player.speederOn) return; // skimmer form: weapons folded away
+    if (player.speederOn) {
+      // null rifts still ground the cannons
+      if (inHazard('rifts', player.x, player.z)) { player.suppressed = true; return; }
+      player.suppressed = false;
+      if (!player.strafeInst) player.strafeInst = makeWeaponInst('strafe', STRAFE_DEF, false);
+      var si = player.strafeInst;
+      si.timer -= dt * (player.stats.atkSpdMult || 1);
+      if (si.timer <= 0) {
+        si.timer = si.w.interval;
+        var sAim = player.facing;
+        fireShot(si, player.x + Math.sin(sAim) * 0.7, player.z + Math.cos(sAim) * 0.7, sAim);
+      }
+      return; // the rest of the suite stays folded
+    }
     // null rifts suppress every weapon while you stand inside one
     if (inHazard('rifts', player.x, player.z)) {
       player.suppressed = true;
@@ -1631,7 +1679,11 @@ GH.game = (function () {
       p2.mesh.rotation.y = Math.atan2(p2.dirX, p2.dirZ);
       if (!p2.flat) p2.mesh.rotation.x = Math.PI / 2;
 
-      var kill = p2.life <= 0 || Math.abs(p2.x) > ARENA_R + 10 || Math.abs(p2.z) > ARENA_R + 10;
+      // out-of-bounds cull must track the active battlefield: the arena
+      // ring in wave modes, the whole continent on expedition
+      var kill = p2.life <= 0 || (expActive
+        ? (Math.abs(p2.x) > GH.world.BOUNDS.x + 10 || Math.abs(p2.z) > GH.world.BOUNDS.z + 10)
+        : (Math.abs(p2.x) > ARENA_R + 10 || Math.abs(p2.z) > ARENA_R + 10));
       if (!kill) {
         for (var j = 0; j < enemies.length; j++) {
           var e = enemies[j];
@@ -2313,10 +2365,11 @@ GH.game = (function () {
     var s = player.stats;
     G._mouseNDC = input.mouseNDC;
 
-    // T: fold into skimmer form (expedition traversal — no weapons, ram hits)
+    // T: fold between frame and skimmer form — a true combat transform.
+    // Skimmer: 2.6x speed, ram hits, its own strafe cannons, +25% damage taken.
     if (input.transformPressed) {
       input.transformPressed = false;
-      if (expActive && !siege) toggleSpeeder();
+      toggleSpeeder();
     }
 
     // aim priority: right stick / touch aim > mouse
@@ -2477,13 +2530,20 @@ GH.game = (function () {
   // is home, and what you destroy stays destroyed.
   // =================================================================
   var expActive = false;
-  var worldH = null;          // {group, nestMeshes, layout}
+  var worldH = null;          // {group, nestMeshes, vaultMeshes, layout}
   var interactables = [];
   var nearInteract = null;
   var zoneNow = null;
   var siege = null;           // {relay, phase, timer, burst}
   var wreckMesh = null;
   var expLevelUps = 0;
+  // daily world state
+  var weatherToday = null;    // zoneId -> weather def (2 zones/day)
+  var weatherNow = null;      // the front you're standing in
+  var weatherT = 0;
+  var harrowSpot = null;      // where THE HARROW stands today (null = slain today)
+  var harrowTotem = null;
+  var harrowUp = false;
 
   function expeditionPlan(zone) {
     var st = GH.world.stageFor(zone.id);
@@ -2549,10 +2609,23 @@ GH.game = (function () {
     document.getElementById('hint-line').classList.add('hidden');
 
     var w = GH.meta.data.world;
-    worldH = GH.world.build(scene, w.nests, w.lairsDown);
+    worldH = GH.world.build(scene, w.nests, w.lairsDown, w.vaults);
     interactables = GH.world.interactables(worldH.layout);
     wallRing.visible = false;
     floor.visible = false; // the continent brings its own ground
+
+    // today's world state: weather fronts + THE HARROW's roost
+    weatherToday = GH.world.weatherToday();
+    weatherNow = null;
+    weatherT = 0;
+    harrowUp = false;
+    harrowSpot = null;
+    if (w.harrowDay !== GH.world.dayStamp()) {
+      harrowSpot = GH.world.harrowToday();
+      harrowTotem = GH.models.buildHarrowTotem();
+      harrowTotem.position.set(harrowSpot.x, 0, harrowSpot.z);
+      scene.add(harrowTotem);
+    }
 
     if (w.exp) {
       restoreCharacter(w.exp);
@@ -2592,6 +2665,9 @@ GH.game = (function () {
     var cl = cleanseCount();
     announce('THE SHATTERED REACH', 34);
     queueAnnounce('NESTS CLEANSED ' + cl.dead + '/' + cl.total, 20);
+    if (harrowSpot) {
+      queueAnnounce('THE HARROW STALKS ' + GH.world.stageFor(harrowSpot.zone).name, 22);
+    }
   };
 
   function nestById(id) {
@@ -2642,7 +2718,7 @@ GH.game = (function () {
       return;
     }
 
-    // zone crossing: look, music, banner
+    // zone crossing: look, music, banner, weather front
     var zone = GH.world.zoneAt(player.x, player.z);
     wavePlan = expeditionPlan(zone);
     if (!zoneNow || zone.id !== zoneNow.id) {
@@ -2651,7 +2727,10 @@ GH.game = (function () {
       applyStageLookLite(stage);
       GH.music.play(stage.id);
       announce(stage.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zone.danger - 1], 26);
+      setZoneWeather(zone);
     }
+    updateWeather(dt);
+    updateHarrow(dt);
 
     // camp: safety, banking, healing
     var inCamp = GH.dist2(player.x, player.z, GH.world.CAMP.x, GH.world.CAMP.z) < GH.world.CAMP.r * GH.world.CAMP.r;
@@ -2733,6 +2812,7 @@ GH.game = (function () {
     for (var ii = 0; ii < interactables.length; ii++) {
       var it = interactables[ii];
       if (it.kind === 'relay' && w.relaysHeld[it.id]) continue;
+      if (it.kind === 'vault' && (w.vaults[it.id] || cipherRun)) continue;
       if (GH.dist2(player.x, player.z, it.x, it.z) < 3.2 * 3.2) { nearInteract = it; break; }
     }
     var promptEl = document.getElementById('interact-line');
@@ -2746,6 +2826,7 @@ GH.game = (function () {
       input.interactPressed = false;
       if (nearInteract && !siege) {
         if (nearInteract.kind === 'relay') startSiege(nearInteract);
+        else if (nearInteract.kind === 'vault') startVaultTrial(nearInteract);
         else if (nearInteract.kind === 'duel' || nearInteract.kind === 'circuit') {
           saveExpedition();
           G.startRace(nearInteract.kind);
@@ -2821,6 +2902,25 @@ GH.game = (function () {
         ctx.fillStyle = w.relaysHeld[r.id] ? '#60ff90' : '#f0f0f0';
         ctx.fillRect(sx(r.x) - 2, sz(r.z) - 2, 4, 4);
       });
+      worldH.layout.vaults.forEach(function (v) {
+        ctx.fillStyle = w.vaults[v.id] ? '#4a5a4a' : '#c050ff';
+        ctx.save();
+        ctx.translate(sx(v.x), sz(v.z));
+        ctx.rotate(Math.PI / 4);
+        ctx.fillRect(-2, -2, 4, 4);
+        ctx.restore();
+      });
+    }
+    if (harrowSpot) {
+      // the roamer's roost pulses red
+      ctx.strokeStyle = '#ff3020';
+      ctx.lineWidth = 1.5;
+      var hx = sx(harrowSpot.x), hz = sz(harrowSpot.z);
+      ctx.beginPath();
+      ctx.moveTo(hx - 3, hz - 3); ctx.lineTo(hx + 3, hz + 3);
+      ctx.moveTo(hx + 3, hz - 3); ctx.lineTo(hx - 3, hz + 3);
+      ctx.stroke();
+      ctx.lineWidth = 1;
     }
     if (w.wreck) {
       ctx.fillStyle = '#ffb040';
@@ -2921,7 +3021,7 @@ GH.game = (function () {
     player.speederMesh.visible = player.speederOn;
     GH.audio.dash();
     spawnBurst(player.x, 1, player.z, 0x70c0ff, 14);
-    announce(player.speederOn ? 'SKIMMER FORM — WEAPONS FOLDED' : 'FRAME FORM', 22);
+    announce(player.speederOn ? 'SKIMMER FORM — STRAFE CANNONS HOT' : 'FRAME FORM', 22);
   }
 
   function startSiege(relay) {
@@ -2975,6 +3075,152 @@ GH.game = (function () {
         }
       }
     }
+  }
+
+  // -------------------------------------------------------------
+  // WEATHER FRONTS — two territories a day, seeded by the real date
+  // -------------------------------------------------------------
+  function clearNullEddies() {
+    for (var i = hazards.length - 1; i >= 0; i--) {
+      if (hazards[i].weather) {
+        if (hazards[i].mesh) scene.remove(hazards[i].mesh);
+        hazards.splice(i, 1);
+      }
+    }
+  }
+
+  function spawnNullEddies() {
+    for (var i = 0; i < 2; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var x = player.x + Math.cos(a) * GH.rand(8, 14);
+      var z = player.z + Math.sin(a) * GH.rand(8, 14);
+      hazards.push({
+        kind: 'rifts', weather: true, x: x, z: z, r: 3,
+        vx: GH.rand(-1.2, 1.2), vz: GH.rand(-1.2, 1.2),
+        mesh: groundDisc(x, z, 3, 0x9040d0, 0.25)
+      });
+    }
+  }
+
+  function setZoneWeather(zone) {
+    var wz = weatherToday ? weatherToday[zone.id] : null;
+    if (weatherNow && wz && weatherNow.id === wz.id) return;
+    // roll back the front we're leaving
+    if (weatherNow) {
+      if (weatherNow.id === 'whiteout') { scene.fog.near = 18; scene.fog.far = 52; }
+      if (weatherNow.id === 'nullwind') clearNullEddies();
+    }
+    weatherNow = wz || null;
+    weatherT = 2.5;
+    if (weatherNow) {
+      queueAnnounce('WEATHER FRONT — ' + weatherNow.name, 22);
+      if (weatherNow.id === 'whiteout') { scene.fog.near = 7; scene.fog.far = 30; }
+      if (weatherNow.id === 'nullwind') spawnNullEddies();
+    }
+  }
+
+  function updateWeather(dt) {
+    if (!weatherNow) return;
+    weatherT -= dt;
+    if (weatherNow.id === 'ashfall') {
+      if (weatherT <= 0) {
+        weatherT = GH.rand(2.0, 3.2);
+        var ax = player.x + GH.rand(-9, 9), az = player.z + GH.rand(-9, 9);
+        spawnTelegraph(ax, az, 2.0, 1.0, 12 * wavePlan.dmgMult);
+        effects.push({
+          kind: 'ventEnemies', mesh: groundDisc(ax, az, 0.1, 0x000000, 0),
+          t: 1.0, x: ax, z: az, r: 2.0, dmg: 30
+        });
+      }
+    } else if (weatherNow.id === 'stormsurge') {
+      if (weatherT <= 0) {
+        weatherT = GH.rand(3.2, 5.0);
+        var sx = player.x + GH.rand(-6, 6), sz = player.z + GH.rand(-6, 6);
+        spawnTelegraph(sx, sz, 2.2, 0.8, 16 * wavePlan.dmgMult);
+        effects.push({
+          kind: 'boltStrike', mesh: groundDisc(sx, sz, 0.1, 0x000000, 0),
+          t: 0.8, x: sx, z: sz, r: 2.2, dmg: 70
+        });
+      }
+    } else if (weatherNow.id === 'nullwind') {
+      // eddies drift and stay in the fight
+      for (var i = 0; i < hazards.length; i++) {
+        var h = hazards[i];
+        if (!h.weather) continue;
+        h.x += h.vx * dt;
+        h.z += h.vz * dt;
+        if (GH.dist2(h.x, h.z, player.x, player.z) > 30 * 30) {
+          var a = Math.random() * Math.PI * 2;
+          h.x = player.x + Math.cos(a) * 14;
+          h.z = player.z + Math.sin(a) * 14;
+          h.vx = GH.rand(-1.2, 1.2); h.vz = GH.rand(-1.2, 1.2);
+        }
+        h.mesh.position.set(h.x, 0.04, h.z);
+        h.mesh.material.opacity = 0.2 + Math.sin(runTime * 4 + i * 2) * 0.08;
+      }
+    }
+  }
+
+  // -------------------------------------------------------------
+  // THE HARROW — the world boss that migrates daily
+  // -------------------------------------------------------------
+  function updateHarrow(dt) {
+    if (!harrowSpot || harrowUp) {
+      if (harrowTotem && harrowTotem.userData.core) {
+        harrowTotem.userData.core.rotation.y += dt * 2;
+      }
+      return;
+    }
+    if (harrowTotem && harrowTotem.userData.core) {
+      harrowTotem.userData.core.rotation.y += dt * 2;
+      harrowTotem.userData.core.scale.setScalar(1 + Math.sin(runTime * 5) * 0.2);
+    }
+    if (GH.dist2(player.x, player.z, harrowSpot.x, harrowSpot.z) < 24 * 24) {
+      harrowUp = true;
+      wavePlan = expeditionPlan(GH.world.zoneAt(harrowSpot.x, harrowSpot.z));
+      spawnEnemy('harrow', harrowSpot.x, harrowSpot.z);
+      if (harrowTotem) { scene.remove(harrowTotem); harrowTotem = null; }
+      shake = Math.min(0.5, shake + 0.35);
+    }
+  }
+
+  // -------------------------------------------------------------
+  // HIDDEN VAULTS — breach a sealed door by passing a field trial
+  // -------------------------------------------------------------
+  function startVaultTrial(v) {
+    if (cipherRun) return;
+    cipherRun = {
+      steps: GH.progress.makeCipher(), idx: 0, t: 0, prog: 0, marker: null,
+      killsAt: kills, boosts: 0, vault: v.id, vx: v.x, vz: v.z
+    };
+    announce('VAULT TRIAL — PROVE YOURSELF', 26);
+    GH.audio.boss();
+    // the vault wakes its guardians so every step has teeth (and targets)
+    var plan = expeditionPlan(GH.world.zoneAt(v.x, v.z));
+    for (var i = 0; i < 7; i++) {
+      var a = Math.random() * Math.PI * 2;
+      spawnEnemy(GH.weightedPick(plan.types).id,
+        v.x + Math.cos(a) * GH.rand(9, 14), v.z + Math.sin(a) * GH.rand(9, 14));
+    }
+    beginCipherStep();
+  }
+
+  function openVault(vaultId, vx, vz) {
+    GH.meta.data.world.vaults[vaultId] = true;
+    GH.meta.data.salvage += 150;
+    GH.meta.save();
+    // swap the sealed door for a breached one
+    var oldMesh = worldH.vaultMeshes[vaultId];
+    if (oldMesh) worldH.group.remove(oldMesh);
+    var openMesh = GH.models.buildVault(true);
+    openMesh.position.set(vx, 0, vz);
+    worldH.group.add(openMesh);
+    worldH.vaultMeshes[vaultId] = openMesh;
+    queueAnnounce('VAULT BREACHED — +150 SALVAGE BANKED', 28);
+    GH.audio.win();
+    spawnPickup('gem:' + GH.pick(GH.gems.typeIds), vx + 1, vz + 2);
+    spawnPickup('cache', vx - 1, vz + 2);
+    saveExpedition();
   }
 
   // lighter look-switch for zone crossings (no prop rescatter)
@@ -3249,8 +3495,14 @@ GH.game = (function () {
     if (step.id === 'stand') {
       var a = Math.random() * Math.PI * 2;
       var r = GH.rand(7, 13);
-      var mx = GH.clamp(player.x + Math.cos(a) * r, -ARENA_R + 3, ARENA_R - 3);
-      var mz = GH.clamp(player.z + Math.sin(a) * r, -ARENA_R + 3, ARENA_R - 3);
+      var mx, mz;
+      if (expActive) {
+        mx = GH.clamp(player.x + Math.cos(a) * r, -GH.world.BOUNDS.x + 3, GH.world.BOUNDS.x - 3);
+        mz = GH.clamp(player.z + Math.sin(a) * r, -GH.world.BOUNDS.z + 3, GH.world.BOUNDS.z - 3);
+      } else {
+        mx = GH.clamp(player.x + Math.cos(a) * r, -ARENA_R + 3, ARENA_R - 3);
+        mz = GH.clamp(player.z + Math.sin(a) * r, -ARENA_R + 3, ARENA_R - 3);
+      }
       cipherRun.marker = groundDisc(mx, mz, 2.0, 0x60e8ff, 0.3);
       cipherRun.mx = mx; cipherRun.mz = mz;
     }
@@ -3261,7 +3513,13 @@ GH.game = (function () {
     cipherRun.idx++;
     if (cipherRun.idx >= cipherRun.steps.length) {
       if (cipherRun.marker) scene.remove(cipherRun.marker);
+      var vaultDone = cipherRun.vault;
+      var vdx = cipherRun.vx, vdz = cipherRun.vz;
       cipherRun = null;
+      if (vaultDone) {
+        openVault(vaultDone, vdx, vdz);
+        return;
+      }
       queueAnnounce('CIPHER SOLVED — CACHE INBOUND', 26);
       spawnPickup('cache', player.x + GH.rand(-1, 1), player.z + GH.rand(-1, 1));
     } else {
@@ -3301,7 +3559,7 @@ GH.game = (function () {
     else if (step.id === 'burst') extra = ' (' + (kills - cipherRun.killsAt) + '/5, ' + GH.fmt1(Math.max(0, 8 - cipherRun.t)) + 's)';
     else if (step.id === 'sprint') extra = ' (' + cipherRun.boosts + '/3)';
     else if (step.id === 'hold') extra = ' (' + GH.fmt1(Math.max(0, 10 - cipherRun.t)) + 's)';
-    return 'CIPHER: ' + step.desc + extra;
+    return (cipherRun.vault ? 'VAULT TRIAL: ' : 'CIPHER: ') + step.desc + extra;
   }
 
   // =================================================================
@@ -3651,6 +3909,9 @@ GH.game = (function () {
     wardEl.innerHTML = wh;
 
     var buffs = [];
+    if (player.speederOn) {
+      buffs.push('<span style="color:#70c0ff">SKIMMER — STRAFE CANNONS · +25% DMG TAKEN</span>');
+    }
     var prim = player.weapons[0];
     if (prim.w.cycle) {
       var elx = currentElement(prim);
@@ -3761,6 +4022,12 @@ GH.game = (function () {
     // expedition teardown: the continent, camp, and its UI
     if (worldH) { scene.remove(worldH.group); worldH = null; }
     if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
+    if (harrowTotem) { scene.remove(harrowTotem); harrowTotem = null; }
+    if (weatherNow && weatherNow.id === 'whiteout') { scene.fog.near = 18; scene.fog.far = 52; }
+    weatherNow = null;
+    weatherToday = null;
+    harrowSpot = null;
+    harrowUp = false;
     expActive = false;
     siege = null;
     zoneNow = null;
@@ -4207,6 +4474,7 @@ GH.game = (function () {
       seasonPts: GH.meta.data.season.pts,
       seasonRelics: GH.meta.data.season.relics.slice(),
       cipher: cipherRun ? cipherRun.steps[cipherRun.idx].id + ' ' + cipherRun.idx + '/' + cipherRun.steps.length : null,
+      cipherMark: cipherRun && cipherRun.mx !== undefined ? { x: Math.round(cipherRun.mx), z: Math.round(cipherRun.mz) } : null,
       ward: player ? player.ward : null,
       wardEnergy: player ? Math.round(player.wardEnergy * 100) / 100 : 0,
       counterStacks: player ? player.counter.length : 0,
@@ -4230,7 +4498,13 @@ GH.game = (function () {
       transformed: player ? !!player.speederOn : false,
       race: G.state === 'race' ? { mode: GH.race.mode(), t: Math.round(GH.race.time() * 10) / 10, riders: GH.race.debug() } : null,
       duelWins: GH.meta.data.world.duelWins,
-      raceBest: GH.meta.data.world.raceBest
+      raceBest: GH.meta.data.world.raceBest,
+      weather: weatherNow ? weatherNow.id : null,
+      weatherToday: weatherToday ? Object.keys(weatherToday) : null,
+      harrow: harrowSpot ? { zone: harrowSpot.zone, x: Math.round(harrowSpot.x), z: Math.round(harrowSpot.z), up: harrowUp } : null,
+      harrowDay: GH.meta.data.world.harrowDay,
+      vaultsOpen: Object.keys(GH.meta.data.world.vaults),
+      strafe: player && player.strafeInst ? Math.round(player.strafeInst.timer * 1000) : null
     };
   };
 

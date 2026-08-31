@@ -100,6 +100,12 @@
               input._gpWardHeld = true;
             }
           } else input._gpWardHeld = false;
+          if (btn(3)) { // Y: transform
+            if (!input._gpTHeld) {
+              if (GH.game.state === 'play') input.transformPressed = true;
+              input._gpTHeld = true;
+            }
+          } else input._gpTHeld = false;
         }
         break;
       }
@@ -245,6 +251,10 @@
     document.getElementById('touch-ward').addEventListener('pointerdown', function (e) {
       e.preventDefault();
       if (GH.game.state === 'play') input.wardCycle = true;
+    });
+    document.getElementById('touch-trans').addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      if (GH.game.state === 'play') input.transformPressed = true;
     });
     var specBtn = document.getElementById('touch-special');
     specBtn.addEventListener('pointerdown', function (e) {

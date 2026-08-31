@@ -547,6 +547,83 @@ GH.models = (function () {
     return g;
   };
 
+  // sealed treasure vault: a squat stone door with a glowing seam;
+  // breached vaults stand open and dark
+  M.buildVault = function (open) {
+    var g = new THREE.Group();
+    var jambL = box(0.9, 3.4, 0.9, 0x4a4650); jambL.position.set(-1.6, 1.7, 0);
+    var jambR = box(0.9, 3.4, 0.9, 0x4a4650); jambR.position.set(1.6, 1.7, 0);
+    var lintel = box(4.4, 0.9, 1.0, 0x3a3642); lintel.position.y = 3.6;
+    g.add(jambL, jambR, lintel);
+    if (open) {
+      // the door lies fallen; the chamber gapes dark
+      var slab = box(2.4, 0.4, 2.8, 0x2e2a34);
+      slab.position.set(0, 0.2, 2.2);
+      slab.rotation.y = 0.3;
+      g.add(slab);
+    } else {
+      var door = box(2.4, 3.0, 0.5, 0x37333f); door.position.y = 1.5;
+      var seam = box(0.16, 2.6, 0.56, 0x000000);
+      seam.position.y = 1.5;
+      var seamGlow = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.4, 0.6),
+        GH.assets.basic(0xc050ff, { transparent: true, opacity: 0.8 }));
+      seamGlow.position.y = 1.5;
+      g.add(door, seam, seamGlow);
+      g.userData.seam = seamGlow;
+    }
+    blobShadow(g, 4);
+    return g;
+  };
+
+  // THE HARROW — the roaming colossus: a slab-bodied quadruped walker,
+  // scorched iron shot through with molten fissures
+  M.buildHarrow = function () {
+    var g = new THREE.Group();
+    var hull = box(3.4, 2.2, 4.2, 0x2c2622); hull.position.y = 3.1;
+    var ridge = box(2.2, 1.0, 3.0, 0x201b18); ridge.position.y = 4.5;
+    g.add(hull, ridge);
+    // molten fissures
+    [[-1.1, 3.2, 1.6], [0.9, 3.5, -1.2], [0, 2.6, 2.1]].forEach(function (p) {
+      var vein = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.9, 0.24),
+        mat(0xff5a20, { emissive: 0x903008, emissiveIntensity: 1.0 }));
+      vein.position.set(p[0], p[1], p[2]);
+      vein.rotation.z = 0.4;
+      g.add(vein);
+    });
+    // four column legs
+    var legs = [];
+    [[-1.5, 1.7], [1.5, 1.7], [-1.5, -1.7], [1.5, -1.7]].forEach(function (p, i) {
+      var leg = box(0.9, 2.4, 0.9, 0x241f1c);
+      leg.position.set(p[0], 1.2, p[1]);
+      g.add(leg);
+      legs.push(leg);
+    });
+    // the eye-furnace
+    var eye = new THREE.Mesh(new THREE.OctahedronGeometry(0.6),
+      mat(0xffa020, { emissive: 0xa04808, emissiveIntensity: 1.0 }));
+    eye.position.set(0, 3.4, 2.3);
+    g.add(eye);
+    g.userData.core = eye;
+    g.userData.parts = { legL: legs[0], legR: legs[1] };
+    blobShadow(g, 6);
+    return g;
+  };
+
+  // warning totem raised wherever THE HARROW stands today
+  M.buildHarrowTotem = function () {
+    var g = new THREE.Group();
+    var spike = new THREE.Mesh(new THREE.ConeGeometry(0.7, 9, 5), mat(0x241f1c));
+    spike.position.y = 4.5;
+    g.add(spike);
+    var brazier = new THREE.Mesh(new THREE.OctahedronGeometry(0.5),
+      GH.assets.basic(0xff4020, { transparent: true, opacity: 0.9 }));
+    brazier.position.y = 9.4;
+    g.add(brazier);
+    g.userData.core = brazier;
+    blobShadow(g, 3);
+    return g;
+  };
+
   M.buildCampFire = function () {
     var g = new THREE.Group();
     for (var i = 0; i < 5; i++) {

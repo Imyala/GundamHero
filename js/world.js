@@ -55,7 +55,7 @@ GH.world = (function () {
 
   // fixed world features, generated once (same every session)
   W.layout = function () {
-    var nests = [], lairs = [], relays = [];
+    var nests = [], lairs = [], relays = [], vaults = [];
     W.ZONES.forEach(function (zn) {
       var rnd = zrng('reach:' + zn.id);
       var count = zn.id === 'wreck' ? 3 : 5;
@@ -77,10 +77,55 @@ GH.world = (function () {
         id: 'lair_' + zn.id, zone: zn.id, x: lx, z: lz,
         boss: W.stageFor(zn.id).unlocks
       });
+      // one sealed vault per territory, tucked in the corner opposite the lair
+      var vx = zn.cx - (zn.cx >= 0 ? 1 : -1) * (W.CELL / 2 - 14);
+      var vz = zn.cz - (zn.cz >= 0 ? 1 : -1) * (W.CELL / 2 - 14);
+      if (GH.dist2(vx, vz, W.CAMP.x, W.CAMP.z) < 22 * 22) vx += 26;
+      if (GH.dist2(vx, vz, W.CIRCUIT.x, W.CIRCUIT.z) < 24 * 24) vz -= 26;
+      vaults.push({ id: 'vault_' + zn.id, zone: zn.id, x: vx, z: vz });
     });
     relays.push({ id: 'relay_wreck', zone: 'wreck', x: 28, z: -18 });
     relays.push({ id: 'relay_storm', zone: 'storm', x: -8, z: 52 });
-    return { nests: nests, lairs: lairs, relays: relays };
+    return { nests: nests, lairs: lairs, relays: relays, vaults: vaults };
+  };
+
+  // ---------------------------------------------------------------
+  // Daily world state — everything keyed off the real UTC date so the
+  // whole Reach shifts once a day, the same way for every pilot.
+  // ---------------------------------------------------------------
+  W.dayStamp = function () { return new Date().toISOString().slice(0, 10); };
+
+  W.WEATHERS = {
+    glacier: { id: 'whiteout', name: 'WHITEOUT', desc: 'fog swallows the hollow; everything moves slower' },
+    wreck: { id: 'kingtide', name: 'KING TIDE', desc: 'the tide washes salvage ashore' },
+    cloister: { id: 'sporebloom', name: 'SPOREBLOOM', desc: 'kills shed extra sparks' },
+    ember: { id: 'ashfall', name: 'ASHFALL', desc: 'burning cinders rain from the sky' },
+    storm: { id: 'stormsurge', name: 'STORM SURGE', desc: 'the sky hunts anything that moves' },
+    null: { id: 'nullwind', name: 'NULL WIND', desc: 'drifting eddies ground your weapons' }
+  };
+
+  // two territories carry a weather front each day
+  W.weatherToday = function () {
+    var rnd = zrng('weather:' + W.dayStamp());
+    var ids = W.ZONES.map(function (z) { return z.id; });
+    var a = Math.floor(rnd() * ids.length);
+    var b = (a + 1 + Math.floor(rnd() * (ids.length - 1))) % ids.length;
+    var out = {};
+    out[ids[a]] = W.WEATHERS[ids[a]];
+    out[ids[b]] = W.WEATHERS[ids[b]];
+    return out;
+  };
+
+  // THE HARROW roams: a different territory every day (never the camp's)
+  W.harrowToday = function () {
+    var rnd = zrng('harrow:' + W.dayStamp());
+    var candidates = W.ZONES.filter(function (z) { return z.id !== 'wreck'; });
+    var zn = candidates[Math.floor(rnd() * candidates.length)];
+    return {
+      zone: zn.id,
+      x: zn.cx + (rnd() - 0.5) * 30,
+      z: zn.cz + (rnd() - 0.5) * 30
+    };
   };
 
   // circuit centerline: a wobbled ring, sampled fine for AI + track checks
@@ -99,9 +144,11 @@ GH.world = (function () {
   // Build all world meshes into the scene. Returns handles for the
   // dynamic pieces (nest cores by id) so the sim can mark them dead.
   // ---------------------------------------------------------------
-  W.build = function (scene, deadNests, lairsDown) {
+  W.build = function (scene, deadNests, lairsDown, vaultsOpen) {
     var group = new THREE.Group();
     var nestMeshes = {};
+    var vaultMeshes = {};
+    vaultsOpen = vaultsOpen || {};
     var mat = GH.assets.mat;
 
     // biome ground tiles
@@ -148,6 +195,12 @@ GH.world = (function () {
       relay.position.set(r.x, 0, r.z);
       group.add(relay);
     });
+    lay.vaults.forEach(function (v) {
+      var vault = GH.models.buildVault(vaultsOpen[v.id]);
+      vault.position.set(v.x, 0, v.z);
+      group.add(vault);
+      vaultMeshes[v.id] = vault;
+    });
 
     // the survivor camp: stations arranged around a fire
     var camp = new THREE.Group();
@@ -179,7 +232,7 @@ GH.world = (function () {
     }
 
     scene.add(group);
-    return { group: group, nestMeshes: nestMeshes, layout: lay };
+    return { group: group, nestMeshes: nestMeshes, vaultMeshes: vaultMeshes, layout: lay };
   };
 
   // camp interactables + world features as one prompt list
@@ -194,6 +247,9 @@ GH.world = (function () {
     ];
     layout.relays.forEach(function (r) {
       list.push({ kind: 'relay', id: r.id, x: r.x, z: r.z, label: 'ACTIVATE THE RELAY (SIEGE)' });
+    });
+    layout.vaults.forEach(function (v) {
+      list.push({ kind: 'vault', id: v.id, x: v.x, z: v.z, label: 'BREACH THE VAULT (FIELD TRIAL)' });
     });
     return list;
   };

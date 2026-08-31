@@ -36,8 +36,8 @@ or move between browsers.
 | Shift / Right-click | Special (per frame: Block, Overdrive, Nova, Lunge, Shade, Frenzy, Blink, Bulwark) |
 | 1 / 2 / 3 (in combat) | Toggle KINETIC / BALLISTIC / ARC ward |
 | Q (or gamepad LB, touch WARD) | Cycle wards |
-| E (expedition) | Interact — camp stations, relays, race starts |
-| T (expedition) | Transform between frame and skimmer form |
+| E (expedition) | Interact — camp stations, relays, vaults, race starts |
+| T (gamepad Y, touch TRANS) | Transform between frame and skimmer combat forms — any mode |
 | 1–6 | Pick a wave-reward card / socket target |
 | F | Toggle CRT scanlines |
 | Esc / P | Pause |
@@ -78,9 +78,16 @@ doesn't scale to you; you grow into it. There are no waves and no timer:
 - A **minimap** tracks territories, nests (live/broken), lairs, relays, your
   wreck, and you.
 
-### Skimmer transform & racing
-Every frame can fold into an anti-grav **skimmer** (T) — ~2.6× speed, weapons
-stowed, and your hull becomes a ram. Two race sites use the transformed form:
+### Skimmer transform — a true combat form
+Every frame can fold into an anti-grav **skimmer** (T, gamepad Y, touch
+TRANS) in *any* mode, arenas included — a real mech↔vehicle combat
+transform, not just traversal. Skimmer form trades armor for tempo: ~2.6×
+speed, your hull becomes a ram, and twin **strafe cannons** auto-fire along
+your aim — but you take **+25% damage** until you fold back. Weave through
+the swarm gunning, transform back to bring the full weapon suite to bear.
+
+### Racing
+Two race sites use the skimmer form:
 
 - **TRACE DUEL** (at the camp pit) — a hard-light trail survival duel against
   three rival riders: your thrusters cut a wall behind you, touching any wall
@@ -90,13 +97,32 @@ stowed, and your hull becomes a ram. Two race sites use the transformed form:
   three rivals with throttle, brake, and a boost meter; best time is recorded
   and first place earns the **Circuit Laurel** artifact. ESC abandons a race.
 
+### The living Reach — daily world state
+The continent shifts once a real day, the same way for everyone:
+
+- **THE HARROW** — a slab-iron colossus shot through with molten fissures —
+  roosts in a different territory each day (a warning totem marks it on the
+  ground and the minimap). Approach and it wakes. Fell it for a heavy
+  salvage purse and the **Harrow Brand** artifact; it re-roosts elsewhere
+  tomorrow.
+- **Weather fronts** blanket two territories a day: WHITEOUT (fog closes
+  in, everything slows), KING TIDE (kills wash up bonus salvage),
+  SPOREBLOOM (kills shed extra sparks), ASHFALL (burning cinders rain on
+  telegraphs), STORM SURGE (the sky hunts you), NULL WIND (drifting eddies
+  ground your weapons).
+- **Hidden vaults** — one sealed door per territory, tucked in a far
+  corner. Breaching one means passing a 3-step field trial while its
+  guardians wake; a breached vault stays open forever and pays banked
+  salvage, a gem, and a cache.
+
 ### Named artifacts
-Eight handcrafted relics from specific places — one equipped at a time (from
+Nine handcrafted relics from specific places — one equipped at a time (from
 the Collection Log): Bulwark Fragment (ward collapses detonate), Glacier Core
 (attackers are flash-chilled), Harvest Coil (kill salvage), Cinder Heart
 (+50% burns, boosting leaves fire), Stormcap (boosts chain lightning), Null
 Lens (shielded elites take full damage, +10% crit), Circuit Laurel (+8%
-speed), Trace Emblem (boosts leave a cutting light-wall).
+speed), Trace Emblem (boosts leave a cutting light-wall), Harrow Brand
+(+1 projectile while above 70% hull).
 
 ### Eight playable frames
 Fantasy archetypes as war machines, each with its own primary, special, passive,
@@ -302,6 +328,6 @@ js/main.js        renderer, input, screen wiring
 ## Roadmap ideas
 
 - Seeded custom runs (share a seed string with a friend)
-- More Reach content: roaming world bosses, weather fronts, hidden vaults
+- More daily events: convoy escorts, territory invasions, migrating herds
 - Online leaderboards for Weekly, Arena, and the Sunspire Circuit
 - Co-op expeditions and split-screen racing

@@ -620,8 +620,10 @@ html, body {
 }
 
 .touch-ward { bottom: calc(6vh + 152px); right: calc(4vw + 230px); }
+.touch-trans { bottom: calc(6vh + 228px); right: calc(4vw + 230px); }
 @media (max-width: 700px) {
   .touch-ward { right: auto; left: calc(4vw + 230px); }
+  .touch-trans { right: auto; left: calc(4vw + 230px); }
 }
 
 #contract-line {

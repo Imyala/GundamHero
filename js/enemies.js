@@ -55,6 +55,13 @@ GH.enemyDefs = {
     behavior: 'boss', slamInterval: 7, summonInterval: 6, summons: 'shardling', summonCount: 5
   },
 
+  // ---- THE HARROW — the world boss that roams the Shattered Reach daily ----
+  harrow: {
+    name: 'THE HARROW', boss: true,
+    hp: 5200, speed: 2.3, damage: 30, radius: 2.2, xp: 150, mass: 22,
+    behavior: 'boss', slamInterval: 5, summonInterval: 9, summonCount: 4
+  },
+
   // ---- corrupt shell bosses (wave 20) — one per unlockable frame ----
   fang:  { name: 'CORRUPTED FANG', boss: true, corrupt: true,
     hp: 2200, speed: 3.6, damage: 24, radius: 1.15, xp: 60, mass: 10, behavior: 'corrupt' },
@@ -80,7 +87,8 @@ GH.enemyBuilders = {
   cinder: function () { return GH.models.buildCinder(); },
   volt: function () { return GH.models.buildVolt(); },
   warden: function () { return GH.models.buildWarden(); },
-  carapace: function () { return GH.models.buildCarapace(); }
+  carapace: function () { return GH.models.buildCarapace(); },
+  harrow: function () { return GH.models.buildHarrow(); }
 };
 
 // corrupt bosses reuse the mech builder in corrupt colors at boss scale

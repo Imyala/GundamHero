@@ -50,12 +50,14 @@ GH.meta = (function () {
         nests: {},          // nest id -> true (core broken, stays broken)
         lairsDown: {},      // zone id -> true (corrupt frame defeated)
         relaysHeld: {},     // relay id -> true (siege won)
+        vaults: {},         // vault id -> true (breached, stays open)
         artifacts: {},      // artifact id -> owned
         equipped: null,     // one artifact slot
         exp: null,          // serialized expedition character
         wreck: null,        // {x, z, salvage} where you last fell
         raceBest: 0,        // best circuit time in ms (0 = none)
-        duelWins: 0
+        duelWins: 0,
+        harrowDay: null     // date stamp of the last day THE HARROW fell
       },
       // one-time onboarding hints already shown
       seenHints: {},

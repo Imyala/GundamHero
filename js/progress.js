@@ -206,7 +206,9 @@ GH.progress = (function () {
     { id: 'circuit_laurel', name: 'Circuit Laurel', source: 'Win the Sunspire Circuit',
       desc: 'A racer’s tuning: +8% move speed.' },
     { id: 'trace_emblem', name: 'Trace Emblem', source: 'Win the Trace Duel',
-      desc: 'Boosting briefly leaves a cutting light-wall behind you.' }
+      desc: 'Boosting briefly leaves a cutting light-wall behind you.' },
+    { id: 'harrow_brand', name: 'Harrow Brand', source: 'Fell THE HARROW (roams the Reach daily)',
+      desc: 'While hull is above 70%, every volley carries +1 projectile.' }
   ];
 
   P.artifactById = function (id) {
