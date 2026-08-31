@@ -10,9 +10,19 @@ audio here are original and generated procedurally at runtime (no binary assets)
 
 ## Play
 
-Open `index.html` in any modern browser — no server or install needed.
-(If your browser blocks local files, run `python3 -m http.server` in this folder
-and visit `http://localhost:8000`.)
+**Live build:** https://imyala.github.io/GundamHero/ (redeploys automatically
+from `main`).
+
+Or open `index.html` locally in any modern browser — no server or install
+needed. (If your browser blocks local files, run `python3 -m http.server` in
+this folder and visit `http://localhost:8000`.) `node tools/build-single.js`
+produces a single-file bundle in `dist/`.
+
+First runs teach the basics with one-time on-screen hints; every meta system
+(Relic Season, the Broker, Stage Trials, Collection Log, Devotions, and Save
+Codes) lives under the **HANGAR** button. Progress saves per browser —
+**HANGAR → SAVE CODE** exports everything as a portable string you can back up
+or move between browsers.
 
 ### Controls
 

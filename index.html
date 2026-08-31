@@ -49,6 +49,7 @@
       <div class="bar-frame boss-frame"><div id="boss-fill" class="bar-fill boss-fill"></div></div>
     </div>
     <div id="announce" class="hidden"></div>
+    <div id="hint-line" class="hidden"></div>
   </div>
 
   <div id="damage-layer"></div>
@@ -62,13 +63,9 @@
     <button id="btn-arena" class="menu-btn small">ARENA — ENDLESS</button>
     <button id="btn-weekly" class="menu-btn small">WEEKLY CHALLENGE</button>
     <div class="title-row">
-      <button id="btn-season" class="menu-btn tiny season-btn">SEASON</button>
-      <button id="btn-hangar" class="menu-btn tiny">DEVOTIONS</button>
-      <button id="btn-broker" class="menu-btn tiny">BROKER</button>
-      <button id="btn-collection" class="menu-btn tiny">COLLECTION LOG</button>
-      <button id="btn-trials" class="menu-btn tiny">STAGE TRIALS</button>
+      <button id="btn-hub" class="menu-btn small">HANGAR</button>
+      <button id="btn-profile" class="menu-btn tiny profile-btn">PILOT: STANDARD</button>
     </div>
-    <button id="btn-profile" class="menu-btn tiny profile-btn">PILOT: STANDARD</button>
     <div id="title-salvage"></div>
     <div id="title-memorial"></div>
     <div class="title-foot">WASD move &nbsp;·&nbsp; mouse aim &nbsp;·&nbsp; SPACE boost &nbsp;·&nbsp; SHIFT / RMB special &nbsp;·&nbsp; F scanlines &nbsp;·&nbsp; weapons fire automatically</div>
@@ -121,6 +118,25 @@
     <div id="hangar-note">Spend salvage on permanent paths. The ACTIVE path also grows every level-up in a run.</div>
     <div id="devotion-list"></div>
     <button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== HANGAR HUB ===================== -->
+  <div id="hub-screen" class="screen hidden">
+    <h2 class="select-title">HANGAR</h2>
+    <div id="hub-cards"></div>
+    <button id="btn-hub-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== SAVE CODE ===================== -->
+  <div id="save-screen" class="screen hidden">
+    <h2 class="select-title">SAVE&nbsp;CODE</h2>
+    <div class="save-note">Your progress lives in this browser. Copy this code somewhere safe, or paste one to restore.</div>
+    <textarea id="save-export" readonly spellcheck="false"></textarea>
+    <button id="btn-save-copy" class="menu-btn small">COPY CODE</button>
+    <textarea id="save-import" placeholder="paste a save code here…" spellcheck="false"></textarea>
+    <button id="btn-save-import" class="menu-btn small">IMPORT</button>
+    <div id="save-feedback"></div>
+    <button id="btn-save-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== RELIC SEASON ===================== -->

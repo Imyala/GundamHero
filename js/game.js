@@ -27,6 +27,50 @@ GH.game = (function () {
 
   G.hitStop = function (t) { hitStopT = Math.max(hitStopT, t); };
 
+  // ---------------------------------------------------------------
+  // First-run onboarding hints: shown once per profile, bottom-center,
+  // timed into the opening waves so new pilots learn by doing.
+  // ---------------------------------------------------------------
+  var hintTimer = 0, activeHint = null;
+
+  function showHint(id, text) {
+    var seen = GH.meta.data.seenHints;
+    if (seen[id] || activeHint) return;
+    seen[id] = true;
+    GH.meta.save();
+    activeHint = id;
+    hintTimer = 5;
+    var el2 = document.getElementById('hint-line');
+    el2.textContent = text;
+    el2.classList.remove('hidden');
+  }
+
+  function updateHints(dt) {
+    if (activeHint) {
+      hintTimer -= dt;
+      if (hintTimer <= 0) {
+        document.getElementById('hint-line').classList.add('hidden');
+        activeHint = null;
+      }
+    }
+    var seen = GH.meta.data.seenHints;
+    if (seen.__done) return;
+    if (waveNum === 1) {
+      if (runTime > 0.5) showHint('move', 'WASD to move · aim with the mouse — your weapons fire on their own');
+      if (runTime > 7) showHint('boost', 'SPACE to boost — a short dash that dodges through danger');
+      if (sparksRun > 0) showHint('sparks', 'Gems are SPARKS — collect them to level up your frame');
+    }
+    if (waveNum === 2) {
+      if (waveTimer < wavePlan.duration - 2) {
+        showHint('wards', 'Press 1 / 2 / 3 to raise a WARD — match it to the incoming damage to cut it 75%');
+      }
+    }
+    if (waveNum === 3) {
+      showHint('special', 'SHIFT or right-click fires your frame’s SPECIAL');
+      if (seen.special) { seen.__done = true; GH.meta.save(); }
+    }
+  }
+
   // season task announcements
   function seasonTaskNotify(taskId) {
     var t = GH.progress.seasonAward(taskId);
@@ -814,9 +858,38 @@ GH.game = (function () {
   // =================================================================
   // FIRING
   // =================================================================
+  // ---- pooled short-lived meshes (projectiles, shots, shards, flashes) ----
+  var meshPool = { cone: [], box: [], sphere: [], flash: [] };
+
+  function poolGet(kind, color) {
+    var m = meshPool[kind].pop();
+    if (!m) {
+      if (kind === 'flash') {
+        m = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: GH.assets.flashTex, transparent: true, depthWrite: false
+        }));
+      } else {
+        m = new THREE.Mesh(GH.assets.geo[kind], GH.assets.basic(color || 0xffffff));
+        m.rotation.order = 'YXZ';
+      }
+      m.userData.poolKind = kind;
+    }
+    if (kind !== 'flash' && color !== undefined) m.material = GH.assets.basic(color);
+    if (kind === 'flash') m.material.opacity = 1;
+    m.visible = true;
+    m.rotation.set(0, 0, 0);
+    return m;
+  }
+
+  function poolPut(m) {
+    scene.remove(m);
+    var kind = m.userData.poolKind;
+    if (kind && meshPool[kind].length < 220) meshPool[kind].push(m);
+  }
+
   function projMesh(size, color) {
-    var m = new THREE.Mesh(new THREE.ConeGeometry(size, size * 3.2, 5), GH.assets.basic(color));
-    m.rotation.order = 'YXZ';
+    var m = poolGet('cone', color);
+    m.scale.setScalar(size);
     return m;
   }
 
@@ -868,9 +941,7 @@ GH.game = (function () {
   }
 
   function spawnFlash(x, y, z) {
-    var s = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: GH.assets.flashTex, transparent: true, depthWrite: false
-    }));
+    var s = poolGet('flash');
     s.position.set(x, y, z);
     s.scale.setScalar(GH.rand(0.7, 1.1));
     scene.add(s);
@@ -1371,7 +1442,8 @@ GH.game = (function () {
         }
       }
       if (kill) {
-        scene.remove(p2.mesh);
+        if (p2.mesh.userData.poolKind) poolPut(p2.mesh);
+        else scene.remove(p2.mesh);
         projectiles.splice(i, 1);
       }
     }
@@ -1393,7 +1465,7 @@ GH.game = (function () {
         dead = true;
       }
       if (dead) {
-        scene.remove(p2.mesh);
+        poolPut(p2.mesh);
         enemyShots.splice(i, 1);
       }
     }
@@ -1401,7 +1473,8 @@ GH.game = (function () {
 
   function spawnEnemyShot(x, y, z, dirX, dirZ, speed, dmg, elem) {
     var color = elem === 'shock' ? 0x90d0ff : 0xff4060;
-    var m = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), GH.assets.basic(color));
+    var m = poolGet('sphere', color);
+    m.scale.setScalar(0.22);
     m.position.set(x, y, z);
     scene.add(m);
     enemyShots.push({ mesh: m, x: x, y: y, z: z, dirX: dirX, dirZ: dirZ, speed: speed, damage: dmg, life: 4.5 });
@@ -1512,7 +1585,8 @@ GH.game = (function () {
   // =================================================================
   function spawnBurst(x, y, z, color, n) {
     for (var i = 0; i < n; i++) {
-      var m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), GH.assets.basic(color));
+      var m = poolGet('box', color);
+      m.scale.setScalar(0.14);
       m.position.set(x, y, z);
       scene.add(m);
       effects.push({
@@ -1596,9 +1670,13 @@ GH.game = (function () {
         }
       }
       if (fx.t <= 0) {
-        scene.remove(fx.mesh);
+        if (fx.mesh.userData.poolKind) {
+          poolPut(fx.mesh); // pooled meshes share geometry — never dispose it
+        } else {
+          scene.remove(fx.mesh);
+          if (fx.mesh.geometry) fx.mesh.geometry.dispose();
+        }
         if (fx.disc) scene.remove(fx.disc);
-        if (fx.mesh.geometry) fx.mesh.geometry.dispose();
         effects.splice(i, 1);
       }
     }
@@ -1659,6 +1737,8 @@ GH.game = (function () {
     hideBossBar();
     for (i = enemyShots.length - 1; i >= 0; i--) scene.remove(enemyShots[i].mesh);
     enemyShots.length = 0;
+
+    GH.meta.save(); // persist run tracking each wave, not only at run end
 
     if (G.mode === 'classic' && waveNum >= 20) {
       gameOver(true);
@@ -1726,6 +1806,8 @@ GH.game = (function () {
     G._rewardCards = null;
     if (card.kind === 'trait' || card.kind === 'protocol') {
       card.apply(player);
+      var tp = GH.meta.data.traitPicks;
+      tp[card.id] = (tp[card.id] || 0) + 1;
     } else if (card.kind === 'gem') {
       renderSocketPicker(card.gemType, false);
       return; // socketing continues this step
@@ -2728,6 +2810,9 @@ GH.game = (function () {
     if (trialTier >= 3) player.stats.damageMult += 0.05;
     kills = 0; coinsRun = 0; runTime = 0; hitCount = 0; sparksRun = 0;
     announceQueue.length = 0;
+    activeHint = null;
+    hintTimer = 0;
+    document.getElementById('hint-line').classList.add('hidden');
     G.state = 'play';
     GH.music.play(stage.id);
     GH.music.setBoss(false);
@@ -3008,6 +3093,7 @@ GH.game = (function () {
       picoDrone.rotation.y += dt * 4;
     }
     updateCamera(dt);
+    updateHints(dt);
     updateHUD();
     G.dmg.update(dt, viewW, viewH);
   };

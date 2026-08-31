@@ -216,5 +216,12 @@ GH.assets = (function () {
 
   A.lambert = function (params) { return psxPatch(new THREE.MeshLambertMaterial(params)); };
 
+  // shared unit geometries for pooled short-lived meshes (scaled per use)
+  A.geo = {
+    cone: new THREE.ConeGeometry(1, 3.2, 5),
+    box: new THREE.BoxGeometry(1, 1, 1),
+    sphere: new THREE.SphereGeometry(1, 6, 5)
+  };
+
   return A;
 })();

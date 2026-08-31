@@ -133,9 +133,17 @@ GH.rollRewards = function (player, wave, count) {
   if (Math.random() < gemChance) {
     picks.push(GH.gemCard(GH.pick(GH.gems.typeIds)));
   }
-  while (picks.length < count && pool.length) {
-    var card = GH.weightedPick(pool);
-    pool.splice(pool.indexOf(card), 1);
+  // diminish the weight of stat traits already stacked several times
+  var picksCount = (GH.meta && GH.meta.data.traitPicks) || {};
+  var weighted = pool.map(function (c) {
+    var w = c.w;
+    if (c.kind === 'trait' && (picksCount[c.id] || 0) >= 3) w = Math.max(1, w * 0.4);
+    return { card: c, w: w };
+  });
+  while (picks.length < count && weighted.length) {
+    var pick = GH.weightedPick(weighted);
+    weighted.splice(weighted.indexOf(pick), 1);
+    var card = pick.card;
     // don't offer a 6th weapon slot
     if (card.kind === 'weapon' && player && player.weapons.length >= 5 &&
       !player.weaponLevels[card.id]) continue;

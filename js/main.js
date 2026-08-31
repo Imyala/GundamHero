@@ -257,7 +257,8 @@
   // ----------------------------------------------------------------
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
-    'trials-screen', 'season-screen', 'reward-screen', 'pause-screen', 'end-screen'];
+    'trials-screen', 'season-screen', 'hub-screen', 'save-screen',
+    'reward-screen', 'pause-screen', 'end-screen'];
 
   function show(id) {
     SCREENS.forEach(function (s) {
@@ -563,6 +564,58 @@
       };
       lastLaunch();
     };
+  }
+
+  // ----------------------------------------------------------------
+  // HANGAR HUB — one door to every meta screen
+  function openHub() {
+    GH.audio.card();
+    GH.game.state = 'hangar';
+    var s = GH.progress.seasonCheck();
+    var comp = GH.progress.completion();
+    var b = GH.meta.data.broker;
+    var cards = [
+      { id: 'hub-season', glyph: '☄', name: 'RELIC SEASON',
+        sub: GH.progress.seasonName(s.id) + ' · ' + s.pts + ' pts' +
+          (GH.progress.relicPicksAvailable() > 0 ? ' · RELIC READY' : ''),
+        open: openSeason },
+      { id: 'hub-broker', glyph: '☰', name: 'THE BROKER',
+        sub: b.active ? GH.progress.contractLabel(b.active) + ' (' + b.active.have + '/' + b.active.need + ')'
+          : b.points + ' pts banked · no active contract',
+        open: openBroker },
+      { id: 'hub-trials', glyph: '⛨', name: 'STAGE TRIALS',
+        sub: 'permanent stage perks', open: openTrials },
+      { id: 'hub-log', glyph: '📖', name: 'COLLECTION LOG',
+        sub: comp.pct + '% complete', open: openCollection },
+      { id: 'hub-devotions', glyph: '☀', name: 'DEVOTIONS',
+        sub: GH.meta.isIron() ? 'sealed on iron profiles' : GH.meta.data.salvage + ' salvage to spend',
+        open: openHangar },
+      { id: 'hub-save', glyph: '⛃', name: 'SAVE CODE',
+        sub: 'back up or restore progress', open: openSave }
+    ];
+    var wrap = document.getElementById('hub-cards');
+    wrap.innerHTML = '';
+    cards.forEach(function (c) {
+      var div = document.createElement('div');
+      div.className = 'hub-card';
+      div.innerHTML = '<div class="hc-glyph">' + c.glyph + '</div>' +
+        '<div class="hc-name">' + c.name + '</div>' +
+        '<div class="hc-sub">' + c.sub + '</div>';
+      div.onclick = c.open;
+      wrap.appendChild(div);
+    });
+    show('hub-screen');
+  }
+
+  // ----------------------------------------------------------------
+  // SAVE CODE — export/import all profiles
+  function openSave() {
+    GH.audio.card();
+    GH.game.state = 'hangar';
+    document.getElementById('save-export').value = GH.meta.exportCode();
+    document.getElementById('save-import').value = '';
+    document.getElementById('save-feedback').textContent = '';
+    show('save-screen');
   }
 
   // ----------------------------------------------------------------
@@ -879,6 +932,7 @@
   }
 
   function toTitle() {
+    GH.meta.save(); // abandoned runs still keep their tracking
     GH.game.state = 'title';
     document.getElementById('hud').classList.add('hidden');
     refreshTitle();
@@ -889,16 +943,45 @@
     document.getElementById('btn-start').onclick = function () { enterSelect('classic'); };
     document.getElementById('btn-arena').onclick = function () { enterSelect('arena'); };
     document.getElementById('btn-weekly').onclick = openWeekly;
-    document.getElementById('btn-hangar').onclick = openHangar;
-    document.getElementById('btn-broker').onclick = openBroker;
-    document.getElementById('btn-collection').onclick = openCollection;
-    document.getElementById('btn-trials').onclick = openTrials;
-    document.getElementById('btn-season').onclick = openSeason;
-    document.getElementById('btn-season-back').onclick = toTitle;
+    document.getElementById('btn-hub').onclick = openHub;
+    document.getElementById('btn-hub-back').onclick = toTitle;
     document.getElementById('btn-profile').onclick = cycleProfile;
-    document.getElementById('btn-broker-back').onclick = toTitle;
-    document.getElementById('btn-collection-back').onclick = toTitle;
-    document.getElementById('btn-trials-back').onclick = toTitle;
+    // meta screens live under the hub now
+    document.getElementById('btn-season-back').onclick = openHub;
+    document.getElementById('btn-broker-back').onclick = openHub;
+    document.getElementById('btn-collection-back').onclick = openHub;
+    document.getElementById('btn-trials-back').onclick = openHub;
+    document.getElementById('btn-hangar-back').onclick = openHub;
+    document.getElementById('btn-save-back').onclick = openHub;
+    document.getElementById('btn-save-copy').onclick = function () {
+      var ta = document.getElementById('save-export');
+      ta.select();
+      var ok = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(ta.value);
+          ok = true;
+        } else {
+          ok = document.execCommand('copy');
+        }
+      } catch (e) { /* fall through */ }
+      document.getElementById('save-feedback').textContent =
+        ok ? 'Copied — keep it somewhere safe.' : 'Select the code and copy it manually.';
+      GH.audio.card();
+    };
+    document.getElementById('btn-save-import').onclick = function () {
+      var res = GH.meta.importCode(document.getElementById('save-import').value);
+      var fb = document.getElementById('save-feedback');
+      if (res.ok) {
+        fb.textContent = 'Restored ' + res.profiles + ' profile(s) from ' + (res.saved || 'save') + '.';
+        GH.audio.win();
+        refreshTitle();
+        document.getElementById('save-export').value = GH.meta.exportCode();
+      } else {
+        fb.textContent = res.error;
+        GH.audio.hit();
+      }
+    };
     document.getElementById('btn-weekly-back').onclick = toTitle;
     document.getElementById('btn-preset-back').onclick = function () {
       GH.game.state = 'stageselect';

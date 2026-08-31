@@ -44,7 +44,11 @@ GH.meta = (function () {
       },
       // signal ciphers: dry-streak pity + owned chase cosmetics
       cipher: { dry: 0, caches: 0 },
-      style: { trail: null, paint: null, drone: null, owned: {} }
+      style: { trail: null, paint: null, drone: null, owned: {} },
+      // one-time onboarding hints already shown
+      seenHints: {},
+      // reward-trait pick counts (for diminishing card weights)
+      traitPicks: {}
     };
   };
 
@@ -158,6 +162,45 @@ GH.meta = (function () {
       critMult: d.ruin * 0.06,
       boostRegen: d.ruin >= 3 ? 0.15 : 0
     };
+  };
+
+  // ---------------------------------------------------------------
+  // Save codes: export/import every profile + the memorial as one
+  // portable string, so browser storage is never the only copy.
+  // ---------------------------------------------------------------
+  M.exportCode = function () {
+    M.save(); // flush the active profile so the code matches live state
+    var blob = { v: 1, saved: new Date().toISOString().slice(0, 10), profiles: {} };
+    for (var p in M.PROFILES) {
+      try {
+        var raw = localStorage.getItem(M.PROFILES[p].key);
+        if (raw) blob.profiles[p] = JSON.parse(raw);
+      } catch (e) { /* skip */ }
+    }
+    blob.memorial = M.memorial();
+    try {
+      return 'HF1.' + btoa(unescape(encodeURIComponent(JSON.stringify(blob))));
+    } catch (e) { return ''; }
+  };
+
+  M.importCode = function (code) {
+    try {
+      code = (code || '').trim();
+      if (code.indexOf('HF1.') !== 0) return { ok: false, error: 'Not a HERO FRAME save code.' };
+      var blob = JSON.parse(decodeURIComponent(escape(atob(code.slice(4)))));
+      if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Code is damaged or truncated.' };
+      var count = 0;
+      for (var p in blob.profiles) {
+        if (!M.PROFILES[p]) continue;
+        localStorage.setItem(M.PROFILES[p].key, JSON.stringify(blob.profiles[p]));
+        count++;
+      }
+      if (blob.memorial) localStorage.setItem('hf_memorial', JSON.stringify(blob.memorial));
+      M.load(M.profile); // re-read the active profile from the imported data
+      return { ok: true, profiles: count, saved: blob.saved };
+    } catch (e) {
+      return { ok: false, error: 'Code is damaged or truncated.' };
+    }
   };
 
   // dev overrides: ?unlock=all etc.

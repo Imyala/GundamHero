@@ -128,9 +128,12 @@ GH.wavePlan = function (stage, wave, arena) {
     types: stage.roster(wave),
     boss: null, midboss: null,
     hpMult: stage.hpMult * (1 + (wave - 1) * 0.16),
-    dmgMult: stage.dmgMult * (1 + (wave - 1) * 0.06),
+    // contact pressure ramps harder past wave 10, where builds have come online
+    dmgMult: stage.dmgMult * (1 + (wave - 1) * 0.06 + Math.max(0, wave - 10) * 0.015),
     overrun: false
   };
+  // gentler first minutes on the opening stage for new pilots
+  if (stage.id === 'wreck' && wave <= 2) plan.rate *= 0.7;
   if (arena) {
     // endless: scale forever, corrupt shells appear as roaming bosses every 10
     plan.hpMult = 1 + (wave - 1) * 0.24;
