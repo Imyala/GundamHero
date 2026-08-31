@@ -443,6 +443,71 @@ html, body {
   color: #a0d8ff; text-shadow: 1px 1px 0 #000;
 }
 
+/* ---------------- P2 frame picker ---------------- */
+
+#p2-select-row {
+  position: absolute; bottom: 15vh; left: 4%;
+  display: flex; gap: 6px; align-items: center;
+}
+.p2-row-label {
+  font-size: 11px; letter-spacing: 2px; color: #a0d8ff;
+  margin-right: 4px;
+}
+.mech-icon.p2-icon { width: 40px; height: 40px; font-size: 20px; }
+.mech-icon.p2-icon.sel { border-color: #60c8ff; background: #10304a; }
+
+/* ---------------- arena loadout ---------------- */
+
+#preset-screen {
+  background:
+    linear-gradient(rgba(20,30,120,0.25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20,30,120,0.25) 1px, transparent 1px),
+    radial-gradient(ellipse at center, rgba(6,10,40,0.94), rgba(0,0,4,0.97));
+  background-size: 34px 34px, 34px 34px, cover;
+}
+#preset-list { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; max-width: 1150px; }
+#preset-list .reward-card { width: 190px; min-height: 220px; }
+
+/* ---------------- touch controls ---------------- */
+
+#touch-ui.gone { display: none !important; }
+.touch-zone {
+  position: absolute; bottom: 4vh;
+  width: 34vw; height: 34vw; max-width: 220px; max-height: 220px;
+  border: 2px solid rgba(160, 180, 255, 0.25);
+  border-radius: 50%;
+  touch-action: none;
+  z-index: 30;
+}
+#touch-move { left: 4vw; }
+#touch-aim { right: 4vw; }
+.touch-nub {
+  position: absolute; left: 50%; top: 50%;
+  width: 34%; height: 34%;
+  margin: -17% 0 0 -17%;
+  background: rgba(160, 180, 255, 0.3);
+  border: 2px solid rgba(200, 220, 255, 0.5);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.touch-btn {
+  position: absolute;
+  width: 62px; height: 62px; line-height: 60px;
+  border-radius: 50%;
+  border: 2px solid #c8b060;
+  background: rgba(20, 28, 72, 0.6);
+  color: #f0e0b0; text-align: center;
+  font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px;
+  touch-action: none;
+  z-index: 31;
+}
+#touch-boost { right: calc(4vw + 230px); bottom: 6vh; }
+#touch-special { right: calc(4vw + 230px); bottom: calc(6vh + 76px); }
+@media (max-width: 700px) {
+  #touch-boost { right: auto; left: calc(4vw + 230px); }
+  #touch-special { right: auto; left: calc(4vw + 230px); }
+}
+
 #mute-btn {
   position: absolute; right: 10px; bottom: 8px;
   width: 30px; height: 30px; line-height: 28px;

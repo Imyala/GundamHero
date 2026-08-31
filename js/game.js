@@ -155,11 +155,12 @@ GH.game = (function () {
     return inst;
   }
 
-  function weaponDamage(inst) {
+  function weaponDamage(inst, actor) {
+    var a2 = actor || player;
     var s = player.stats;
     var d = (inst.w.damage + s.flatDamage) * s.damageMult * inst.mods.damageMult;
-    if (player.def.passive === 'wrath') {
-      var missing = 1 - player.hp / s.maxHP;
+    if (a2.def.passive === 'wrath') {
+      var missing = 1 - a2.hp / s.maxHP;
       d *= 1 + Math.min(0.6, missing * 0.75);
     }
     if (inst.w.element || inst.w.cycle || inst.w.cls === 'HEAVY · ELEMENTAL' || inst.w.cls === 'LIGHT · ELEMENTAL') {
@@ -327,6 +328,7 @@ GH.game = (function () {
     scene.add(mesh);
     var hpMult = def.boss ? Math.max(1, wavePlan.hpMult * 0.55) : wavePlan.hpMult;
     if (def.boss && GH.devWeakBoss) hpMult *= 0.03;
+    if (def.boss && GH.devPhaseBoss) hpMult *= 0.25;
     if (weekly) hpMult *= weekly.mods.ehp;
     var e = {
       id: typeId, def: def, mesh: mesh,
@@ -539,9 +541,11 @@ GH.game = (function () {
           spawnTelegraph(tgtP.x, tgtP.z, 3.2, 1.0, e.damage * 1.3);
         }
         if (e.summonT <= 0) {
-          e.summonT = def.summonInterval || 10;
+          // midbosses spiral up their summons below half hull
+          var frantic = e.hp < e.maxHp * 0.5;
+          e.summonT = (def.summonInterval || 10) * (frantic ? 0.6 : 1);
           var sid = def.summons || GH.weightedPick(wavePlan.types).id;
-          for (var s2 = 0; s2 < (def.summonCount || 3); s2++) {
+          for (var s2 = 0; s2 < (def.summonCount || 3) + (frantic ? 1 : 0); s2++) {
             spawnEnemy(sid, e.x + GH.rand(-2.5, 2.5), e.z + GH.rand(-2.5, 2.5));
           }
         }
@@ -638,11 +642,25 @@ GH.game = (function () {
   // ---- corrupt shell boss AI: archetype attacks every few seconds ----
   function corruptAI(e, dt, dist, nx, nz) {
     var out = { mx: nx, mz: nz };
+    // phase 2 at half hull: UNBOUND — faster cycle + radial bursts
+    if (!e.phase2 && e.hp < e.maxHp * 0.5) {
+      e.phase2 = true;
+      announce(e.def.name + ' — UNBOUND', 30);
+      GH.audio.boss();
+      G.hitStop(0.1);
+      spawnBurst(e.x, 2, e.z, 0xff2838, 30);
+      var aura = new THREE.Mesh(new THREE.TorusGeometry(e.def.radius + 0.6, 0.08, 4, 16),
+        GH.assets.basic(0xff2838, { transparent: true, opacity: 0.7 }));
+      aura.rotation.x = Math.PI / 2;
+      aura.position.y = 0.4;
+      e.mesh.add(aura);
+      e.abilityT = Math.min(e.abilityT, 1.2);
+    }
     e.abilityT -= dt;
     e.summonT -= dt;
     if (e.summonT <= 0) {
-      e.summonT = 12;
-      for (var s = 0; s < 4; s++) {
+      e.summonT = e.phase2 ? 9 : 12;
+      for (var s = 0; s < (e.phase2 ? 5 : 4); s++) {
         spawnEnemy(GH.weightedPick(wavePlan.types).id,
           e.x + GH.rand(-3, 3), e.z + GH.rand(-3, 3));
       }
@@ -659,8 +677,15 @@ GH.game = (function () {
       return out;
     }
     if (e.abilityT <= 0) {
-      e.abilityT = 5;
+      e.abilityT = e.phase2 ? 3.2 : 5;
       var id = e.id;
+      // UNBOUND: every cycle also throws a radial burst
+      if (e.phase2) {
+        for (var rb = 0; rb < 8; rb++) {
+          var ra = (rb / 8) * Math.PI * 2 + runTime;
+          spawnEnemyShot(e.x, 1.4, e.z, Math.sin(ra), Math.cos(ra), 9, e.damage * 0.5);
+        }
+      }
       if (id === 'fang' || id === 'viper' && Math.random() < 0.4) {
         // predatory dash (fang always; viper sometimes)
         e.dashing = 0.5;
@@ -723,7 +748,7 @@ GH.game = (function () {
     return m;
   }
 
-  function fireShot(inst, originX, originZ, aimAngle) {
+  function fireShot(inst, originX, originZ, aimAngle, actor) {
     var w = inst.w;
     // soft aim assist
     var bestE = null, bestDiff = 0.35;
@@ -748,7 +773,7 @@ GH.game = (function () {
       count += frag >= 1 ? 2 : 1;
       dmgMult = frag >= 1 ? 0.65 : 0.75;
     }
-    var dmg = weaponDamage(inst) * dmgMult;
+    var dmg = weaponDamage(inst, actor) * dmgMult;
     for (var i = 0; i < count; i++) {
       var off = count > 1
         ? (i - (count - 1) / 2) * (Math.max(w.spread, frag > 0 ? 0.3 : w.spread) / Math.max(1, count - 1) * 2)
@@ -791,9 +816,10 @@ GH.game = (function () {
     return best;
   }
 
-  function frenzyMult() {
-    if (player.def.passive !== 'frenzy') return 1;
-    return 1 + player.frenzy.length * 0.08;
+  function frenzyMult(actor) {
+    var a2 = actor || player;
+    if (a2.def.passive !== 'frenzy') return 1;
+    return 1 + a2.frenzy.length * 0.08;
   }
 
   function fireWeaponOnce(inst, aim) {
@@ -957,7 +983,7 @@ GH.game = (function () {
     var parts = a2.mesh.userData.parts;
     if (parts && parts.armR) parts.armR.rotation.x = -2.2;
 
-    var dmg = weaponDamage(inst);
+    var dmg = weaponDamage(inst, a2);
     for (var i = 0; i < enemies.length; i++) {
       var e = enemies[i];
       if (e.dead) continue;
@@ -983,7 +1009,7 @@ GH.game = (function () {
         mesh: wm, x: a2.x, z: a2.z,
         dirX: Math.sin(aim), dirZ: Math.cos(aim),
         speed: w.wave.speed, life: w.wave.life,
-        damage: weaponDamage(inst) * (w.wave.damage / w.damage),
+        damage: weaponDamage(inst, a2) * (w.wave.damage / w.damage),
         inst: inst, elem: null, pierce: 99, homing: 0, aoe: 0,
         hitSet: [], flat: true
       });
@@ -998,8 +1024,8 @@ GH.game = (function () {
     var a2 = actor || player;
     var w = inst.w;
     var range = w.range *
-      (a2 === player && player.special.active > 0 && player.def.special === 'frenzy' ? 1.9 : 1);
-    var dmg = weaponDamage(inst);
+      (a2.special && a2.special.active > 0 && a2.def.special === 'frenzy' ? 1.9 : 1);
+    var dmg = weaponDamage(inst, a2);
     var hitAny = false;
     for (var i = 0; i < enemies.length; i++) {
       var e = enemies[i];
@@ -1075,7 +1101,7 @@ GH.game = (function () {
       effects.push({
         kind: 'pshell', mesh: shell, disc: disc, t: w.arcTime, total: w.arcTime,
         x0: a2.x, z0: a2.z, x1: tx, z1: tz,
-        damage: weaponDamage(inst), aoe: w.aoe, inst: inst
+        damage: weaponDamage(inst, a2), aoe: w.aoe, inst: inst
       });
     }
     GH.audio.shoot();
@@ -1796,16 +1822,25 @@ GH.game = (function () {
     var s = player.stats;
     G._mouseNDC = input.mouseNDC;
 
-    raycaster.setFromCamera(input.mouseNDC, camera);
-    if (raycaster.ray.intersectPlane(groundPlane, tmpV3)) {
-      player.facing = GH.angleTo(player.x, player.z, tmpV3.x, tmpV3.z);
+    // aim priority: right stick / touch aim > mouse
+    if (input.padAimActive) {
+      player.facing = Math.atan2(input.padAimX, input.padAimY);
+    } else if (input.touchAimActive) {
+      player.facing = Math.atan2(input.touchAimX, input.touchAimY);
+    } else {
+      raycaster.setFromCamera(input.mouseNDC, camera);
+      if (raycaster.ray.intersectPlane(groundPlane, tmpV3)) {
+        player.facing = GH.angleTo(player.x, player.z, tmpV3.x, tmpV3.z);
+      }
     }
 
-    var mx = (input.keys.d ? 1 : 0) - (input.keys.a ? 1 : 0);
-    var mz = (input.keys.s ? 1 : 0) - (input.keys.w ? 1 : 0);
-    var len = Math.sqrt(mx * mx + mz * mz) || 1;
-    player.moveX = mx / len; player.moveZ = mz / len;
-    if (mx === 0 && mz === 0) { player.moveX = 0; player.moveZ = 0; }
+    var mx = (input.keys.d ? 1 : 0) - (input.keys.a ? 1 : 0) + input.padMoveX + input.touchMoveX;
+    var mz = (input.keys.s ? 1 : 0) - (input.keys.w ? 1 : 0) + input.padMoveY + input.touchMoveY;
+    var len = Math.sqrt(mx * mx + mz * mz);
+    if (len > 0.001) {
+      var nlen = Math.max(1, len);
+      player.moveX = mx / nlen; player.moveZ = mz / nlen;
+    } else { player.moveX = 0; player.moveZ = 0; }
 
     player.blocking = player.def.special === 'block' && input.special;
 
@@ -1896,8 +1931,11 @@ GH.game = (function () {
       def: def,
       mesh: GH.models.buildMech(cfg),
       x: 2.2, z: 1.5, facing: 0, moveX: 0, moveZ: 0,
-      hp: 0, boost: 1, dashTime: 0, dashX: 0, dashZ: 0,
+      hp: 0, boost: 1, dashTime: 0, dashX: 0, dashZ: 0, dashKind: 'boost', dashId: 0,
       down: false, reviveT: 0, hurtCd: 0,
+      blocking: false,
+      special: { cd: 0, active: 0 },
+      frenzy: [], edgeT: 0,
       weapons: [makeWeaponInst('primary', def.weapon, false)]
     };
     mate.hp = player.stats.maxHP;
@@ -1907,7 +1945,13 @@ GH.game = (function () {
 
   function wingmateDamage(raw) {
     if (!mate || mate.down || mate.dashTime > 0.12 || GH.devGod) return;
-    var dmg = Math.max(1, Math.round(raw - player.stats.armor));
+    var dmg = Math.max(1, Math.round(raw - player.stats.armor -
+      (mate.special.active > 0 && mate.def.special === 'bulwark' ? 12 : 0)));
+    if (mate.blocking) {
+      dmg = Math.max(1, Math.round(dmg * 0.3));
+      mate.hp = Math.min(player.stats.maxHP, mate.hp + 3);
+      GH.audio.block();
+    }
     mate.hp -= dmg;
     mate.hurtCd = 0.25;
     G.dmg.spawn(mate.x, 2.6, mate.z, dmg, 'player', 17);
@@ -1918,6 +1962,63 @@ GH.game = (function () {
       mate.reviveT = 0;
       spawnBurst(mate.x, 1, mate.z, 0x60c8ff, 18);
       announce('WINGMATE DOWN', 26);
+    }
+  }
+
+  function mateSpecial() {
+    var sp = mate.special;
+    var kind = mate.def.special;
+    if (kind === 'block') return; // handled as a hold
+    if (sp.cd > 0) return;
+    if (kind === 'overdrive') { sp.cd = 9; sp.active = 3; announce('P2 OVERDRIVE', 18); }
+    else if (kind === 'frenzy') { sp.cd = 9; sp.active = 4; announce('P2 FRENZY', 18); }
+    else if (kind === 'bulwark') { sp.cd = 10; sp.active = 4; announce('P2 BULWARK', 18); GH.audio.block(); }
+    else if (kind === 'nova') {
+      sp.cd = 7;
+      var elem = currentElement(mate.weapons[0]);
+      var color = elem && GH.elements[elem] ? GH.elements[elem].color : 0x50e8d8;
+      GH.audio.explode();
+      spawnBurst(mate.x, 1, mate.z, color, 16);
+      var m = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.9, 24),
+        new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(mate.x, 0.3, mate.z);
+      scene.add(m);
+      effects.push({ kind: 'boom', mesh: m, t: 0.3, total: 0.3, grow: 6 });
+      for (var i = 0; i < enemies.length; i++) {
+        var e = enemies[i];
+        if (e.dead) continue;
+        if (GH.dist2(mate.x, mate.z, e.x, e.z) < 49) {
+          var a = GH.angleTo(mate.x, mate.z, e.x, e.z);
+          e.vx += Math.sin(a) * 16 / e.def.mass;
+          e.vz += Math.cos(a) * 16 / e.def.mass;
+          damageEnemy(e, 10 * player.stats.damageMult, { canCrit: false, elem: elem });
+        }
+      }
+    }
+    else if (kind === 'lunge' || kind === 'blink') {
+      sp.cd = kind === 'lunge' ? 3.5 : 4;
+      var mx = mate.moveX, mz = mate.moveZ;
+      if (mx === 0 && mz === 0) { mx = Math.sin(mate.facing); mz = Math.cos(mate.facing); }
+      var len = Math.sqrt(mx * mx + mz * mz);
+      if (kind === 'blink') {
+        spawnBurst(mate.x, 1, mate.z, 0xf05060, 8);
+        mate.x = GH.clamp(mate.x + mx / len * 6.5, -ARENA_R, ARENA_R);
+        mate.z = GH.clamp(mate.z + mz / len * 6.5, -ARENA_R, ARENA_R);
+        mate.dashTime = 0.15;
+        spawnBurst(mate.x, 1, mate.z, 0xf05060, 8);
+        if (mate.def.passive === 'edge') mate.edgeT = 2;
+      } else {
+        mate.dashX = mx / len; mate.dashZ = mz / len;
+        mate.dashTime = 0.2;
+        mate.dashId++;
+        mate.dashKind = 'lunge';
+        if (mate.def.passive === 'frenzy') {
+          mate.frenzy.push(4);
+          if (mate.frenzy.length > 5) mate.frenzy.shift();
+        }
+      }
+      GH.audio.dash();
     }
   }
 
@@ -1957,8 +2058,9 @@ GH.game = (function () {
       mate.x += mate.dashX * 26 * dt;
       mate.z += mate.dashZ * 26 * dt;
     } else {
-      mate.x += mx * s.speed * dt;
-      mate.z += mz * s.speed * dt;
+      var mspd = s.speed * (mate.blocking ? 0.55 : 1);
+      mate.x += mx * mspd * dt;
+      mate.z += mz * mspd * dt;
     }
     mate.x = GH.clamp(mate.x, -ARENA_R, ARENA_R);
     mate.z = GH.clamp(mate.z, -ARENA_R, ARENA_R);
@@ -1982,20 +2084,60 @@ GH.game = (function () {
         var bl = Math.sqrt(bx * bx + bz * bz);
         mate.dashX = bx / bl; mate.dashZ = bz / bl;
         mate.dashTime = 0.22;
+        mate.dashId++;
+        mate.dashKind = 'boost';
         GH.audio.dash();
         spawnBurst(mate.x, 0.6, mate.z, 0x60c8ff, 6);
+        if (mate.def.passive === 'frenzy') {
+          mate.frenzy.push(4);
+          if (mate.frenzy.length > 5) mate.frenzy.shift();
+        }
+        if (mate.def.passive === 'edge') mate.edgeT = 2;
       }
     }
+    // special (press for actives, hold for AEGIS block)
+    mate.blocking = mate.def.special === 'block' && input.p2Special;
+    if (input.p2SpecialPressed) {
+      input.p2SpecialPressed = false;
+      mateSpecial();
+    }
+    mate.special.cd = Math.max(0, mate.special.cd - dt);
+    mate.special.active = Math.max(0, mate.special.active - dt);
+    mate.edgeT = Math.max(0, mate.edgeT - dt);
+    for (var fz = mate.frenzy.length - 1; fz >= 0; fz--) {
+      mate.frenzy[fz] -= dt;
+      if (mate.frenzy[fz] <= 0) mate.frenzy.splice(fz, 1);
+    }
     mate.hurtCd = Math.max(0, mate.hurtCd - dt);
+
+    // ram/lunge damage during dash (AEGIS boost-ram and FANG lunge parity)
+    if (mate.dashTime > 0 && (mate.def.special === 'block' || mate.dashKind === 'lunge')) {
+      for (var di = 0; di < enemies.length; di++) {
+        var de = enemies[di];
+        if (de.dead || de.lastDashId === 1000 + mate.dashId) continue;
+        var drr = 1.3 + de.def.radius;
+        if (GH.dist2(mate.x, mate.z, de.x, de.z) <= drr * drr) {
+          de.lastDashId = 1000 + mate.dashId;
+          var ddmg = mate.dashKind === 'lunge'
+            ? (12 + s.flatDamage * 2) * s.damageMult
+            : (10 + s.armor + s.block) * s.damageMult;
+          damageEnemy(de, ddmg, {});
+          var da = GH.angleTo(mate.x, mate.z, de.x, de.z);
+          de.vx += Math.sin(da) * 14 / de.def.mass;
+          de.vz += Math.cos(da) * 14 / de.def.mass;
+        }
+      }
+    }
 
     // auto-aim at the nearest enemy
     var tgt = nearestEnemy(mate.x, mate.z, 26);
     if (tgt) mate.facing = GH.angleTo(mate.x, mate.z, tgt.x, tgt.z);
 
-    // fire primary (mirrors P1's stats; own clip/reload timers)
+    // fire primary (shares P1's stat pool; own clip/reload and passives)
     var inst = mate.weapons[0];
     var w = inst.w;
-    var spdMult = s.atkSpdMult * inst.mods.atkSpdMult;
+    var spdMult = s.atkSpdMult * inst.mods.atkSpdMult * frenzyMult(mate) *
+      (mate.special.active > 0 && mate.def.special === 'overdrive' ? 2 : 1);
     if (inst.reloading > 0) {
       inst.reloading -= dt * spdMult;
       if (inst.reloading <= 0) { inst.clip = w.clip; onReload(inst); }
@@ -2005,7 +2147,7 @@ GH.game = (function () {
         inst.timer = w.interval;
         var aim = mate.facing;
         if (w.type === 'shot') {
-          fireShot(inst, mate.x + Math.sin(aim) * 0.8, mate.z + Math.cos(aim) * 0.8, aim);
+          fireShot(inst, mate.x + Math.sin(aim) * 0.8, mate.z + Math.cos(aim) * 0.8, aim, mate);
         } else if (w.type === 'melee') {
           meleeSwing(inst, aim, mate);
         } else if (w.type === 'aura') {
@@ -2187,7 +2329,11 @@ GH.game = (function () {
     }
     if (weekly && weekly.mods.crit) player.stats.crit += weekly.mods.crit;
     mate = null;
-    if (G.coop) spawnWingmate(mechIndex);
+    if (G.coop) {
+      var p2Idx = (opts.p2Mech !== undefined && opts.p2Mech >= 0) ? opts.p2Mech : mechIndex;
+      spawnWingmate(p2Idx);
+    }
+    if (opts.preset) applyPreset(opts.preset);
     kills = 0; coinsRun = 0; runTime = 0; hitCount = 0;
     G.state = 'play';
     GH.music.play(stage.id);
@@ -2198,6 +2344,34 @@ GH.game = (function () {
     updateHUDStatic();
     document.getElementById('hud').classList.remove('hidden');
   };
+
+  // Arena loadout preset: grant starting weapons/traits/gems by card id
+  function applyPreset(ps) {
+    var findCard = function (id) {
+      for (var i = 0; i < GH.upgrades.length; i++) {
+        if (GH.upgrades[i].id === id) return GH.upgrades[i];
+      }
+      return null;
+    };
+    (ps.weapons || []).forEach(function (wid) {
+      var card = findCard(wid);
+      if (card && !player.weaponLevels[wid]) {
+        player.weapons.push(makeWeaponInst(wid, card.weapon));
+        player.weaponLevels[wid] = 1;
+      }
+    });
+    (ps.traits || []).forEach(function (tid) {
+      var card = findCard(tid);
+      if (card) card.apply(player);
+    });
+    (ps.gems || []).forEach(function (g) {
+      var prim = player.weapons[0];
+      if (prim.sockets.length < 4) {
+        prim.sockets.push(g);
+        GH.gems.applySocketBonuses(prim);
+      }
+    });
+  }
 
   function devCatchUp(startAt) {
     // dev skip (?wave=N): rough catch-up levels + auto-picked cards
@@ -2334,7 +2508,7 @@ GH.game = (function () {
         '<b>To unlock</b>\nDefeat ' + def.name + '\'s corrupted double on wave 20 of ' +
         (stIdx >= 0 ? GH.stages[stIdx].name : '???') + '.';
     }
-    var icons = document.querySelectorAll('.mech-icon');
+    var icons = document.querySelectorAll('#select-icons .mech-icon');
     for (var n = 0; n < icons.length; n++) {
       icons[n].className = 'mech-icon' + (n === i ? ' sel' : '') +
         (GH.meta.data.shells[GH.mechs[n].id] ? '' : ' locked');
@@ -2405,7 +2579,8 @@ GH.game = (function () {
       weapons: player ? player.weapons.map(function (w2) {
         return w2.id + ':' + w2.sockets.join('');
       }) : [],
-      boss: bossRef ? bossRef.def.name + ' ' + Math.round(bossRef.hp) : null,
+      boss: bossRef ? bossRef.def.name + ' ' + Math.round(bossRef.hp) +
+        (bossRef.phase2 ? ' [UNBOUND]' : '') : null,
       salvage: GH.meta.data.salvage,
       shells: Object.keys(GH.meta.data.shells).length,
       music: GH.music.mode(),

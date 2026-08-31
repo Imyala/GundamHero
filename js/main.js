@@ -8,10 +8,14 @@
     special: false,
     boostPressed: false,
     specialPressed: false,
-    p2x: 0, p2y: 0, p2Boost: false
+    p2x: 0, p2y: 0, p2Boost: false,
+    p2Special: false, p2SpecialPressed: false,
+    padMoveX: 0, padMoveY: 0, padAimX: 0, padAimY: 0, padAimActive: false,
+    touchMoveX: 0, touchMoveY: 0, touchAimX: 0, touchAimY: 0, touchAimActive: false
   };
   var chosenStage = 0;
   var p2keys = {};
+  var p2MechIndex = -1;   // -1 = mirror P1
 
   function boot() {
     canvas = document.getElementById('game-canvas');
@@ -25,6 +29,7 @@
 
     bindInput();
     bindUI();
+    bindTouch();
     refreshTitle();
     requestAnimationFrame(loop);
   }
@@ -48,22 +53,46 @@
   };
   var P2KEYMAP = { KeyI: 'w', KeyJ: 'a', KeyK: 's', KeyL: 'd' };
 
-  // merge IJKL + first gamepad's left stick into the P2 axis
-  function pollP2() {
+  // Gamepad routing: with co-op ON the first pad is Player 2; solo, it
+  // drives Player 1 (left stick move, right stick aim, A boost, B special).
+  function pollPads() {
     var x = (p2keys.d ? 1 : 0) - (p2keys.a ? 1 : 0);
     var y = (p2keys.s ? 1 : 0) - (p2keys.w ? 1 : 0);
+    input.padMoveX = 0; input.padMoveY = 0; input.padAimActive = false;
     try {
       var pads = navigator.getGamepads ? navigator.getGamepads() : [];
       for (var i = 0; i < pads.length; i++) {
         var gp = pads[i];
         if (!gp || !gp.connected) continue;
-        if (Math.abs(gp.axes[0]) > 0.25) x += gp.axes[0];
-        if (Math.abs(gp.axes[1]) > 0.25) y += gp.axes[1];
-        if (gp.buttons[0] && gp.buttons[0].pressed && !input._gpHeld) {
-          input.p2Boost = true;
-          input._gpHeld = true;
-        } else if (gp.buttons[0] && !gp.buttons[0].pressed) {
-          input._gpHeld = false;
+        var ax = Math.abs(gp.axes[0]) > 0.25 ? gp.axes[0] : 0;
+        var ay = Math.abs(gp.axes[1]) > 0.25 ? gp.axes[1] : 0;
+        var btn = function (n) { return gp.buttons[n] && gp.buttons[n].pressed; };
+        if (GH.game.coop) {
+          // pad = P2
+          x += ax; y += ay;
+          if (btn(0) && !input._gpHeld) { input.p2Boost = true; input._gpHeld = true; }
+          else if (!btn(0)) input._gpHeld = false;
+          if (btn(1) || btn(2)) {
+            if (!input._gpSpHeld) { input.p2SpecialPressed = true; input._gpSpHeld = true; }
+            input.p2Special = true;
+          } else { input._gpSpHeld = false; input.p2Special = p2keys.sp || false; }
+        } else {
+          // pad = P1
+          input.padMoveX = ax; input.padMoveY = ay;
+          var rx = Math.abs(gp.axes[2] || 0) > 0.3 ? gp.axes[2] : 0;
+          var ry = Math.abs(gp.axes[3] || 0) > 0.3 ? gp.axes[3] : 0;
+          if (rx || ry) { input.padAimX = rx; input.padAimY = ry; input.padAimActive = true; }
+          if (btn(0) && !input._gpHeld) {
+            if (GH.game.state === 'play') input.boostPressed = true;
+            input._gpHeld = true;
+          } else if (!btn(0)) input._gpHeld = false;
+          if (btn(1) || btn(2)) {
+            if (!input._gpSpHeld) {
+              if (GH.game.state === 'play') input.specialPressed = true;
+              input._gpSpHeld = true;
+            }
+            input.special = true;
+          } else if (input._gpSpHeld) { input._gpSpHeld = false; input.special = false; }
         }
         break;
       }
@@ -81,6 +110,16 @@
       var pk = P2KEYMAP[e.code];
       if (pk) p2keys[pk] = true;
       if (e.code === 'KeyO' && GH.game.state === 'play') input.p2Boost = true;
+      if (e.code === 'KeyU') {
+        p2keys.sp = true;
+        input.p2Special = true;
+        if (GH.game.state === 'play') input.p2SpecialPressed = true;
+      }
+      // co-op reward votes: P2 picks with J/K/L
+      if (GH.game.coop && GH.game.state === 'reward') {
+        var vn = { KeyJ: 0, KeyK: 1, KeyL: 2 }[e.code];
+        if (vn !== undefined) GH.game.pickRewardIndex(vn);
+      }
       if (e.code === 'Space' && GH.game.state === 'play') {
         input.boostPressed = true; e.preventDefault();
       }
@@ -107,6 +146,7 @@
       if (k) input.keys[k] = false;
       var pk = P2KEYMAP[e.code];
       if (pk) p2keys[pk] = false;
+      if (e.code === 'KeyU') { p2keys.sp = false; input.p2Special = false; }
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.special = false;
     });
     window.addEventListener('mousemove', function (e) {
@@ -135,8 +175,72 @@
   }
 
   // ----------------------------------------------------------------
+  // Touch controls: left half = move stick, right half = aim stick,
+  // plus BOOST / SPEC buttons. Shown only on coarse-pointer devices.
+  var touchCapable = false;
+  function bindTouch() {
+    try {
+      touchCapable = ('ontouchstart' in window) ||
+        (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    } catch (e) { touchCapable = false; }
+    if (!touchCapable) return;
+    var ui = document.getElementById('touch-ui');
+    ui.classList.remove('gone');
+
+    function stick(zoneId, nubId, onMove, onEnd) {
+      var zone = document.getElementById(zoneId);
+      var nub = document.getElementById(nubId);
+      var pid = null, ox = 0, oy = 0;
+      zone.addEventListener('pointerdown', function (e) {
+        pid = e.pointerId; ox = e.clientX; oy = e.clientY;
+        zone.setPointerCapture(pid);
+        e.preventDefault();
+      });
+      zone.addEventListener('pointermove', function (e) {
+        if (e.pointerId !== pid) return;
+        var dx = GH.clamp((e.clientX - ox) / 45, -1, 1);
+        var dy = GH.clamp((e.clientY - oy) / 45, -1, 1);
+        nub.style.transform = 'translate(' + dx * 22 + 'px,' + dy * 22 + 'px)';
+        onMove(dx, dy);
+      });
+      var end = function (e) {
+        if (e.pointerId !== pid) return;
+        pid = null;
+        nub.style.transform = '';
+        onEnd();
+      };
+      zone.addEventListener('pointerup', end);
+      zone.addEventListener('pointercancel', end);
+    }
+
+    stick('touch-move', 'touch-move-nub', function (dx, dy) {
+      input.touchMoveX = dx; input.touchMoveY = dy;
+    }, function () { input.touchMoveX = 0; input.touchMoveY = 0; });
+
+    stick('touch-aim', 'touch-aim-nub', function (dx, dy) {
+      if (dx * dx + dy * dy > 0.04) {
+        input.touchAimX = dx; input.touchAimY = dy; input.touchAimActive = true;
+      }
+    }, function () { input.touchAimActive = false; });
+
+    document.getElementById('touch-boost').addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      GH.audio.unlock();
+      if (GH.game.state === 'play') input.boostPressed = true;
+    });
+    var specBtn = document.getElementById('touch-special');
+    specBtn.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      input.special = true;
+      if (GH.game.state === 'play') input.specialPressed = true;
+    });
+    specBtn.addEventListener('pointerup', function () { input.special = false; });
+    specBtn.addEventListener('pointercancel', function () { input.special = false; });
+  }
+
+  // ----------------------------------------------------------------
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
-    'weekly-screen', 'reward-screen', 'pause-screen', 'end-screen'];
+    'weekly-screen', 'preset-screen', 'reward-screen', 'pause-screen', 'end-screen'];
 
   function show(id) {
     SCREENS.forEach(function (s) {
@@ -157,6 +261,30 @@
     show('select-screen');
     document.getElementById('hud').classList.add('hidden');
     GH.game.enterSelect();
+    renderP2Row();
+  }
+
+  // P2's own frame picker (visible when co-op is on)
+  function renderP2Row() {
+    var wrap = document.getElementById('p2-select-row');
+    wrap.classList.toggle('hidden', !GH.game.coop);
+    if (!GH.game.coop) return;
+    wrap.innerHTML = '<span class="p2-row-label">P2 FRAME:</span>';
+    var mirror = document.createElement('div');
+    mirror.className = 'mech-icon p2-icon' + (p2MechIndex === -1 ? ' sel' : '');
+    mirror.textContent = '⇔';
+    mirror.title = 'Mirror P1';
+    mirror.onclick = function () { p2MechIndex = -1; GH.audio.card(); renderP2Row(); };
+    wrap.appendChild(mirror);
+    GH.mechs.forEach(function (def, i) {
+      if (!GH.meta.data.shells[def.id]) return;
+      var d = document.createElement('div');
+      d.className = 'mech-icon p2-icon' + (i === p2MechIndex ? ' sel' : '');
+      d.textContent = def.icon;
+      d.title = def.name;
+      d.onclick = function () { p2MechIndex = i; GH.audio.card(); renderP2Row(); };
+      wrap.appendChild(d);
+    });
   }
 
   function openStageSelect() {
@@ -191,7 +319,11 @@
         '<div class="sc-best">' + (won ? '★ CLEARED · ' : '') +
         (best ? 'best wave ' + best : '') + '</div>';
       if (unlocked) {
-        div.onclick = function () { chosenStage = i; launch(i); };
+        div.onclick = function () {
+          chosenStage = i;
+          if (arena) openPresetPicker(i);
+          else launch(i);
+        };
       }
       wrap.appendChild(div);
     });
@@ -199,18 +331,55 @@
 
   var lastLaunch = null;
 
-  function launch(stageIdx) {
+  // Arena loadout presets: a starting kit instead of a bare frame.
+  var PRESETS = [
+    { id: 'bare', name: 'Standard Issue', glyph: '—', desc: 'No starting kit. The classic climb.' },
+    { id: 'gunplatform', name: 'Gun Platform', glyph: '⋔',
+      desc: 'Start with a Flak Fan and a Missile Rack.',
+      weapons: ['flakfan', 'missiles'] },
+    { id: 'stormcell', name: 'Storm Cell', glyph: '϶',
+      desc: 'Start with an Arc Coil and Orbit Blades, plus a Keen gem in your primary.',
+      weapons: ['tesla', 'blades'], gems: ['keen'] },
+    { id: 'sapper', name: 'Sapper', glyph: '☒',
+      desc: 'Start with a Mine Layer and a Mortar Pod, plus +2 armor.',
+      weapons: ['mines', 'mortarpod'], traits: ['t_arm'] },
+    { id: 'pyrecult', name: 'Pyre Cult', glyph: '♨',
+      desc: 'Start with a Flame Projector, +25% elemental damage, and a Pyre gem.',
+      weapons: ['flamer'], traits: ['t_elem'], gems: ['pyre'] }
+  ];
+
+  function openPresetPicker(stageIdx) {
+    GH.game.state = 'stageselect';
+    var wrap = document.getElementById('preset-list');
+    wrap.innerHTML = '';
+    PRESETS.forEach(function (ps) {
+      var div = document.createElement('div');
+      div.className = 'reward-card';
+      div.innerHTML =
+        '<div class="rc-kind">LOADOUT</div>' +
+        '<div class="rc-glyph">' + ps.glyph + '</div>' +
+        '<div class="rc-name">' + ps.name + '</div>' +
+        '<div class="rc-desc">' + ps.desc + '</div>';
+      div.onclick = function () { launch(stageIdx, ps); };
+      wrap.appendChild(div);
+    });
+    show('preset-screen');
+  }
+
+  function launch(stageIdx, preset) {
     GH.audio.wave();
     show(null);
     var devWave = 1;
     try {
       devWave = parseInt(new URLSearchParams(location.search).get('wave') || '1', 10) || 1;
     } catch (e) { /* older browsers */ }
-    lastLaunch = function () {
+    var doLaunch = function () {
       show(null);
-      GH.game.startRun(GH.game.getSelectedMech(), stageIdx, devWave);
+      GH.game.startRun(GH.game.getSelectedMech(), stageIdx, devWave,
+        { p2Mech: p2MechIndex, preset: preset });
     };
-    GH.game.startRun(GH.game.getSelectedMech(), stageIdx, devWave);
+    lastLaunch = doLaunch;
+    doLaunch();
   }
 
   // ----------------------------------------------------------------
@@ -372,11 +541,17 @@
     document.getElementById('btn-weekly').onclick = openWeekly;
     document.getElementById('btn-hangar').onclick = openHangar;
     document.getElementById('btn-weekly-back').onclick = toTitle;
+    document.getElementById('btn-preset-back').onclick = function () {
+      GH.game.state = 'stageselect';
+      renderStageList();
+      show('stage-screen');
+    };
     document.getElementById('btn-coop').onclick = function () {
       GH.game.coop = !GH.game.coop;
       GH.audio.card();
       document.getElementById('btn-coop').textContent =
-        'CO-OP P2: ' + (GH.game.coop ? 'ON (IJKL + O, or gamepad)' : 'OFF');
+        'CO-OP P2: ' + (GH.game.coop ? 'ON (IJKL + O boost + U special)' : 'OFF');
+      renderP2Row();
     };
     document.getElementById('btn-launch').onclick = openStageSelect;
     document.getElementById('btn-select-back').onclick = toTitle;
@@ -403,7 +578,10 @@
     requestAnimationFrame(loop);
     var dt = Math.min(0.05, (now - last) / 1000 || 0.016);
     last = now;
-    pollP2();
+    pollPads();
+    if (touchCapable) {
+      document.getElementById('touch-ui').classList.toggle('hidden', GH.game.state !== 'play');
+    }
     GH.game.update(dt, input, window.innerWidth, window.innerHeight);
     renderer.render(GH.game.scene(), GH.game.camera());
   }

@@ -74,9 +74,17 @@
       <div id="select-stats"></div>
     </div>
     <div id="select-icons"></div>
+    <div id="p2-select-row" class="hidden"></div>
     <button id="btn-launch" class="menu-btn">SELECT STAGE</button>
     <button id="btn-coop" class="menu-btn tiny coop-btn">CO-OP P2: OFF</button>
     <button id="btn-select-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== ARENA LOADOUT ===================== -->
+  <div id="preset-screen" class="screen hidden">
+    <h2 class="select-title">LOADOUT</h2>
+    <div id="preset-list"></div>
+    <button id="btn-preset-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== WEEKLY CHALLENGE ===================== -->
@@ -124,6 +132,14 @@
     <div id="end-stats"></div>
     <button id="btn-retry" class="menu-btn">RETRY</button>
     <button id="btn-menu" class="menu-btn small">MAIN MENU</button>
+  </div>
+
+  <!-- touch controls (coarse-pointer devices only) -->
+  <div id="touch-ui" class="gone hidden">
+    <div id="touch-move" class="touch-zone"><div id="touch-move-nub" class="touch-nub"></div></div>
+    <div id="touch-aim" class="touch-zone"><div id="touch-aim-nub" class="touch-nub"></div></div>
+    <div id="touch-boost" class="touch-btn">BOOST</div>
+    <div id="touch-special" class="touch-btn">SPEC</div>
   </div>
 
   <div id="mute-btn" title="toggle sound">♪</div>

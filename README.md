@@ -25,7 +25,10 @@ and visit `http://localhost:8000`.)
 | 1–6 | Pick a wave-reward card / socket target |
 | F | Toggle CRT scanlines |
 | Esc / P | Pause |
-| IJKL + O (or gamepad stick + A) | Player 2 in co-op: move + boost |
+| IJKL + O + U (or gamepad stick + A + B) | Player 2 in co-op: move, boost, special |
+| Gamepad (solo) | Left stick move, right stick aim, A boost, B special |
+| Touch | Virtual sticks (left move, right aim) + BOOST/SPEC buttons |
+| J / K / L | Player 2 votes on wave-reward cards in co-op |
 
 Dev shortcuts: `?wave=N` starts at wave N with catch-up levels; `?unlock=all`
 opens every shell and stage; `?salvage=500` grants test salvage.
@@ -56,7 +59,10 @@ Every stage runs 20 timed waves with set-pieces: a **RUST WARDEN** midboss at
 wave 10, an **OVERRUN** spawn-rate spike at wave 16, the **GRAVE CARAPACE**
 broodmother at wave 18, and at wave 20 a **CORRUPTED** dark-mirror of the next
 playable frame — beat it to *unlock that frame* and the next stage. Mirror
-matches (fighting your own frame's double) welcome.
+matches (fighting your own frame's double) welcome. At half hull every corrupt
+boss goes **UNBOUND**: a second phase with a red aura, faster ability cycles,
+radial bullet bursts, and heavier summons — and midbosses spiral up their own
+summons when wounded.
 
 ### Gems & Resonance
 Midbosses and bosses drop gems of five affinities — **Sol** ☀, **Pyre** 🔥,
@@ -88,17 +94,23 @@ level-up during a run.
 
 ### Modes
 - **Classic** — pick a frame and stage, survive 20 waves, claim the corrupted frame.
-- **Arena** — endless, infinitely scaling waves on any unlocked stage; best wave saved.
+- **Arena** — endless, infinitely scaling waves on any unlocked stage; best wave
+  saved. Before deploying, pick a **loadout preset**: Standard Issue, Gun
+  Platform, Storm Cell, Sapper, or Pyre Cult — starting weapon/trait/gem kits
+  that seed different builds.
 - **Weekly Challenge** — a deterministic ISO-week seed issues everyone the same
   frame, stage, and modifier trio (two hazards like SWARM / IRONCLAD / GLASS
   FRAME / HASTE / FERAL plus one boon like BOUNTY or KEEN EYES); endless
   scoring, best wave recorded per week.
-- **Shared-screen co-op (first pass)** — toggle CO-OP on the player-select
-  screen: Player 2 pilots a blue-accented mirror of your frame with IJKL + O
-  (or a gamepad), auto-aiming its primary and sharing your stat upgrades.
-  Enemies target the nearest pilot, the camera pulls back as you spread out
-  (with a shared-screen tether), and a downed wingmate revives at the next
-  wave or when P1 stands close.
+- **Shared-screen co-op** — toggle CO-OP on the player-select screen: Player 2
+  now picks their *own* frame (any unlocked shell, or a mirror of P1) with a
+  blue-accent livery, and gets full parity — their frame's special on U /
+  gamepad B (block hold, Overdrive, Nova, Lunge, Shade, Frenzy, Blink,
+  Bulwark), boost-fed passives (FRENZY stacks, EDGE crits, WRATH scaling on
+  their own hull), and J/K/L votes on wave-reward cards. Enemies target the
+  nearest pilot, the camera pulls back as you spread out (with a shared-screen
+  tether), and a downed wingmate revives at the next wave or when P1 stands
+  close.
 
 ### Music & feel
 Every stage has its own generative soundtrack — bass, pad, arp, and drum
@@ -136,7 +148,7 @@ js/main.js        renderer, input, screen wiring
 
 ## Roadmap ideas
 
-- Full P2 parity in co-op: own frame pick, specials, and reward votes
-- P1 gamepad + touch controls
-- Loadout presets and seeded runs for Arena
-- More resonance hybrids and boss phases
+- Seeded custom runs (share a seed string with a friend)
+- More resonance hybrids and stage hazards
+- Online leaderboards for Weekly and Arena
+- A third playable pilot slot

@@ -94,6 +94,7 @@ GH.meta = (function () {
       }
       if (p.get('salvage')) M.data.salvage += parseInt(p.get('salvage'), 10) || 0;
       if (p.get('weakboss') === '1') GH.devWeakBoss = true;
+      if (p.get('phaseboss') === '1') GH.devPhaseBoss = true;
       if (p.get('god') === '1') GH.devGod = true;
     } catch (e) { /* ignore */ }
   };
