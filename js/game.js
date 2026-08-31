@@ -190,6 +190,9 @@ GH.game = (function () {
     var a2 = actor || player;
     var s = player.stats;
     var d = (inst.w.damage + s.flatDamage) * s.damageMult * inst.mods.damageMult;
+    if (a2 === player && player.counter.length) {
+      d *= 1 + player.counter.length * 0.03; // ward COUNTER stacks
+    }
     if (a2.def.passive === 'wrath') {
       var missing = 1 - a2.hp / s.maxHP;
       d *= 1 + Math.min(0.6, missing * 0.75);
@@ -243,6 +246,7 @@ GH.game = (function () {
       blocking: false,
       special: { cd: 0, active: 0 },
       frenzy: [], edgeT: 0,
+      ward: null, wardEnergy: 1, wardCd: 0, counter: [],
       hurtCd: 0,
       heal: function (amt) {
         if (p.hp <= 0) return;
@@ -258,7 +262,7 @@ GH.game = (function () {
     return p;
   }
 
-  function playerDamage(raw, srcE) {
+  function playerDamage(raw, srcE, dmgType) {
     if (!player || player.hp <= 0 || player.dashTime > 0.12 || GH.devGod) return;
     var s = player.stats;
     var block = s.block + (player.protocols.vents && player.hp < s.maxHP * 0.35 ? 10 : 0);
@@ -267,6 +271,16 @@ GH.game = (function () {
       GH.audio.block();
       if (player.def.special === 'block') player.heal(2);
       return;
+    }
+    // matching ward: 75% cut, small energy cost, feeds COUNTER stacks
+    var warded = dmgType && player.ward === dmgType;
+    if (warded) {
+      raw *= 0.25;
+      player.wardEnergy = Math.max(0, player.wardEnergy - 0.06);
+      player.counter.push(4);
+      if (player.counter.length > 5) player.counter.shift();
+      G.dmg.spawn(player.x, 3.0, player.z, 'WARDED', 'elem', 13);
+      GH.audio.block();
     }
     var armor = s.armor + (player.special.active > 0 && player.def.special === 'bulwark' ? 12 : 0);
     var dmg = Math.max(1, Math.round(raw - armor));
@@ -687,7 +701,7 @@ GH.game = (function () {
       if (e.attackCd <= 0) {
         if (GH.dist2(e.x, e.z, player.x, player.z) < Math.pow(def.radius + 0.8, 2)) {
           e.attackCd = 1.1;
-          playerDamage(e.damage, e);
+          playerDamage(e.damage, e, 'kinetic');
         } else if (mate && !mate.down &&
           GH.dist2(e.x, e.z, mate.x, mate.z) < Math.pow(def.radius + 0.8, 2)) {
           e.attackCd = 1.1;
@@ -730,7 +744,7 @@ GH.game = (function () {
       // dash contact
       if (dist < e.def.radius + 1.0 && e.attackCd <= 0) {
         e.attackCd = 0.8;
-        playerDamage(e.damage * 0.8, e);
+        playerDamage(e.damage * 0.8, e, 'kinetic');
       }
       return out;
     }
@@ -1370,7 +1384,7 @@ GH.game = (function () {
       p2.mesh.position.set(p2.x, p2.y, p2.z);
       var dead = p2.life <= 0;
       if (!dead && GH.dist2(p2.x, p2.z, player.x, player.z) < 0.8 * 0.8) {
-        playerDamage(p2.damage, null);
+        playerDamage(p2.damage, null, 'ballistic');
         dead = true;
       }
       if (!dead && mate && !mate.down &&
@@ -1533,7 +1547,7 @@ GH.game = (function () {
         fx.mesh.material.opacity = 0.25 + Math.sin(runTime * 20) * 0.12;
         if (fx.t <= 0) {
           if (GH.dist2(fx.x, fx.z, player.x, player.z) < fx.radius * fx.radius) {
-            playerDamage(fx.damage, null);
+            playerDamage(fx.damage, null, 'arc');
           }
           if (mate && !mate.down && GH.dist2(fx.x, fx.z, mate.x, mate.z) < fx.radius * fx.radius) {
             wingmateDamage(fx.damage);
@@ -1548,7 +1562,7 @@ GH.game = (function () {
           var along = relX * Math.sin(fx.angle) + relZ * Math.cos(fx.angle);
           var across = Math.abs(relX * Math.cos(fx.angle) - relZ * Math.sin(fx.angle));
           if (along > 0 && along < fx.len && across < fx.width + 0.5) {
-            playerDamage(fx.damage, null);
+            playerDamage(fx.damage, null, 'arc');
           }
           var beam = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, fx.len),
             GH.assets.basic(0xff8090, { transparent: true, opacity: 0.9 }));
@@ -1572,7 +1586,7 @@ GH.game = (function () {
         fx.mesh.material.opacity = 0.15 + Math.sin(runTime * 10) * 0.08;
         if (GH.dist2(fx.x, fx.z, player.x, player.z) < fx.radius * fx.radius) {
           fx.tick = (fx.tick || 0) - dt;
-          if (fx.tick <= 0) { fx.tick = 0.5; playerDamage(fx.dps * 0.5 + player.stats.armor, null); }
+          if (fx.tick <= 0) { fx.tick = 0.5; playerDamage(fx.dps * 0.5 + player.stats.armor, null, 'arc'); }
         }
       } else if (fx.kind === 'shrub') {
         fx.emitT -= dt;
@@ -1972,6 +1986,7 @@ GH.game = (function () {
     player.special.active = Math.max(0, player.special.active - dt);
     player.hurtCd = Math.max(0, player.hurtCd - dt);
     player.edgeT = Math.max(0, player.edgeT - dt);
+    updateWard(dt, input);
     for (var f = player.frenzy.length - 1; f >= 0; f--) {
       player.frenzy[f] -= dt;
       if (player.frenzy[f] <= 0) player.frenzy.splice(f, 1);
@@ -2005,6 +2020,91 @@ GH.game = (function () {
       });
     }
     player.mesh.visible = !(player.hurtCd > 0 && Math.floor(runTime * 24) % 2 === 0);
+  }
+
+  // =================================================================
+  // WARD STANCES — typed defensive shells. The right ward cuts its
+  // damage type by 75% and feeds COUNTER damage stacks; the wrong ward
+  // does nothing. Running a ward drains energy; empty = collapse.
+  // =================================================================
+  var WARDS = {
+    kinetic: { name: 'KINETIC', color: 0xf0a030, desc: 'contact & rams' },
+    ballistic: { name: 'BALLISTIC', color: 0x50c8f0, desc: 'enemy projectiles' },
+    arc: { name: 'ARC', color: 0xb060f0, desc: 'blasts, beams & burning ground' }
+  };
+  var WARD_ORDER = ['kinetic', 'ballistic', 'arc'];
+  var wardDome = null;
+
+  function setWard(kind) {
+    if (!player || player.wardCd > 0) return;
+    if (player.ward === kind || kind === null) {
+      player.ward = null;
+    } else {
+      player.ward = kind;
+      GH.audio.block();
+    }
+    updateWardDome();
+  }
+
+  function cycleWard() {
+    if (!player || player.wardCd > 0) return;
+    var i = player.ward ? WARD_ORDER.indexOf(player.ward) : -1;
+    player.ward = i >= WARD_ORDER.length - 1 ? null : WARD_ORDER[i + 1];
+    if (player.ward) GH.audio.block();
+    updateWardDome();
+  }
+
+  function updateWardDome() {
+    if (!wardDome) {
+      wardDome = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(1.55, 1),
+        new THREE.MeshBasicMaterial({
+          color: 0xffffff, transparent: true, opacity: 0.16,
+          wireframe: true, depthWrite: false
+        })
+      );
+      wardDome.position.y = 1.3;
+    }
+    if (player && player.ward) {
+      wardDome.material.color.setHex(WARDS[player.ward].color);
+      if (wardDome.parent !== player.mesh) player.mesh.add(wardDome);
+      wardDome.visible = true;
+    } else if (wardDome.parent) {
+      wardDome.visible = false;
+    }
+  }
+
+  function updateWard(dt, input) {
+    if (input.wardPressed) {
+      setWard(input.wardPressed === 1 ? 'kinetic' : input.wardPressed === 2 ? 'ballistic' : 'arc');
+      input.wardPressed = 0;
+    }
+    if (input.wardCycle) {
+      cycleWard();
+      input.wardCycle = false;
+    }
+    player.wardCd = Math.max(0, player.wardCd - dt);
+    if (player.ward) {
+      player.wardEnergy -= dt * 0.2;
+      if (player.wardEnergy <= 0) {
+        player.wardEnergy = 0;
+        player.ward = null;
+        player.wardCd = 2;
+        announce('WARD COLLAPSE', 20);
+        GH.audio.hit();
+        updateWardDome();
+      }
+    } else {
+      player.wardEnergy = Math.min(1, player.wardEnergy + dt * 0.16);
+    }
+    for (var i = player.counter.length - 1; i >= 0; i--) {
+      player.counter[i] -= dt;
+      if (player.counter[i] <= 0) player.counter.splice(i, 1);
+    }
+    if (wardDome && wardDome.visible) {
+      wardDome.material.opacity = 0.12 + Math.sin(runTime * 5) * 0.05;
+      wardDome.rotation.y += dt * 0.8;
+    }
   }
 
   // =================================================================
@@ -2436,6 +2536,21 @@ GH.game = (function () {
       el['boss-fill'].style.width = GH.clamp(bossRef.hp / bossRef.maxHp * 100, 0, 100) + '%';
     }
     // buff line: element / frenzy / wrath / special state
+    // ward row: three stances + energy
+    var wardEl = document.getElementById('ward-row');
+    var wh = '';
+    WARD_ORDER.forEach(function (w, i) {
+      var on = player.ward === w;
+      wh += '<span class="ward-chip' + (on ? ' on' : '') + '" style="' +
+        (on ? 'border-color:#' + WARDS[w].color.toString(16) + ';color:#fff' : '') + '">' +
+        (i + 1) + ' ' + WARDS[w].name + '</span>';
+    });
+    wh += '<span class="ward-energy"><span class="ward-energy-fill" style="width:' +
+      Math.round(player.wardEnergy * 100) + '%"></span></span>';
+    if (player.counter.length) wh += '<span class="ward-counter">COUNTER ×' + player.counter.length + '</span>';
+    if (player.wardCd > 0) wh += '<span class="ward-counter" style="color:#ff8080">COLLAPSED</span>';
+    wardEl.innerHTML = wh;
+
     var buffs = [];
     var prim = player.weapons[0];
     if (prim.w.cycle) {
@@ -2531,7 +2646,11 @@ GH.game = (function () {
       if (cipherRun.marker) scene.remove(cipherRun.marker);
       cipherRun = null;
     }
-    if (player) { scene.remove(player.mesh); player = null; }
+    if (player) {
+      if (wardDome && wardDome.parent === player.mesh) player.mesh.remove(wardDome);
+      scene.remove(player.mesh);
+      player = null;
+    }
     if (mate) { scene.remove(mate.mesh); mate = null; }
     if (selPreview) { scene.remove(selPreview); selPreview = null; }
     bossRef = null;
@@ -2922,6 +3041,9 @@ GH.game = (function () {
       seasonPts: GH.meta.data.season.pts,
       seasonRelics: GH.meta.data.season.relics.slice(),
       cipher: cipherRun ? cipherRun.steps[cipherRun.idx].id + ' ' + cipherRun.idx + '/' + cipherRun.steps.length : null,
+      ward: player ? player.ward : null,
+      wardEnergy: player ? Math.round(player.wardEnergy * 100) / 100 : 0,
+      counterStacks: player ? player.counter.length : 0,
       cipherDry: GH.meta.data.cipher.dry,
       caches: GH.meta.data.cipher.caches,
       cosmetics: Object.keys(GH.meta.data.style.owned).length,

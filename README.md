@@ -22,6 +22,8 @@ and visit `http://localhost:8000`.)
 | Mouse | Aim (weapons fire automatically) |
 | Space | Boost (dash — some frames weaponize it) |
 | Shift / Right-click | Special (per frame: Block, Overdrive, Nova, Lunge, Shade, Frenzy, Blink, Bulwark) |
+| 1 / 2 / 3 (in combat) | Toggle KINETIC / BALLISTIC / ARC ward |
+| Q (or gamepad LB, touch WARD) | Cycle wards |
 | 1–6 | Pick a wave-reward card / socket target |
 | F | Toggle CRT scanlines |
 | Esc / P | Pause |
@@ -86,6 +88,17 @@ Reactor, Thorn Plating, Emergency Vents), or gems to socket.
 ### Elements
 Burn (stacking DoT), Shock (chance to stun), Frost (slow) — boosted by
 elemental-damage traits and HEXEN's passive.
+
+### Ward stances
+Every frame carries three toggleable defensive shells, one active at a time:
+**KINETIC** (amber — contact hits and boss rams), **BALLISTIC** (cyan — enemy
+projectiles), **ARC** (violet — telegraphed blasts, rail beams, burning
+ground). The matching ward cuts that damage by 75% and feeds **COUNTER**
+stacks (+3% damage each, up to 5) — the wrong ward does nothing. Wards drain
+energy while raised and collapse when it empties, so reading the incoming
+attack and flicking the right stance at the right moment is the skill
+ceiling: hold ARC through a boss slam, swap to BALLISTIC for the radial
+burst, drop the ward to recharge between waves.
 
 ### The Broker (hunt contracts)
 A hangar contact assigns directed missions — "destroy 32 Shardlings in Glacier

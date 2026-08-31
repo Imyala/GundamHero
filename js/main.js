@@ -10,6 +10,7 @@
     specialPressed: false,
     p2x: 0, p2y: 0, p2Boost: false,
     p2Special: false, p2SpecialPressed: false,
+    wardPressed: 0, wardCycle: false,
     padMoveX: 0, padMoveY: 0, padAimX: 0, padAimY: 0, padAimActive: false,
     touchMoveX: 0, touchMoveY: 0, touchAimX: 0, touchAimY: 0, touchAimActive: false
   };
@@ -93,6 +94,12 @@
             }
             input.special = true;
           } else if (input._gpSpHeld) { input._gpSpHeld = false; input.special = false; }
+          if (btn(4) || btn(5)) {
+            if (!input._gpWardHeld) {
+              if (GH.game.state === 'play') input.wardCycle = true;
+              input._gpWardHeld = true;
+            }
+          } else input._gpWardHeld = false;
         }
         break;
       }
@@ -126,6 +133,11 @@
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         input.special = true;
         if (GH.game.state === 'play') input.specialPressed = true;
+      }
+      if (GH.game.state === 'play') {
+        var wn = { Digit1: 1, Digit2: 2, Digit3: 3 }[e.code];
+        if (wn) input.wardPressed = wn;
+        if (e.code === 'KeyQ') input.wardCycle = true;
       }
       if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
       if (e.code === 'KeyF') {
@@ -227,6 +239,10 @@
       e.preventDefault();
       GH.audio.unlock();
       if (GH.game.state === 'play') input.boostPressed = true;
+    });
+    document.getElementById('touch-ward').addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      if (GH.game.state === 'play') input.wardCycle = true;
     });
     var specBtn = document.getElementById('touch-special');
     specBtn.addEventListener('pointerdown', function (e) {

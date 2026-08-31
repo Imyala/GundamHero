@@ -597,6 +597,33 @@ html, body {
 
 .sc-trial { color: #90f0a0; font-size: 10px; letter-spacing: 1px; }
 
+/* ---------------- ward stances ---------------- */
+
+#ward-row { margin-top: 3px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ward-chip {
+  font-family: "Courier New", monospace; font-size: 10px; letter-spacing: 1px;
+  color: #7a86a8;
+  border: 1px solid #3a4468;
+  background: rgba(8, 12, 28, 0.7);
+  padding: 1px 5px;
+}
+.ward-chip.on { background: rgba(20, 30, 60, 0.9); font-weight: bold; }
+.ward-energy {
+  display: inline-block; width: 52px; height: 7px;
+  background: #0a0e20; border: 1px solid #4a5888;
+  vertical-align: middle;
+}
+.ward-energy-fill { display: block; height: 100%; background: linear-gradient(#a0c8ff, #4060a0); }
+.ward-counter {
+  font-family: "Times New Roman", serif; font-weight: bold; font-size: 12px;
+  color: #ffd050; text-shadow: 1px 1px 0 #000;
+}
+
+.touch-ward { bottom: calc(6vh + 152px); right: calc(4vw + 230px); }
+@media (max-width: 700px) {
+  .touch-ward { right: auto; left: calc(4vw + 230px); }
+}
+
 #contract-line {
   margin-top: 2px;
   font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px;
