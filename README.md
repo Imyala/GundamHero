@@ -64,11 +64,19 @@ your target — attacks square up on the mark when it's in reach, melee
 frames swing steel up close, and only ranged frames actually shoot.
 Around that basic attack you make the real decisions:
 
-- **Weapon reach is real**: melee frames (AEGIS greatblade, FANG claws,
-  VIPER daggers, MORROW scythe) only land hits in actual melee range —
-  no thrown blades, no sword-waves. Ranged frames (VULCAN, HEXEN, STRIX,
-  TITAN) fire aimed shots at distance. The same is true of the enemy:
-  bruisers have to reach you, only shooters shoot.
+- **Weapon reach is real**: melee frames (AEGIS blade & shield, FANG
+  claws, VIPER daggers, MORROW scythe, STRIX lance) only land hits in
+  actual melee range — no thrown blades, no sword-waves. Ranged frames
+  (VULCAN, HEXEN, TITAN) fire aimed shots at distance. The same is true
+  of the enemy: bruisers have to reach you, only shooters shoot.
+- **Every weapon has its own character**: AEGIS pairs the fastest block
+  in the hangar with quick, wide sword swings; VULCAN's twin autocannons
+  have the fastest trigger but the smallest drums; STRIX's lance thrusts
+  fast and far in a narrow line but its haft blocks poorly; FANG rakes
+  fastest at the shortest reach; VIPER's flurries are rapid, narrow and
+  crit-hungry; HEXEN lobs slow, heavy elemental splash shots; MORROW
+  grinds all-around with the scythe aura; TITAN is slowest of all with
+  the biggest blast.
 - **Abilities (1–4)** spend the blue **energy capacitor** and run
   cooldowns: RUPTURE (a 2.2× focused strike), SWEEP (radial knockback),
   SHACKLE (chain a cluster in place), OVERLOAD (detonate their footing).

@@ -1623,8 +1623,14 @@ GH.game = (function () {
       if (target && !target.dead) {
         var range = attackRange(inst);
         if (GH.dist2(player.x, player.z, target.x, target.z) <= range * range) {
-          aim = GH.angleTo(player.x, player.z, target.x, target.z);
-          player.facing = aim; // square up like you mean it
+          var ta = GH.angleTo(player.x, player.z, target.x, target.z);
+          // melee never spins you onto a mark behind your back — a swing
+          // only squares up on a target you're already roughly facing
+          var tdiff = Math.abs(((ta - aim + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+          if (w.type !== 'melee' || tdiff <= (w.arc || 2) / 2 + 0.35) {
+            aim = ta;
+            player.facing = aim; // square up like you mean it
+          }
         }
       }
       fireWeaponOnce(inst, aim);
@@ -1689,7 +1695,10 @@ GH.game = (function () {
     var a2 = actor || player;
     var w = inst.w;
     GH.audio.melee();
-    var geo = new THREE.CircleGeometry(w.range, 12, aim - w.arc / 2 + Math.PI / 2, w.arc);
+    // fan centered on the swing direction: after the -PI/2 X-rotation a
+    // circle point (cosθ, sinθ) lands at world (cosθ, -sinθ), so the
+    // world aim direction (sin a, cos a) is θ = a - PI/2
+    var geo = new THREE.CircleGeometry(w.range, 12, aim - Math.PI / 2 - w.arc / 2, w.arc);
     var m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
       color: 0xfff0c0, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide
     }));
