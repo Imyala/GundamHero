@@ -9,15 +9,15 @@ GH.mechs = [
     name: 'AEGIS',
     role: 'Paladin frame · starter',
     icon: '⚔',
-    desc: 'Built for survivability. Blocking restores HP. Boosting rams enemies for force damage that scales with Block and Armor. The greatblade is pure steel — close the distance and swing.',
+    desc: 'Sword and shield. The heater shield makes AEGIS the best blocker in the hangar, and the blade comes off it fast — quick, wide swings with real knockback. Blocking restores HP; boosting rams for force damage that scales with Block and Armor.',
     model: { body: 0x9aa09a, accent: 0xd8b040, dark: 0x30342e, trim: 0x787e76, prop: 'sword' },
-    stats: { maxHP: 125, speed: 16, armor: 5, block: 8, crit: 5, lifesteal: 0 },
+    stats: { maxHP: 125, speed: 16, armor: 5, block: 14, crit: 5, lifesteal: 0 },
     levelUp: { armor: 1, maxHP: 2, block: 1 },
     levelText: '+1 Armor Rating\n+2 Max Health\n+1% Block',
-    baseText: '+16 Speed\n+5 Armor Rating\n+25 Max Health',
+    baseText: '+16 Speed\n+5 Armor Rating\n+25 Max Health\n+14% Block — shield-wall of the lineup',
     weapon: {
-      type: 'melee', name: 'Greatblade', cls: 'HEAVY · PHYSICAL',
-      damage: 26, interval: 0.62, range: 3.4, arc: 2.1, knockback: 7
+      type: 'melee', name: 'Blade & Shield', cls: 'QUICK · PHYSICAL',
+      damage: 21, interval: 0.48, range: 3.2, arc: 2.2, knockback: 7
     },
     special: 'block', specialText: 'BLOCK — hold to brace: 70% damage cut, blocked hits mend the frame',
     hudStats: ['block', 'armor', 'crit']
@@ -27,16 +27,16 @@ GH.mechs = [
     name: 'VULCAN',
     role: 'Gunner frame · starter',
     icon: '◉',
-    desc: 'A walking foundry. Twin autocannons hose down everything ahead — 24-round drums with a snap reload. Special: OVERDRIVE doubles fire rate for a burst.',
+    desc: 'A walking foundry. Twin autocannons trade drum size for cycle rate — the fastest trigger in the lineup, but only 14 rounds between snap reloads. Special: OVERDRIVE doubles fire rate for a burst.',
     model: { body: 0x8a3028, accent: 0xf0c040, dark: 0x381410, trim: 0x5a201a, prop: 'guns' },
     stats: { maxHP: 95, speed: 17, armor: 2, block: 0, crit: 10, lifesteal: 0 },
     levelUp: { damage: 1, atkSpd: 2, maxHP: 1 },
     levelText: '+1 Damage\n+2% Attack Speed\n+1 Max Health',
-    baseText: '+17 Speed\n+2 Armor Rating\n-5 Max Health',
+    baseText: '+17 Speed\n+2 Armor Rating\n-5 Max Health\nFastest fire rate · smallest drums',
     weapon: {
-      type: 'shot', name: 'Autocannon', cls: 'LIGHT · PHYSICAL',
-      damage: 8, interval: 0.15, speed: 30, life: 0.9, size: 0.22,
-      color: 0xf0d040, spread: 0.14, count: 1, clip: 24, reload: 1.1
+      type: 'shot', name: 'Twin Autocannons', cls: 'RAPID · PHYSICAL',
+      damage: 6, interval: 0.11, speed: 30, life: 0.9, size: 0.2,
+      color: 0xf0d040, spread: 0.16, count: 1, clip: 14, reload: 0.85
     },
     special: 'overdrive', specialText: 'OVERDRIVE — 3s of doubled fire rate',
     hudStats: ['crit', 'atkSpd', 'damage']
@@ -51,10 +51,10 @@ GH.mechs = [
     stats: { maxHP: 90, speed: 19, armor: 1, block: 0, crit: 12, lifesteal: 4 },
     levelUp: { atkSpd: 3, speed: 0.2, maxHP: 1 },
     levelText: '+3% Attack Speed\n+0.2 Speed\n+1 Max Health',
-    baseText: '+19 Speed\n+1 Armor Rating\n-10 Max Health\nBoost feeds Frenzy',
+    baseText: '+19 Speed\n+1 Armor Rating\n-10 Max Health\nBoost feeds Frenzy\nFastest swings · shortest reach',
     weapon: {
-      type: 'melee', name: 'Talon Rake', cls: 'LIGHT · PHYSICAL',
-      damage: 8, interval: 0.24, range: 2.5, arc: 1.6, knockback: 2
+      type: 'melee', name: 'Talon Rake', cls: 'SAVAGE · PHYSICAL',
+      damage: 7, interval: 0.2, range: 2.2, arc: 1.9, knockback: 2
     },
     special: 'lunge', specialText: 'LUNGE — a second short dash that slashes through enemies',
     passive: 'frenzy',
@@ -70,12 +70,12 @@ GH.mechs = [
     stats: { maxHP: 85, speed: 16, armor: 1, block: 0, crit: 8, lifesteal: 0 },
     levelUp: { damage: 2, maxHP: 1, magnet: 2 },
     levelText: '+2 Damage\n+1 Max Health\n+2% Magnet Range',
-    baseText: '+16 Speed\n+1 Armor Rating\n-15 Max Health\n+15% Elemental Damage',
+    baseText: '+16 Speed\n+1 Armor Rating\n-15 Max Health\n+15% Elemental Damage\nSlow, heavy splash shots',
     weapon: {
-      type: 'shot', name: 'Spellcannon', cls: 'HEAVY · ELEMENTAL',
-      damage: 17, interval: 0.55, speed: 17, life: 2.2, size: 0.32,
-      color: 0x50e8d8, spread: 0.3, count: 1, homing: 4, aoe: 1.6,
-      cycle: ['burn', 'shock', 'frost'], clip: 8, reload: 1.0
+      type: 'shot', name: 'Spellcannon', cls: 'SLOW · ELEMENTAL · SPLASH',
+      damage: 22, interval: 0.75, speed: 15, life: 2.4, size: 0.36,
+      color: 0x50e8d8, spread: 0.3, count: 1, homing: 4, aoe: 2.2,
+      cycle: ['burn', 'shock', 'frost'], clip: 6, reload: 1.2
     },
     special: 'nova', specialText: 'NOVA — an elemental shockwave that shoves the swarm away',
     hudStats: ['damage', 'magnet', 'crit']
@@ -90,10 +90,10 @@ GH.mechs = [
     stats: { maxHP: 80, speed: 18, armor: 1, block: 0, crit: 16, lifesteal: 0 },
     levelUp: { crit: 1, damage: 1, atkSpd: 1 },
     levelText: '+1% Critical\n+1 Damage\n+1% Attack Speed',
-    baseText: '+18 Speed\n+1 Armor Rating\n-20 Max Health\nBoost sharpens crit',
+    baseText: '+18 Speed\n+1 Armor Rating\n-20 Max Health\nBoost sharpens crit\nNarrow, rapid precision flurries',
     weapon: {
-      type: 'melee', name: 'Dagger Flurry', cls: 'LIGHT · PHYSICAL',
-      damage: 9, interval: 0.2, range: 2.6, arc: 1.3, knockback: 1
+      type: 'melee', name: 'Dagger Flurry', cls: 'PRECISE · PHYSICAL',
+      damage: 8, interval: 0.17, range: 2.4, arc: 1.0, knockback: 1
     },
     special: 'blink', specialText: 'SHADE — teleport through danger, untouchable for a breath',
     passive: 'edge',
@@ -111,8 +111,8 @@ GH.mechs = [
     levelText: '+1% Lifesteal\n+2 Max Health\n+1 Damage',
     baseText: '+17 Speed\n+3 Armor Rating\n+5 Max Health\nWrath: missing HP → damage',
     weapon: {
-      type: 'aura', name: 'Reap Cycle', cls: 'HEAVY · PHYSICAL',
-      damage: 12, interval: 0.38, range: 3.0
+      type: 'aura', name: 'Reap Cycle', cls: 'HEAVY · ALL-AROUND',
+      damage: 14, interval: 0.45, range: 3.2
     },
     special: 'frenzy', specialText: 'FRENZY — the reap radius briefly doubles',
     passive: 'wrath',
@@ -123,16 +123,15 @@ GH.mechs = [
     name: 'STRIX',
     role: 'Duelist frame',
     icon: '➳',
-    desc: 'A duelist tuned for precision. Rail lances punch through entire columns and crit hard. Special: BLINK — a short teleport through danger.',
+    desc: 'A duelist tuned for reach. The powered lance thrusts fast and far in a narrow line — outrange every other melee frame and crit hard, but the haft blocks poorly next to a real shield. Special: BLINK — a short teleport through danger.',
     model: { body: 0xc8c8d0, accent: 0xf05060, dark: 0x404048, trim: 0x8a8a96, prop: 'lance' },
-    stats: { maxHP: 80, speed: 18, armor: 1, block: 0, crit: 18, lifesteal: 0 },
+    stats: { maxHP: 80, speed: 18, armor: 1, block: 4, crit: 18, lifesteal: 0 },
     levelUp: { crit: 1, speed: 0.2, damage: 1 },
     levelText: '+1% Critical\n+0.2 Speed\n+1 Damage',
-    baseText: '+18 Speed\n+1 Armor Rating\n-20 Max Health',
+    baseText: '+18 Speed\n+1 Armor Rating\n-20 Max Health\n+4% Block — a haft is no shield\nLongest melee reach, narrow thrust',
     weapon: {
-      type: 'shot', name: 'Rail Lance', cls: 'HEAVY · PHYSICAL',
-      damage: 26, interval: 0.7, speed: 46, life: 1.1, size: 0.24,
-      color: 0xff6070, spread: 0.0, count: 1, pierce: 99, clip: 5, reload: 1.3
+      type: 'melee', name: 'Rail Lance', cls: 'REACH · PHYSICAL',
+      damage: 15, interval: 0.36, range: 4.4, arc: 0.7, knockback: 4
     },
     special: 'blink', specialText: 'BLINK — teleport through danger',
     hudStats: ['crit', 'speed', 'damage']
@@ -144,13 +143,13 @@ GH.mechs = [
     icon: '◆',
     desc: 'A siege engine that learned to walk. Mortar shells arc over the swarm and detonate in wide force blasts. Slow, but nearly unbreakable. Special: BULWARK — brief immovable overplating.',
     model: { body: 0x5a6a5a, accent: 0xf0a030, dark: 0x242c24, trim: 0x8a988a, prop: 'mortar' },
-    stats: { maxHP: 160, speed: 13, armor: 8, block: 4, crit: 4, lifesteal: 0 },
+    stats: { maxHP: 160, speed: 13, armor: 8, block: 6, crit: 4, lifesteal: 0 },
     levelUp: { armor: 1, maxHP: 4, damage: 2 },
     levelText: '+1 Armor Rating\n+4 Max Health\n+2 Damage',
-    baseText: '+13 Speed\n+8 Armor Rating\n+60 Max Health',
+    baseText: '+13 Speed\n+8 Armor Rating\n+60 Max Health\nSlowest weapon · biggest blast',
     weapon: {
-      type: 'mortar', name: 'Siege Mortar', cls: 'HEAVY · PHYSICAL',
-      damage: 34, interval: 1.5, aoe: 2.8, arcTime: 0.85, color: 0xffa040
+      type: 'mortar', name: 'Siege Mortar', cls: 'SIEGE · PHYSICAL · SPLASH',
+      damage: 42, interval: 1.8, aoe: 3.3, arcTime: 0.85, color: 0xffa040
     },
     special: 'bulwark', specialText: 'BULWARK — 4s of +12 armor and knockback immunity',
     hudStats: ['armor', 'damage', 'block']
