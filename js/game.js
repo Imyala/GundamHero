@@ -59,7 +59,7 @@ GH.game = (function () {
     }
     if (seen.__done) return;
     if (waveNum === 1) {
-      if (runTime > 0.5) showHint('move', 'WASD to move · CLICK a hostile (or TAB) to mark it — your frame fights your marked target on its own cycle');
+      if (runTime > 0.5) showHint('move', 'WASD to move · LEFT CLICK to attack (hold to keep attacking) — clicking a hostile marks it as your target');
       if (runTime > 8) showHint('ability', 'Press 1 to cast RUPTURE on your target — abilities spend the blue ENERGY bar');
       if (sparksRun > 0) showHint('sparks', 'SPARKS feed your level AND your persistent PILOT LEVEL — skill points are spent in the tree [K]');
     }
@@ -125,7 +125,7 @@ GH.game = (function () {
 
     floor = new THREE.Mesh(
       new THREE.PlaneGeometry(120, 120),
-      GH.assets.lambert({ map: GH.assets.stageTex.glacier.floor })
+      GH.assets.lambert({ map: GH.assets.stageTex.glacier.floor }, { nosnap: true })
     );
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
@@ -133,7 +133,7 @@ GH.game = (function () {
     // encircling cliffs
     wallRing = new THREE.Mesh(
       new THREE.CylinderGeometry(ARENA_R + 14, ARENA_R + 10, 16, 24, 1, true),
-      GH.assets.lambert({ map: GH.assets.stageTex.glacier.wall, side: THREE.BackSide })
+      GH.assets.lambert({ map: GH.assets.stageTex.glacier.wall, side: THREE.BackSide }, { nosnap: true })
     );
     wallRing.position.y = 7.5;
     scene.add(wallRing);
@@ -1364,8 +1364,9 @@ GH.game = (function () {
 
   // =================================================================
   // TARGET-BASED COMBAT — pick a fight, don't hose the room.
-  // Click (or Tab) selects a target; your primary auto-attacks it on
-  // its own cycle while it's in range; abilities spend energy on it.
+  // Left click attacks with the equipped weapon (clicking a hostile
+  // also marks it; Tab cycles); the attack homes on the marked target
+  // when it's in reach, and abilities spend energy on it.
   // =================================================================
   var target = null;
   var reticle = null;
@@ -1469,6 +1470,11 @@ GH.game = (function () {
 
     if (slot === 1) {          // RUPTURE — focused strike
       player.facing = GH.angleTo(player.x, player.z, target.x, target.z);
+      if (inst.w.type === 'melee') {
+        player.swingArm = 'R';
+        player.swingDur = 0.26;
+        player.swingT = 0.26;
+      }
       damageEnemy(target, dmg * 2.2, { inst: inst });
       spawnBurst(target.x, 1.4, target.z, 0xfff0c0, 12);
       var ra = GH.angleTo(player.x, player.z, target.x, target.z);
@@ -1515,6 +1521,12 @@ GH.game = (function () {
 
   function updateWeapons(dt, input) {
     var s = player.stats;
+    // the trigger: a click (or held button) from mouse, or an active aim
+    // stick on gamepad/touch (twin-stick devices fire while aiming).
+    // Consumed here every frame like the other pressed flags.
+    var trigger = !!(input.attackPressed || input.attackHeld ||
+      input.padAimActive || input.touchAimActive);
+    input.attackPressed = false;
     // the capacitor always refills; cooldowns always tick
     // (a DAMPENED dungeon chokes the reactor)
     var enRate = dungeonState && dungeonState.modIds.dampened ? 0.55 : 1;
@@ -1525,16 +1537,19 @@ GH.game = (function () {
     maintainTarget();
 
     if (player.speederOn) {
-      // skimmer cannons fire only at a marked target — no hosing
+      // skimmer cannons fire on the trigger — at the marked target when
+      // one's in reach, otherwise straight along the hull's heading
       if (inHazard('rifts', player.x, player.z)) { player.suppressed = true; return; }
       player.suppressed = false;
       if (!player.strafeInst) player.strafeInst = makeWeaponInst('strafe', STRAFE_DEF, false);
       var si = player.strafeInst;
       si.timer -= dt * (s.atkSpdMult || 1);
-      if (si.timer <= 0 && target &&
-        GH.dist2(player.x, player.z, target.x, target.z) < 22 * 22) {
+      if (si.timer <= 0 && trigger) {
         si.timer = si.w.interval;
-        var sAim = GH.angleTo(player.x, player.z, target.x, target.z);
+        var sAim = (target && !target.dead &&
+          GH.dist2(player.x, player.z, target.x, target.z) < 22 * 22)
+          ? GH.angleTo(player.x, player.z, target.x, target.z)
+          : (player.drive ? player.drive.heading : player.facing);
         var surge = player.skillBon.surge ? 1.4 : 1;
         var keep = si.w.damage;
         si.w.damage = keep * surge;
@@ -1597,20 +1612,25 @@ GH.game = (function () {
       if (inst.prismT <= 0) { inst.prismT = 6; prismBlast(inst); }
     }
 
-    // auto-attack: the cycle winds regardless, but only lands on a
-    // marked target inside the weapon's reach
+    // manual attack: the cycle winds down on its own, but nothing fires
+    // until the pilot pulls the trigger — left mouse (hold to keep
+    // swinging/shooting), or the aim stick on pad/touch. Only ranged
+    // weapon types launch projectiles; melee frames swing steel.
     inst.timer = Math.max(0, inst.timer - dt * spdMult);
-    if (inst.timer <= 0 && target && !target.dead) {
-      var range = attackRange(inst);
-      if (GH.dist2(player.x, player.z, target.x, target.z) <= range * range) {
-        inst.timer = w.interval;
-        var aim = GH.angleTo(player.x, player.z, target.x, target.z);
-        player.facing = aim; // square up like you mean it
-        fireWeaponOnce(inst, aim);
-        if (w.clip) {
-          inst.clip--;
-          if (inst.clip <= 0) inst.reloading = w.reload;
+    if (inst.timer <= 0 && trigger) {
+      inst.timer = w.interval;
+      var aim = player.facing;
+      if (target && !target.dead) {
+        var range = attackRange(inst);
+        if (GH.dist2(player.x, player.z, target.x, target.z) <= range * range) {
+          aim = GH.angleTo(player.x, player.z, target.x, target.z);
+          player.facing = aim; // square up like you mean it
         }
+      }
+      fireWeaponOnce(inst, aim);
+      if (w.clip) {
+        inst.clip--;
+        if (inst.clip <= 0) inst.reloading = w.reload;
       }
     }
   }
@@ -1677,8 +1697,12 @@ GH.game = (function () {
     m.position.set(a2.x, 0.35, a2.z);
     scene.add(m);
     effects.push({ kind: 'fade', mesh: m, t: 0.18, total: 0.18 });
-    var parts = a2.mesh.userData.parts;
-    if (parts && parts.armR) parts.armR.rotation.x = -2.2;
+    // kick the swing animation (windup + cut, see poseMeleeSwing);
+    // dual-wield frames alternate arms
+    var dual = a2.def.model && (a2.def.model.prop === 'claws' || a2.def.model.prop === 'daggers');
+    a2.swingArm = dual && a2.swingArm === 'R' ? 'L' : 'R';
+    a2.swingDur = GH.clamp(w.interval * 0.45, 0.2, 0.34);
+    a2.swingT = a2.swingDur;
 
     var dmg = weaponDamage(inst, a2);
     // RESONANT EDGE capstone: primary swings carve a wider arc
@@ -3024,10 +3048,16 @@ GH.game = (function () {
     parts.legL.rotation.x = sw;
     parts.legR.rotation.x = -sw;
     parts.torso.position.y = 1.72 + Math.abs(Math.sin(t)) * (moving ? 0.06 : 0.02);
-    if (parts.armR && player.def.weapon.type !== 'melee') parts.armR.rotation.x = -1.35;
-    else if (parts.armR) parts.armR.rotation.x = GH.lerp(parts.armR.rotation.x, -0.2, dt * 6);
-    if (parts.armL && (player.def.model.prop === 'guns' || player.def.model.prop === 'claws' ||
-      player.def.model.prop === 'daggers')) parts.armL.rotation.x = -1.35;
+    if (!poseMeleeSwing(player, parts, dt)) {
+      if (parts.armR && player.def.weapon.type !== 'melee') parts.armR.rotation.x = -1.35;
+      else if (parts.armR) parts.armR.rotation.x = GH.lerp(parts.armR.rotation.x, -0.2, dt * 6);
+      if (parts.armL) {
+        if (player.def.model.prop === 'guns') parts.armL.rotation.x = -1.35;
+        else if (player.def.model.prop === 'claws' || player.def.model.prop === 'daggers')
+          parts.armL.rotation.x = GH.lerp(parts.armL.rotation.x, -0.2, dt * 6);
+      }
+      parts.torso.rotation.y = GH.lerp(parts.torso.rotation.y, 0, dt * 8);
+    }
     if (player.blocking && parts.armL) parts.armL.rotation.x = -1.5;
     if (player.def.weapon.type === 'aura' && parts.weapon) parts.weapon.rotation.y += dt * 10;
     if (parts.gem) parts.gem.rotation.y += dt * 3;
@@ -4239,11 +4269,30 @@ GH.game = (function () {
       if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
     }
 
+    // roaming packs: wake each pack once as the pilot draws near, so
+    // the ground between nests is contested instead of empty
+    if (!zoneNow.dungeon) {
+      for (var rp = 0; rp < worldH.layout.packs.length; rp++) {
+        var pk = worldH.layout.packs[rp];
+        if (!pk.roam || pk.spawned) continue;
+        if (GH.dist2(player.x, player.z, pk.x, pk.z) < 65 * 65) {
+          pk.spawned = true;
+          for (var pm = 0; pm < pk.n; pm++) {
+            var ppick = GH.weightedPick(expeditionPlan(zoneNow).types);
+            var pang = Math.random() * Math.PI * 2;
+            spawnEnemy(ppick.id,
+              pk.x + Math.cos(pang) * GH.rand(1, 5),
+              pk.z + Math.sin(pang) * GH.rand(1, 5));
+          }
+        }
+      }
+    }
+
     // nests: activate near, spawn from live ones
     worldH.layout.nests.forEach(function (n) {
       if (w.nests[n.id]) return;
       var d2 = GH.dist2(player.x, player.z, n.x, n.z);
-      if (d2 < 60 * 60) activateNest(n);
+      if (d2 < 80 * 80) activateNest(n);
     });
     var localCount = 0;
     for (var li = 0; li < enemies.length; li++) {
@@ -4254,8 +4303,8 @@ GH.game = (function () {
       if (!ne.nestId || ne.dead) continue;
       ne.spawnT -= dt;
       var nd2 = GH.dist2(player.x, player.z, ne.x, ne.z);
-      if (ne.spawnT <= 0 && nd2 < 45 * 45 && localCount < 12) {
-        ne.spawnT = Math.max(2.2, 7 - ne.spawnZone.danger);
+      if (ne.spawnT <= 0 && nd2 < 55 * 55 && localCount < 20) {
+        ne.spawnT = Math.max(1.8, 6 - ne.spawnZone.danger);
         var pick = GH.weightedPick(expeditionPlan(ne.spawnZone).types);
         var sa = Math.random() * Math.PI * 2;
         spawnEnemy(pick.id, ne.x + Math.cos(sa) * 4, ne.z + Math.sin(sa) * 4);
@@ -4387,6 +4436,15 @@ GH.game = (function () {
     var tints = { glacier: '#1c3346', wreck: '#33301f', cloister: '#20321f', ember: '#3a2117', storm: '#211f38', null: '#2c1733' };
     ctx.fillStyle = zoneNow && zoneNow.dungeon ? '#0b0b12' : (tints[zoneNow ? zoneNow.parent : 'wreck'] || '#222');
     ctx.fillRect(0, 0, W2, H2);
+    // faint quarter grid: gives the dots a sense of distance
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    for (var gl = 1; gl < 4; gl++) {
+      ctx.beginPath();
+      ctx.moveTo(gl * W2 / 4 + 0.5, 0); ctx.lineTo(gl * W2 / 4 + 0.5, H2);
+      ctx.moveTo(0, gl * H2 / 4 + 0.5); ctx.lineTo(W2, gl * H2 / 4 + 0.5);
+      ctx.stroke();
+    }
     // hub landmarks
     if (curZone === 'wreck') {
       ctx.strokeStyle = '#ffd050';
@@ -4408,7 +4466,7 @@ GH.game = (function () {
     });
     worldH.layout.nests.forEach(function (n) {
       ctx.fillStyle = w.nests[n.id] ? '#4a5a4a' : '#ff5040';
-      ctx.fillRect(sx(n.x) - 1.5, sz(n.z) - 1.5, 3, 3);
+      ctx.fillRect(sx(n.x) - 2, sz(n.z) - 2, 4, 4);
     });
     if (worldH.layout.lair) {
       var l = worldH.layout.lair;
@@ -4464,10 +4522,40 @@ GH.game = (function () {
       ctx.fillStyle = '#ffb040';
       ctx.fillRect(sx(w.wreck.x) - 2, sz(w.wreck.z) - 2, 4, 4);
     }
+    // live hostiles: small hot dots so a fight reads at a glance
+    ctx.fillStyle = '#ff8860';
+    for (var mi = 0; mi < enemies.length; mi++) {
+      var me2 = enemies[mi];
+      if (me2.dead || me2.nestId) continue;
+      ctx.fillRect(sx(me2.x) - 1, sz(me2.z) - 1, 2, 2);
+    }
+    // you: a facing arrow, outlined so it pops on any biome tint
+    ctx.save();
+    ctx.translate(sx(player.x), sz(player.z));
+    ctx.rotate(Math.PI - player.facing);
     ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(sx(player.x), sz(player.z), 2.5, 0, Math.PI * 2);
+    ctx.moveTo(0, -5);
+    ctx.lineTo(3.5, 4);
+    ctx.lineTo(0, 2);
+    ctx.lineTo(-3.5, 4);
+    ctx.closePath();
     ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    // compass + zone name band
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText('N', W2 / 2 - 3, 9);
+    if (zoneNow) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(0, H2 - 12, W2, 12);
+      ctx.fillStyle = '#f0d888';
+      ctx.font = 'bold 8px monospace';
+      ctx.fillText(zoneNow.name.toUpperCase(), 4, H2 - 3);
+    }
   }
 
   // ------------------------------------------------------------
@@ -5364,12 +5452,38 @@ GH.game = (function () {
     var sw = moving ? Math.sin(t) * 0.55 : 0;
     parts.legL.rotation.x = sw;
     parts.legR.rotation.x = -sw;
-    if (parts.armR && mate.def.weapon.type !== 'melee') parts.armR.rotation.x = -1.35;
+    if (!poseMeleeSwing(mate, parts, dt)) {
+      if (parts.armR && mate.def.weapon.type !== 'melee') parts.armR.rotation.x = -1.35;
+      else if (parts.armR) parts.armR.rotation.x = GH.lerp(parts.armR.rotation.x, -0.2, dt * 6);
+      if (parts.torso) parts.torso.rotation.y = GH.lerp(parts.torso.rotation.y, 0, dt * 8);
+    }
     if (parts.flames) {
       parts.flames.forEach(function (fl) { fl.visible = mate.dashTime > 0; });
     }
     if (mate.def.weapon.type === 'aura' && parts.weapon) parts.weapon.rotation.y += dt * 10;
     mate.mesh.visible = !(mate.hurtCd > 0 && Math.floor(runTime * 24) % 2 === 0);
+  }
+
+  // =================================================================
+  // MELEE SWING POSE — a fast windup then a full cut, with torso
+  // torque. Driven by swingT/swingDur set in meleeSwing(); returns
+  // true while the animation owns the arms.
+  // =================================================================
+  function poseMeleeSwing(actor, parts, dt) {
+    if (!actor.swingT || actor.swingT <= 0) return false;
+    actor.swingT = Math.max(0, actor.swingT - dt);
+    var p = 1 - actor.swingT / actor.swingDur;  // 0 → 1 over the swing
+    // raise fast (first 30%), then slash through the rest
+    var ang = p < 0.3
+      ? GH.lerp(-0.2, -2.5, p / 0.3)
+      : GH.lerp(-2.5, 0.7, (p - 0.3) / 0.7);
+    var left = actor.swingArm === 'L';
+    var arm = left ? (parts.armL || parts.armR) : parts.armR;
+    if (arm) arm.rotation.x = ang;
+    if (parts.torso) {
+      parts.torso.rotation.y = Math.sin(p * Math.PI) * (left ? 0.3 : -0.3);
+    }
+    return true;
   }
 
   // =================================================================
@@ -5946,8 +6060,8 @@ GH.game = (function () {
     for (var k in def.model) cfg[k] = def.model[k];
     if (!unlocked) cfg.corrupt = true;
     selPreview = GH.models.buildMech(cfg);
-    selPreview.position.set(0, 0.4, 0);
-    selPreview.scale.setScalar(1.6);
+    selPreview.position.set(0, 0.2, 0);
+    selPreview.scale.setScalar(1.0);
     scene.add(selPreview);
     document.getElementById('select-name').textContent = def.name + (unlocked ? '' : ' — LOCKED');
     document.getElementById('select-role').textContent = def.role;

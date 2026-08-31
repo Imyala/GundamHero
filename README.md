@@ -33,7 +33,8 @@ or move between browsers.
 | Input | Action |
 |---|---|
 | WASD / arrows | Move |
-| Left click / Tab | **Mark a target** — your frame auto-attacks it while it's in reach |
+| Left click | **Attack** with the equipped weapon (hold to keep attacking) — clicking a hostile also marks it as your target |
+| Tab | Cycle to the nearest target |
 | 1 / 2 / 3 / 4 | Cast RUPTURE / SWEEP / SHACKLE / OVERLOAD (energy + cooldowns; 2–4 unlock in the tree) |
 | Z / X / C | Raise KINETIC / BALLISTIC / ARC ward (your "protection prayers") |
 | Q (or gamepad LB, touch WARD) | Cycle wards |
@@ -56,11 +57,12 @@ opens every shell and stage; `?salvage=500` grants test salvage.
 ## The game
 
 ### Deliberate, target-based combat
-No bullet-hose, no auto-spray. In the spirit of the classic MMOs and
-ARPGs: **left-click (or Tab) marks a hostile**, and your frame works that
-target on its weapon's own attack cycle whenever it's in reach — melee
-frames swing when you close the gap, ranged frames fire aimed single
-shots. Around that auto-attack you make the real decisions:
+No bullet-hose, no auto-spray. In the spirit of the classic ARPGs:
+**left-click swings or fires the equipped weapon** (hold the button to
+keep attacking on the weapon's cycle). Clicking a hostile marks it as
+your target — attacks square up on the mark when it's in reach, melee
+frames swing steel up close, and only ranged frames actually shoot.
+Around that basic attack you make the real decisions:
 
 - **Weapon reach is real**: melee frames (AEGIS greatblade, FANG claws,
   VIPER daggers, MORROW scythe) only land hits in actual melee range —

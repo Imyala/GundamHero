@@ -435,7 +435,8 @@ html, body {
 
 /* ---------------- co-op ---------------- */
 
-.coop-btn { position: absolute; bottom: 8vh; left: 4%; }
+/* top-right, clear of the frame icons and the preview mech */
+.coop-btn { position: absolute; top: 20px; right: 20px; max-width: 38vw; }
 #p2-row { margin-top: 4px; display: flex; align-items: center; gap: 6px; }
 .p2-frame { height: 12px; width: 45%; border-color: #4a7898; }
 .p2-fill { background: linear-gradient(#60c8ff, #1a6a9a); }
@@ -447,8 +448,10 @@ html, body {
 /* ---------------- P2 frame picker ---------------- */
 
 #p2-select-row {
-  position: absolute; bottom: 15vh; left: 4%;
-  display: flex; gap: 6px; align-items: center;
+  /* right side, above SELECT STAGE — clear of the info panel and P1 icons */
+  position: absolute; bottom: calc(8vh + 70px); right: 6%;
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  justify-content: flex-end; max-width: 44vw;
 }
 .p2-row-label {
   font-size: 11px; letter-spacing: 2px; color: #a0d8ff;
@@ -856,10 +859,10 @@ html, body {
 
 #minimap {
   position: absolute; right: 14px; bottom: 14px;
-  width: 132px; height: 88px;
-  border: 1px solid #4a5a6a;
+  width: 160px; height: 160px; /* square: zone maps are square */
+  border: 2px solid #6a7a8a;
   box-shadow: 0 0 0 1px #000, 0 0 12px rgba(0, 0, 0, 0.6);
-  background: rgba(4, 6, 12, 0.8);
+  background: rgba(4, 6, 12, 0.85);
   image-rendering: pixelated;
 }
 
@@ -877,7 +880,7 @@ html, body {
 
 /* skimmer drive cluster: speed, the nitro bottle, the drift call */
 #drive-hud {
-  position: absolute; right: 16px; bottom: calc(3.5vh + 120px);
+  position: absolute; right: 16px; bottom: calc(3.5vh + 190px); /* clear of the larger minimap */
   text-align: right;
   font-family: "Times New Roman", serif; font-weight: bold;
   text-shadow: 2px 2px 0 #000;
