@@ -15,8 +15,13 @@ GH.game = (function () {
   var orbitGroup = null, droneMesh = null, droneAngle = 0;
   var waveNum = 0, waveTimer = 0, wavePlan = null, spawnAcc = 0, bossRef = null;
   var kills = 0, coinsRun = 0, runTime = 0, hitCount = 0;
-  var announceTimer = 0, shake = 0;
+  var announceTimer = 0, shake = 0, hitStopT = 0;
   var selMechIndex = 0, selPreview = null, selSpin = 0;
+  var weekly = null;   // active weekly-challenge modifiers
+  var mate = null;     // co-op wingmate (player 2)
+  G.coop = false;
+
+  G.hitStop = function (t) { hitStopT = Math.max(hitStopT, t); };
 
   var raycaster = new THREE.Raycaster();
   var groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -240,6 +245,7 @@ GH.game = (function () {
     }
     player.hp -= dmg;
     player.hurtCd = 0.25;
+    G.hitStop(0.05);
     shake = Math.min(0.5, shake + 0.18);
     G.dmg.spawn(player.x, 2.6, player.z, dmg, 'player', 19);
     GH.audio.hurt();
@@ -321,6 +327,7 @@ GH.game = (function () {
     scene.add(mesh);
     var hpMult = def.boss ? Math.max(1, wavePlan.hpMult * 0.55) : wavePlan.hpMult;
     if (def.boss && GH.devWeakBoss) hpMult *= 0.03;
+    if (weekly) hpMult *= weekly.mods.ehp;
     var e = {
       id: typeId, def: def, mesh: mesh,
       x: x, z: z, vx: 0, vz: 0,
@@ -332,6 +339,7 @@ GH.game = (function () {
       dashing: 0, telegraphing: 0,
       abilityT: 4, summonT: 10,
       burn: null, stun: 0, slowT: 0, burnAcc: 0, burnNumT: 0,
+      popT: 0, baseScale: mesh.scale.x,
       anim: Math.random() * 10,
       lastOrbitHit: 0, lastDashId: -1,
       dead: false
@@ -340,6 +348,7 @@ GH.game = (function () {
     if (def.boss) {
       bossRef = e;
       GH.audio.boss();
+      GH.music.setBoss(true);
       announce(def.name, 32);
       showBossBar(def.name);
     }
@@ -363,6 +372,8 @@ GH.game = (function () {
     dmg = Math.max(1, Math.round(dmg));
     hitCount++;
     e.hp -= dmg;
+    e.popT = 0.12;
+    if (crit) G.hitStop(0.035);
     var cls = crit ? 'crit' : (opts.elem ? 'elem' : (opts.isDot ? 'dot' : ''));
     G.dmg.spawn(e.x, 2.0 + (e.def.boss ? 2 : 0), e.z,
       crit ? dmg + '!' : dmg, cls, crit ? 20 : (opts.isDot ? 12 : 15));
@@ -392,6 +403,8 @@ GH.game = (function () {
     if (e.dead) return;
     e.dead = true;
     kills++;
+    if (e.def.boss) G.hitStop(0.14);
+    else if (e.def.mass >= 3) G.hitStop(0.06);
     scene.remove(e.mesh);
     spawnBurst(e.x, 1, e.z, e.def.boss ? 0xffd060 : 0xc0c0c0, e.def.boss ? 26 : 8);
     // sparks (XP)
@@ -413,7 +426,7 @@ GH.game = (function () {
       }
       spawnPickup('gem:' + GH.pick(GH.gems.typeIds), e.x, e.z);
       hideBossBar();
-      if (bossRef === e) bossRef = null;
+      if (bossRef === e) { bossRef = null; GH.music.setBoss(false); }
       GH.audio.explode();
     } else {
       if (Math.random() < 0.10) spawnPickup('coin', e.x, e.z);
@@ -450,7 +463,12 @@ GH.game = (function () {
       var e = enemies[i];
       if (e.dead) { enemies.splice(i, 1); continue; }
       var def = e.def;
-      var dx = player.x - e.x, dz = player.z - e.z;
+      // target the nearest alive pilot
+      var tgtP = player;
+      if (mate && !mate.down) {
+        if (GH.dist2(e.x, e.z, mate.x, mate.z) < GH.dist2(e.x, e.z, player.x, player.z)) tgtP = mate;
+      }
+      var dx = tgtP.x - e.x, dz = tgtP.z - e.z;
       var dist = Math.sqrt(dx * dx + dz * dz) || 0.001;
       var nx = dx / dist, nz = dz / dist;
 
@@ -475,7 +493,7 @@ GH.game = (function () {
         e.mesh.position.set(e.x, Math.sin(runTime * 30) * 0.03, e.z);
         continue;
       }
-      var spd = def.speed * (e.slowT > 0 ? 0.6 : 1);
+      var spd = def.speed * (e.slowT > 0 ? 0.6 : 1) * (weekly ? weekly.mods.espd : 1);
       if (e.slowT > 0) e.slowT -= dt;
       if (def.boss && e.hp < e.maxHp * 0.35) spd *= 1.35; // enrage
 
@@ -518,7 +536,7 @@ GH.game = (function () {
         e.summonT -= dt;
         if (e.abilityT <= 0) {
           e.abilityT = def.slamInterval || 6;
-          spawnTelegraph(player.x, player.z, 3.2, 1.0, e.damage * 1.3);
+          spawnTelegraph(tgtP.x, tgtP.z, 3.2, 1.0, e.damage * 1.3);
         }
         if (e.summonT <= 0) {
           e.summonT = def.summonInterval || 10;
@@ -555,13 +573,17 @@ GH.game = (function () {
       e.x = GH.clamp(e.x, -ARENA_R - 3, ARENA_R + 3);
       e.z = GH.clamp(e.z, -ARENA_R - 3, ARENA_R + 3);
 
-      // never overlap the player: hold attackers on a contact ring
-      var pdx = e.x - player.x, pdz = e.z - player.z;
-      var pd = Math.sqrt(pdx * pdx + pdz * pdz) || 0.001;
-      var minPD = def.radius + 0.65;
-      if (pd < minPD) {
-        e.x = player.x + (pdx / pd) * minPD;
-        e.z = player.z + (pdz / pd) * minPD;
+      // never overlap a pilot: hold attackers on a contact ring
+      var ringTargets = mate && !mate.down ? [player, mate] : [player];
+      for (var rt = 0; rt < ringTargets.length; rt++) {
+        var rp = ringTargets[rt];
+        var pdx = e.x - rp.x, pdz = e.z - rp.z;
+        var pd = Math.sqrt(pdx * pdx + pdz * pdz) || 0.001;
+        var minPD = def.radius + 0.65;
+        if (pd < minPD) {
+          e.x = rp.x + (pdx / pd) * minPD;
+          e.z = rp.z + (pdz / pd) * minPD;
+        }
       }
 
       e.mesh.position.set(e.x, 0, e.z);
@@ -592,12 +614,23 @@ GH.game = (function () {
       if (e.burn && Math.floor(runTime * 20) % 2 === 0) {
         e.mesh.position.y += 0.02;
       }
+      // hit pop
+      if (e.popT > 0) {
+        e.popT -= dt;
+        e.mesh.scale.setScalar(e.baseScale * (1 + Math.max(0, e.popT) * 1.4));
+      }
 
-      // contact damage
+      // contact damage (whichever pilot is in reach)
       e.attackCd -= dt;
-      if (dist < def.radius + 0.8 && e.attackCd <= 0) {
-        e.attackCd = 1.1;
-        playerDamage(e.damage, e);
+      if (e.attackCd <= 0) {
+        if (GH.dist2(e.x, e.z, player.x, player.z) < Math.pow(def.radius + 0.8, 2)) {
+          e.attackCd = 1.1;
+          playerDamage(e.damage, e);
+        } else if (mate && !mate.down &&
+          GH.dist2(e.x, e.z, mate.x, mate.z) < Math.pow(def.radius + 0.8, 2)) {
+          e.attackCd = 1.1;
+          wingmateDamage(e.damage);
+        }
       }
     }
   }
@@ -909,7 +942,8 @@ GH.game = (function () {
     }
   }
 
-  function meleeSwing(inst, aim) {
+  function meleeSwing(inst, aim, actor) {
+    var a2 = actor || player;
     var w = inst.w;
     GH.audio.melee();
     var geo = new THREE.CircleGeometry(w.range, 12, aim - w.arc / 2 + Math.PI / 2, w.arc);
@@ -917,10 +951,10 @@ GH.game = (function () {
       color: 0xfff0c0, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide
     }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(player.x, 0.35, player.z);
+    m.position.set(a2.x, 0.35, a2.z);
     scene.add(m);
     effects.push({ kind: 'fade', mesh: m, t: 0.18, total: 0.18 });
-    var parts = player.mesh.userData.parts;
+    var parts = a2.mesh.userData.parts;
     if (parts && parts.armR) parts.armR.rotation.x = -2.2;
 
     var dmg = weaponDamage(inst);
@@ -928,8 +962,8 @@ GH.game = (function () {
       var e = enemies[i];
       if (e.dead) continue;
       var rr = w.range + e.def.radius;
-      if (GH.dist2(player.x, player.z, e.x, e.z) > rr * rr) continue;
-      var angTo = GH.angleTo(player.x, player.z, e.x, e.z);
+      if (GH.dist2(a2.x, a2.z, e.x, e.z) > rr * rr) continue;
+      var angTo = GH.angleTo(a2.x, a2.z, e.x, e.z);
       var diff = Math.abs(((angTo - aim + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
       if (diff <= w.arc / 2 + 0.25) {
         damageEnemy(e, dmg, { inst: inst });
@@ -942,11 +976,11 @@ GH.game = (function () {
     if (w.wave) {
       var wm = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 0.16),
         GH.assets.basic(w.wave.color, { transparent: true, opacity: 0.85 }));
-      wm.position.set(player.x, 1.2, player.z);
+      wm.position.set(a2.x, 1.2, a2.z);
       wm.rotation.y = aim;
       scene.add(wm);
       projectiles.push({
-        mesh: wm, x: player.x, z: player.z,
+        mesh: wm, x: a2.x, z: a2.z,
         dirX: Math.sin(aim), dirZ: Math.cos(aim),
         speed: w.wave.speed, life: w.wave.life,
         damage: weaponDamage(inst) * (w.wave.damage / w.damage),
@@ -960,16 +994,18 @@ GH.game = (function () {
 
   function sanctityMaybe() { /* handled by timers */ }
 
-  function auraTick(inst) {
+  function auraTick(inst, actor) {
+    var a2 = actor || player;
     var w = inst.w;
-    var range = w.range * (player.special.active > 0 && player.def.special === 'frenzy' ? 1.9 : 1);
+    var range = w.range *
+      (a2 === player && player.special.active > 0 && player.def.special === 'frenzy' ? 1.9 : 1);
     var dmg = weaponDamage(inst);
     var hitAny = false;
     for (var i = 0; i < enemies.length; i++) {
       var e = enemies[i];
       if (e.dead) continue;
       var rr = range + e.def.radius;
-      if (GH.dist2(player.x, player.z, e.x, e.z) <= rr * rr) {
+      if (GH.dist2(a2.x, a2.z, e.x, e.z) <= rr * rr) {
         damageEnemy(e, dmg, { inst: inst });
         hitAny = true;
       }
@@ -978,7 +1014,7 @@ GH.game = (function () {
     var m = new THREE.Mesh(new THREE.RingGeometry(range - 0.25, range, 22),
       new THREE.MeshBasicMaterial({ color: 0xc04060, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(player.x, 0.3, player.z);
+    m.position.set(a2.x, 0.3, a2.z);
     scene.add(m);
     effects.push({ kind: 'fade', mesh: m, t: 0.22, total: 0.22 });
   }
@@ -1011,20 +1047,23 @@ GH.game = (function () {
     }
   }
 
-  function fireMortar(inst, aim) {
+  function fireMortar(inst, aim, actor) {
+    var a2 = actor || player;
     var w = inst.w;
     var count = w.count || 1;
     for (var i = 0; i < count; i++) {
-      var tgt = nearestEnemy(player.x, player.z, 20);
+      var tgt = nearestEnemy(a2.x, a2.z, 20);
       var tx, tz;
-      if (tgt && !inst.isPrimary) { tx = tgt.x + GH.rand(-1.5, 1.5); tz = tgt.z + GH.rand(-1.5, 1.5); }
+      if (tgt && (!inst.isPrimary || a2 !== player)) {
+        tx = tgt.x + GH.rand(-1.5, 1.5); tz = tgt.z + GH.rand(-1.5, 1.5);
+      }
       else {
         // primary mortar drops at the aim point (snapping to a nearby enemy)
         raycaster.setFromCamera(G._mouseNDC || new THREE.Vector2(), camera);
         if (raycaster.ray.intersectPlane(groundPlane, tmpV3)) {
           tx = GH.clamp(tmpV3.x, -ARENA_R, ARENA_R);
           tz = GH.clamp(tmpV3.z, -ARENA_R, ARENA_R);
-        } else { tx = player.x + Math.sin(aim) * 8; tz = player.z + Math.cos(aim) * 8; }
+        } else { tx = a2.x + Math.sin(aim) * 8; tz = a2.z + Math.cos(aim) * 8; }
         var near = nearestEnemy(tx, tz, 6);
         if (near) { tx = near.x; tz = near.z; }
         tx += GH.rand(-0.8, 0.8);
@@ -1035,7 +1074,7 @@ GH.game = (function () {
       var disc = groundDisc(tx, tz, w.aoe * 0.8, 0xffa040, 0.18);
       effects.push({
         kind: 'pshell', mesh: shell, disc: disc, t: w.arcTime, total: w.arcTime,
-        x0: player.x, z0: player.z, x1: tx, z1: tz,
+        x0: a2.x, z0: a2.z, x1: tx, z1: tz,
         damage: weaponDamage(inst), aoe: w.aoe, inst: inst
       });
     }
@@ -1111,6 +1150,7 @@ GH.game = (function () {
     GH.audio.explode();
     spawnBurst(x, 0.8, z, 0xffa040, 14);
     shake = Math.min(0.5, shake + 0.12);
+    if (dmg > 0) G.hitStop(0.03);
     var m = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.6, 8, 6),
       new THREE.MeshBasicMaterial({ color: 0xffc060, transparent: true, opacity: 0.7 }));
     m.position.set(x, 0.8, z);
@@ -1249,6 +1289,11 @@ GH.game = (function () {
         playerDamage(p2.damage, null);
         dead = true;
       }
+      if (!dead && mate && !mate.down &&
+        GH.dist2(p2.x, p2.z, mate.x, mate.z) < 0.8 * 0.8) {
+        wingmateDamage(p2.damage);
+        dead = true;
+      }
       if (dead) {
         scene.remove(p2.mesh);
         enemyShots.splice(i, 1);
@@ -1319,13 +1364,19 @@ GH.game = (function () {
       pk.t += dt;
       pk.x += pk.vx * dt; pk.z += pk.vz * dt;
       pk.vx *= Math.pow(0.05, dt); pk.vz *= Math.pow(0.05, dt);
-      var d2 = GH.dist2(pk.x, pk.z, player.x, player.z);
+      // magnet toward the nearest pilot; either can collect
+      var px2 = player.x, pz2 = player.z;
+      var d2 = GH.dist2(pk.x, pk.z, px2, pz2);
+      if (mate && !mate.down) {
+        var dm = GH.dist2(pk.x, pk.z, mate.x, mate.z);
+        if (dm < d2) { d2 = dm; px2 = mate.x; pz2 = mate.z; }
+      }
       var mag = player.stats.magnet;
       if (d2 < mag * mag) {
         var d = Math.sqrt(d2) || 0.01;
         var pull = (1 - d / mag) * 26 + 6;
-        pk.x += ((player.x - pk.x) / d) * pull * dt;
-        pk.z += ((player.z - pk.z) / d) * pull * dt;
+        pk.x += ((px2 - pk.x) / d) * pull * dt;
+        pk.z += ((pz2 - pk.z) / d) * pull * dt;
       }
       pk.mesh.position.set(pk.x, 0.5 + Math.sin(pk.t * 3) * 0.12, pk.z);
       pk.mesh.rotation.y += dt * 2.5;
@@ -1378,6 +1429,9 @@ GH.game = (function () {
         if (fx.t <= 0) {
           if (GH.dist2(fx.x, fx.z, player.x, player.z) < fx.radius * fx.radius) {
             playerDamage(fx.damage, null);
+          }
+          if (mate && !mate.down && GH.dist2(fx.x, fx.z, mate.x, mate.z) < fx.radius * fx.radius) {
+            wingmateDamage(fx.damage);
           }
           explode(fx.x, fx.z, fx.radius * 0.8, 0);
         }
@@ -1436,9 +1490,16 @@ GH.game = (function () {
   // =================================================================
   function startWave(n) {
     waveNum = n;
-    wavePlan = GH.wavePlan(stage, n, G.mode === 'arena');
+    wavePlan = GH.wavePlan(stage, n, G.mode !== 'classic');
+    if (weekly) {
+      wavePlan.rate *= weekly.mods.rate;
+      if (weekly.mods.midbossEvery && n % weekly.mods.midbossEvery === 0 && !wavePlan.midboss) {
+        wavePlan.midboss = 'warden';
+      }
+    }
     waveTimer = wavePlan.duration;
     spawnAcc = 0;
+    if (mate && mate.down) reviveWingmate(0.5);
     if (wavePlan.overrun) {
       announce('OVERRUN', 44);
     } else {
@@ -1473,6 +1534,7 @@ GH.game = (function () {
     }
     enemies.length = 0;
     bossRef = null;
+    GH.music.setBoss(false);
     hideBossBar();
     for (i = enemyShots.length - 1; i >= 0; i--) scene.remove(enemyShots[i].mesh);
     enemyShots.length = 0;
@@ -1823,15 +1885,178 @@ GH.game = (function () {
   }
 
   // =================================================================
+  // CO-OP WINGMATE (player 2 — mirror frame, IJKL or gamepad)
+  // =================================================================
+  function spawnWingmate(mechIndex) {
+    var def = GH.mechs[mechIndex];
+    var cfg = {};
+    for (var k in def.model) cfg[k] = def.model[k];
+    cfg.accent = 0x60c8ff; // P2 tell: cool-blue accents
+    mate = {
+      def: def,
+      mesh: GH.models.buildMech(cfg),
+      x: 2.2, z: 1.5, facing: 0, moveX: 0, moveZ: 0,
+      hp: 0, boost: 1, dashTime: 0, dashX: 0, dashZ: 0,
+      down: false, reviveT: 0, hurtCd: 0,
+      weapons: [makeWeaponInst('primary', def.weapon, false)]
+    };
+    mate.hp = player.stats.maxHP;
+    mate.mesh.position.set(mate.x, 0, mate.z);
+    scene.add(mate.mesh);
+  }
+
+  function wingmateDamage(raw) {
+    if (!mate || mate.down || mate.dashTime > 0.12 || GH.devGod) return;
+    var dmg = Math.max(1, Math.round(raw - player.stats.armor));
+    mate.hp -= dmg;
+    mate.hurtCd = 0.25;
+    G.dmg.spawn(mate.x, 2.6, mate.z, dmg, 'player', 17);
+    GH.audio.hurt();
+    if (mate.hp <= 0) {
+      mate.hp = 0;
+      mate.down = true;
+      mate.reviveT = 0;
+      spawnBurst(mate.x, 1, mate.z, 0x60c8ff, 18);
+      announce('WINGMATE DOWN', 26);
+    }
+  }
+
+  function reviveWingmate(frac) {
+    mate.down = false;
+    mate.hp = Math.max(1, Math.round(player.stats.maxHP * frac));
+    spawnBurst(mate.x, 1, mate.z, 0x80ffb0, 12);
+    announce('WINGMATE UP', 20);
+    GH.audio.levelup();
+  }
+
+  function updateWingmate(dt, input) {
+    if (!mate) return;
+    var s = player.stats;
+
+    if (mate.down) {
+      mate.mesh.rotation.z = GH.lerp(mate.mesh.rotation.z, 1.35, dt * 4);
+      // P1 revives by standing close
+      if (GH.dist2(player.x, player.z, mate.x, mate.z) < 6.25) {
+        mate.reviveT += dt;
+        if (mate.reviveT >= 2.5) reviveWingmate(0.4);
+      } else {
+        mate.reviveT = Math.max(0, mate.reviveT - dt);
+      }
+      return;
+    }
+    mate.mesh.rotation.z = 0;
+
+    // movement (IJKL or gamepad stick)
+    var mx = input.p2x || 0, mz = input.p2y || 0;
+    var len = Math.sqrt(mx * mx + mz * mz);
+    if (len > 1) { mx /= len; mz /= len; }
+    mate.moveX = mx; mate.moveZ = mz;
+
+    if (mate.dashTime > 0) {
+      mate.dashTime -= dt;
+      mate.x += mate.dashX * 26 * dt;
+      mate.z += mate.dashZ * 26 * dt;
+    } else {
+      mate.x += mx * s.speed * dt;
+      mate.z += mz * s.speed * dt;
+    }
+    mate.x = GH.clamp(mate.x, -ARENA_R, ARENA_R);
+    mate.z = GH.clamp(mate.z, -ARENA_R, ARENA_R);
+
+    // shared-screen tether: P2 can't wander further than the camera can show
+    var sepX = mate.x - player.x, sepZ = mate.z - player.z;
+    var sep = Math.sqrt(sepX * sepX + sepZ * sepZ);
+    var MAX_SEP = 19;
+    if (sep > MAX_SEP) {
+      mate.x = player.x + (sepX / sep) * MAX_SEP;
+      mate.z = player.z + (sepZ / sep) * MAX_SEP;
+    }
+
+    mate.boost = Math.min(1, mate.boost + s.boostRegen * dt);
+    if (input.p2Boost) {
+      input.p2Boost = false;
+      if (mate.boost >= s.boostCost) {
+        mate.boost -= s.boostCost;
+        var bx = mx, bz = mz;
+        if (bx === 0 && bz === 0) { bx = Math.sin(mate.facing); bz = Math.cos(mate.facing); }
+        var bl = Math.sqrt(bx * bx + bz * bz);
+        mate.dashX = bx / bl; mate.dashZ = bz / bl;
+        mate.dashTime = 0.22;
+        GH.audio.dash();
+        spawnBurst(mate.x, 0.6, mate.z, 0x60c8ff, 6);
+      }
+    }
+    mate.hurtCd = Math.max(0, mate.hurtCd - dt);
+
+    // auto-aim at the nearest enemy
+    var tgt = nearestEnemy(mate.x, mate.z, 26);
+    if (tgt) mate.facing = GH.angleTo(mate.x, mate.z, tgt.x, tgt.z);
+
+    // fire primary (mirrors P1's stats; own clip/reload timers)
+    var inst = mate.weapons[0];
+    var w = inst.w;
+    var spdMult = s.atkSpdMult * inst.mods.atkSpdMult;
+    if (inst.reloading > 0) {
+      inst.reloading -= dt * spdMult;
+      if (inst.reloading <= 0) { inst.clip = w.clip; onReload(inst); }
+    } else if (tgt) {
+      inst.timer -= dt * spdMult;
+      if (inst.timer <= 0) {
+        inst.timer = w.interval;
+        var aim = mate.facing;
+        if (w.type === 'shot') {
+          fireShot(inst, mate.x + Math.sin(aim) * 0.8, mate.z + Math.cos(aim) * 0.8, aim);
+        } else if (w.type === 'melee') {
+          meleeSwing(inst, aim, mate);
+        } else if (w.type === 'aura') {
+          auraTick(inst, mate);
+        } else if (w.type === 'mortar') {
+          fireMortar(inst, aim, mate);
+        }
+        if (w.clip) {
+          inst.clip--;
+          if (inst.clip <= 0) inst.reloading = w.reload;
+        }
+      }
+    }
+
+    // pose
+    mate.mesh.position.set(mate.x, 0, mate.z);
+    mate.mesh.rotation.y = mate.facing;
+    var parts = mate.mesh.userData.parts;
+    var moving = mx !== 0 || mz !== 0;
+    var t = runTime * (moving ? 9 : 2);
+    var sw = moving ? Math.sin(t) * 0.55 : 0;
+    parts.legL.rotation.x = sw;
+    parts.legR.rotation.x = -sw;
+    if (parts.armR && mate.def.weapon.type !== 'melee') parts.armR.rotation.x = -1.35;
+    if (parts.flames) {
+      parts.flames.forEach(function (fl) { fl.visible = mate.dashTime > 0; });
+    }
+    if (mate.def.weapon.type === 'aura' && parts.weapon) parts.weapon.rotation.y += dt * 10;
+    mate.mesh.visible = !(mate.hurtCd > 0 && Math.floor(runTime * 24) % 2 === 0);
+  }
+
+  // =================================================================
   // CAMERA
   // =================================================================
+  var camZoom = 1;
   function updateCamera(dt) {
     var tx = player ? player.x : 0;
     var tz = player ? player.z : 0;
+    var zoomTarget = 1;
+    if (mate && !mate.down) {
+      tx = (tx + mate.x) / 2;
+      tz = (tz + mate.z) / 2;
+      // pull back as the pilots spread out
+      var sep = Math.sqrt(GH.dist2(player.x, player.z, mate.x, mate.z));
+      zoomTarget = 1 + GH.clamp((sep - 6) / 14, 0, 0.65);
+    }
+    camZoom = GH.lerp(camZoom, zoomTarget, dt * 3);
     var sx = (Math.random() - 0.5) * shake;
     var sz = (Math.random() - 0.5) * shake;
     shake = Math.max(0, shake - dt * 1.4);
-    camera.position.set(tx + sx, 13.5, tz + 11.5 + sz);
+    camera.position.set(tx + sx, 13.5 * camZoom, tz + 11.5 * camZoom + sz);
     camera.lookAt(tx + sx, 0, tz + 2.0 + sz);
   }
 
@@ -1894,6 +2119,16 @@ GH.game = (function () {
     el['buff-line'].innerHTML = buffs.join(' · ');
     el['reload-line'].textContent = prim.reloading > 0 ? 'RELOADING' :
       (prim.w.clip ? prim.clip + '/' + prim.w.clip : '');
+    var p2wrap = document.getElementById('p2-row');
+    if (mate) {
+      p2wrap.classList.remove('hidden');
+      document.getElementById('p2-fill').style.width =
+        GH.clamp(mate.hp / s.maxHP * 100, 0, 100) + '%';
+      document.getElementById('p2-text').textContent =
+        mate.down ? 'DOWN — stand close to revive' : 'P2 ' + Math.ceil(mate.hp);
+    } else {
+      p2wrap.classList.add('hidden');
+    }
     if (announceTimer > 0) {
       announceTimer -= 1 / 60;
       if (announceTimer <= 0) el['announce'].classList.add('hidden');
@@ -1932,19 +2167,31 @@ GH.game = (function () {
     while (orbitGroup.children.length) orbitGroup.remove(orbitGroup.children[0]);
     if (droneMesh) { scene.remove(droneMesh); droneMesh = null; }
     if (player) { scene.remove(player.mesh); player = null; }
+    if (mate) { scene.remove(mate.mesh); mate = null; }
     if (selPreview) { scene.remove(selPreview); selPreview = null; }
     bossRef = null;
     hideBossBar();
   }
 
-  G.startRun = function (mechIndex, stageIdx, startAt) {
+  G.startRun = function (mechIndex, stageIdx, startAt, opts) {
     clearWorld();
+    opts = opts || {};
+    weekly = opts.weekly || null;
     stageIndex = GH.clamp(stageIdx || 0, 0, GH.stages.length - 1);
     stage = GH.stages[stageIndex];
     applyStageLook(stage);
     player = makePlayer(GH.mechs[mechIndex]);
+    if (weekly && weekly.mods.php !== 1) {
+      player.stats.maxHP = Math.round(player.stats.maxHP * weekly.mods.php);
+      player.hp = player.stats.maxHP;
+    }
+    if (weekly && weekly.mods.crit) player.stats.crit += weekly.mods.crit;
+    mate = null;
+    if (G.coop) spawnWingmate(mechIndex);
     kills = 0; coinsRun = 0; runTime = 0; hitCount = 0;
     G.state = 'play';
+    GH.music.play(stage.id);
+    GH.music.setBoss(false);
     startAt = GH.clamp(startAt || 1, 1, 20);
     if (startAt > 1) devCatchUp(startAt);
     startWave(startAt);
@@ -1985,11 +2232,22 @@ GH.game = (function () {
     G.state = won ? 'win' : 'over';
     if (won) GH.audio.win(); else GH.audio.die();
     if (!won) spawnBurst(player.x, 1.2, player.z, 0xff6030, 30);
+    GH.music.play('title');
+    GH.music.setBoss(false);
 
     var meta = GH.meta;
-    meta.data.salvage += coinsRun;
+    var banked = weekly ? Math.round(coinsRun * weekly.mods.salvage) : coinsRun;
+    meta.data.salvage += banked;
     var unlockMsg = '';
-    if (G.mode === 'classic') {
+    if (G.mode === 'weekly') {
+      var wk = meta.data.weekly || {};
+      if (wk.week !== weekly.week || waveNum > (wk.best || 0)) {
+        if (wk.week !== weekly.week) wk = { week: weekly.week, best: 0 };
+        if (waveNum > wk.best) wk.best = waveNum;
+        meta.data.weekly = wk;
+      }
+      unlockMsg = 'WEEKLY ' + weekly.week + ' — best wave ' + meta.data.weekly.best + '\n';
+    } else if (G.mode === 'classic') {
       var best = meta.data.bestWave[stage.id] || 0;
       if (waveNum > best) meta.data.bestWave[stage.id] = waveNum;
       if (won) {
@@ -2007,9 +2265,10 @@ GH.game = (function () {
 
     document.getElementById('end-title').innerHTML = won ? 'ARENA&nbsp;CLEARED' : 'FRAME&nbsp;DESTROYED';
     document.getElementById('end-stats').innerHTML = unlockMsg +
-      stage.name + (G.mode === 'arena' ? ' · ARENA' : '') +
-      ' — reached <b>Wave ' + waveNum + '</b> as <b>' + player.def.name + '</b>\n' +
-      'Level <b>' + player.level + '</b> · Kills <b>' + kills + '</b> · Salvage <b>+' + coinsRun + '</b>\n' +
+      stage.name + (G.mode === 'arena' ? ' · ARENA' : (G.mode === 'weekly' ? ' · WEEKLY' : '')) +
+      ' — reached <b>Wave ' + waveNum + '</b> as <b>' + player.def.name + '</b>' +
+      (mate ? ' <i>(co-op)</i>' : '') + '\n' +
+      'Level <b>' + player.level + '</b> · Kills <b>' + kills + '</b> · Salvage <b>+' + banked + '</b>\n' +
       'Time <b>' + Math.floor(runTime / 60) + ':' + ('0' + Math.floor(runTime % 60)).slice(-2) + '</b>';
     document.getElementById('hud').classList.add('hidden');
     document.getElementById('end-screen').classList.remove('hidden');
@@ -2033,6 +2292,7 @@ GH.game = (function () {
   G.enterSelect = function () {
     clearWorld();
     G.state = 'select';
+    GH.music.play('title');
     scene.background = GH.assets.selectSky;
     scene.fog.color.setHex(0x060a2a);
     floor.material.map = GH.assets.gridTex;
@@ -2113,8 +2373,14 @@ GH.game = (function () {
       G.dmg.update(dt, viewW, viewH);
       return;
     }
+    if (hitStopT > 0) {   // frame-freeze for impact
+      hitStopT -= dt;
+      G.dmg.update(dt, viewW, viewH);
+      return;
+    }
     runTime += dt;
     updatePlayer(dt, input);
+    updateWingmate(dt, input);
     updateWave(dt);
     updateEnemies(dt);
     updateWeapons(dt, input);
@@ -2141,7 +2407,10 @@ GH.game = (function () {
       }) : [],
       boss: bossRef ? bossRef.def.name + ' ' + Math.round(bossRef.hp) : null,
       salvage: GH.meta.data.salvage,
-      shells: Object.keys(GH.meta.data.shells).length
+      shells: Object.keys(GH.meta.data.shells).length,
+      music: GH.music.mode(),
+      weekly: weekly ? weekly.week : null,
+      mate: mate ? { hp: Math.round(mate.hp), down: mate.down, x: Math.round(mate.x * 10) / 10, z: Math.round(mate.z * 10) / 10 } : null
     };
   };
 

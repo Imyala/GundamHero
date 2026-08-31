@@ -67,7 +67,11 @@ GH.audio = (function () {
     win: function () { [392, 494, 587, 784].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, 'triangle', 0.18, 15); }, i * 160); }); }
   };
 
-  S.setMuted = function (m) { muted = m; };
+  S.setMuted = function (m) {
+    muted = m;
+    if (GH.music) GH.music.setMuted(m);
+  };
   S.isMuted = function () { return muted; };
+  S.ctx = function () { ensure(); return ctx; };
   return S;
 })();

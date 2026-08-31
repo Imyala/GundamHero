@@ -23,6 +23,10 @@
           <div id="boost-fill" class="bar-fill boost-fill"></div>
         </div>
         <div id="reload-line"></div>
+        <div id="p2-row" class="hidden">
+          <div class="bar-frame p2-frame"><div id="p2-fill" class="bar-fill p2-fill"></div></div>
+          <div id="p2-text">P2</div>
+        </div>
         <div id="coin-row"><span class="coin-icon">S</span><span id="coin-count">×0</span></div>
         <div id="buff-line"></div>
       </div>
@@ -54,6 +58,7 @@
     <div class="title-sub">A MECH ARENA SURVIVOR</div>
     <button id="btn-start" class="menu-btn">CLASSIC</button>
     <button id="btn-arena" class="menu-btn small">ARENA — ENDLESS</button>
+    <button id="btn-weekly" class="menu-btn small">WEEKLY CHALLENGE</button>
     <button id="btn-hangar" class="menu-btn small">HANGAR · DEVOTIONS</button>
     <div id="title-salvage"></div>
     <div class="title-foot">WASD move &nbsp;·&nbsp; mouse aim &nbsp;·&nbsp; SPACE boost &nbsp;·&nbsp; SHIFT / RMB special &nbsp;·&nbsp; F scanlines &nbsp;·&nbsp; weapons fire automatically</div>
@@ -70,7 +75,16 @@
     </div>
     <div id="select-icons"></div>
     <button id="btn-launch" class="menu-btn">SELECT STAGE</button>
+    <button id="btn-coop" class="menu-btn tiny coop-btn">CO-OP P2: OFF</button>
     <button id="btn-select-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== WEEKLY CHALLENGE ===================== -->
+  <div id="weekly-screen" class="screen hidden">
+    <h2 class="select-title">WEEKLY&nbsp;CHALLENGE</h2>
+    <div id="weekly-brief"></div>
+    <button id="btn-weekly-go" class="menu-btn">DEPLOY</button>
+    <button id="btn-weekly-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== STAGE SELECT ===================== -->
@@ -126,6 +140,7 @@
 <script src="js/upgrades.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/audio.js"></script>
+<script src="js/music.js"></script>
 <script src="js/game.js"></script>
 <script src="js/main.js"></script>
 </body>

@@ -25,6 +25,7 @@ and visit `http://localhost:8000`.)
 | 1–6 | Pick a wave-reward card / socket target |
 | F | Toggle CRT scanlines |
 | Esc / P | Pause |
+| IJKL + O (or gamepad stick + A) | Player 2 in co-op: move + boost |
 
 Dev shortcuts: `?wave=N` starts at wave N with catch-up levels; `?unlock=all`
 opens every shell and stage; `?salvage=500` grants test salvage.
@@ -88,6 +89,23 @@ level-up during a run.
 ### Modes
 - **Classic** — pick a frame and stage, survive 20 waves, claim the corrupted frame.
 - **Arena** — endless, infinitely scaling waves on any unlocked stage; best wave saved.
+- **Weekly Challenge** — a deterministic ISO-week seed issues everyone the same
+  frame, stage, and modifier trio (two hazards like SWARM / IRONCLAD / GLASS
+  FRAME / HASTE / FERAL plus one boon like BOUNTY or KEEN EYES); endless
+  scoring, best wave recorded per week.
+- **Shared-screen co-op (first pass)** — toggle CO-OP on the player-select
+  screen: Player 2 pilots a blue-accented mirror of your frame with IJKL + O
+  (or a gamepad), auto-aiming its primary and sharing your stat upgrades.
+  Enemies target the nearest pilot, the camera pulls back as you spread out
+  (with a shared-screen tether), and a downed wingmate revives at the next
+  wave or when P1 stands close.
+
+### Music & feel
+Every stage has its own generative soundtrack — bass, pad, arp, and drum
+patterns produced at runtime by a WebAudio step sequencer from per-stage seeds,
+with an intensity layer that kicks in during boss fights and a separate title
+theme. Impact is sold with hit-stop frame-freezes on crits, heavy kills, and
+explosions, plus scale-pops on every hit.
 
 ### Presentation
 1/3-resolution pixelated renderer with PSX vertex-snap jitter, per-stage sky
@@ -118,7 +136,7 @@ js/main.js        renderer, input, screen wiring
 
 ## Roadmap ideas
 
-- Weekly challenge seeds and loadout presets for Arena
-- Shared/split-screen co-op
-- Gamepad + touch controls
-- Music loops, hit-stop, more resonance hybrids
+- Full P2 parity in co-op: own frame pick, specials, and reward votes
+- P1 gamepad + touch controls
+- Loadout presets and seeded runs for Arena
+- More resonance hybrids and boss phases

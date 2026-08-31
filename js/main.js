@@ -7,9 +7,11 @@
     mouseNDC: new THREE.Vector2(0, 0),
     special: false,
     boostPressed: false,
-    specialPressed: false
+    specialPressed: false,
+    p2x: 0, p2y: 0, p2Boost: false
   };
   var chosenStage = 0;
+  var p2keys = {};
 
   function boot() {
     canvas = document.getElementById('game-canvas');
@@ -44,12 +46,41 @@
     KeyS: 's', ArrowDown: 's',
     KeyD: 'd', ArrowRight: 'd'
   };
+  var P2KEYMAP = { KeyI: 'w', KeyJ: 'a', KeyK: 's', KeyL: 'd' };
+
+  // merge IJKL + first gamepad's left stick into the P2 axis
+  function pollP2() {
+    var x = (p2keys.d ? 1 : 0) - (p2keys.a ? 1 : 0);
+    var y = (p2keys.s ? 1 : 0) - (p2keys.w ? 1 : 0);
+    try {
+      var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (var i = 0; i < pads.length; i++) {
+        var gp = pads[i];
+        if (!gp || !gp.connected) continue;
+        if (Math.abs(gp.axes[0]) > 0.25) x += gp.axes[0];
+        if (Math.abs(gp.axes[1]) > 0.25) y += gp.axes[1];
+        if (gp.buttons[0] && gp.buttons[0].pressed && !input._gpHeld) {
+          input.p2Boost = true;
+          input._gpHeld = true;
+        } else if (gp.buttons[0] && !gp.buttons[0].pressed) {
+          input._gpHeld = false;
+        }
+        break;
+      }
+    } catch (e) { /* gamepad API unavailable */ }
+    input.p2x = GH.clamp(x, -1, 1);
+    input.p2y = GH.clamp(y, -1, 1);
+  }
 
   function bindInput() {
     window.addEventListener('keydown', function (e) {
       GH.audio.unlock();
+      if (!GH.music.mode()) GH.music.play('title');
       var k = KEYMAP[e.code];
       if (k) { input.keys[k] = true; e.preventDefault(); }
+      var pk = P2KEYMAP[e.code];
+      if (pk) p2keys[pk] = true;
+      if (e.code === 'KeyO' && GH.game.state === 'play') input.p2Boost = true;
       if (e.code === 'Space' && GH.game.state === 'play') {
         input.boostPressed = true; e.preventDefault();
       }
@@ -74,6 +105,8 @@
     window.addEventListener('keyup', function (e) {
       var k = KEYMAP[e.code];
       if (k) input.keys[k] = false;
+      var pk = P2KEYMAP[e.code];
+      if (pk) p2keys[pk] = false;
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.special = false;
     });
     window.addEventListener('mousemove', function (e) {
@@ -84,6 +117,7 @@
     });
     window.addEventListener('mousedown', function (e) {
       GH.audio.unlock();
+      if (!GH.music.mode()) GH.music.play('title');
       if (e.button === 2 && GH.game.state === 'play') {
         input.special = true;
         input.specialPressed = true;
@@ -102,7 +136,7 @@
 
   // ----------------------------------------------------------------
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
-    'reward-screen', 'pause-screen', 'end-screen'];
+    'weekly-screen', 'reward-screen', 'pause-screen', 'end-screen'];
 
   function show(id) {
     SCREENS.forEach(function (s) {
@@ -163,6 +197,8 @@
     });
   }
 
+  var lastLaunch = null;
+
   function launch(stageIdx) {
     GH.audio.wave();
     show(null);
@@ -170,7 +206,95 @@
     try {
       devWave = parseInt(new URLSearchParams(location.search).get('wave') || '1', 10) || 1;
     } catch (e) { /* older browsers */ }
+    lastLaunch = function () {
+      show(null);
+      GH.game.startRun(GH.game.getSelectedMech(), stageIdx, devWave);
+    };
     GH.game.startRun(GH.game.getSelectedMech(), stageIdx, devWave);
+  }
+
+  // ----------------------------------------------------------------
+  // Weekly challenge: everyone gets the same frame/stage/modifiers for the
+  // ISO week, derived from a deterministic seed.
+  function isoWeek(d) {
+    d = d || new Date();
+    var date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    var dayNum = (date.getUTCDay() + 6) % 7;
+    date.setUTCDate(date.getUTCDate() - dayNum + 3);
+    var firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+    var week = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+    return date.getUTCFullYear() + '-W' + ('0' + week).slice(-2);
+  }
+
+  function seededRng(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    var s = h >>> 0 || 1;
+    return function () {
+      s ^= s << 13; s >>>= 0;
+      s ^= s >> 17;
+      s ^= s << 5; s >>>= 0;
+      return s / 4294967296;
+    };
+  }
+
+  var WEEKLY_MODS = [
+    { id: 'swarm', label: 'SWARM — +40% enemy spawns', apply: function (m) { m.rate *= 1.4; } },
+    { id: 'ironclad', label: 'IRONCLAD — enemies +30% hull', apply: function (m) { m.ehp *= 1.3; } },
+    { id: 'glass', label: 'GLASS FRAME — your hull -25%', apply: function (m) { m.php *= 0.75; } },
+    { id: 'haste', label: 'HASTE — enemies +15% speed', apply: function (m) { m.espd *= 1.15; } },
+    { id: 'feral', label: 'FERAL — a warden hunts every 5 waves', apply: function (m) { m.midbossEvery = 5; } }
+  ];
+  var WEEKLY_BOONS = [
+    { id: 'bounty', label: 'BOUNTY — +50% salvage', apply: function (m) { m.salvage *= 1.5; } },
+    { id: 'keeneyes', label: 'KEEN EYES — +10% crit', apply: function (m) { m.crit += 10; } }
+  ];
+
+  function buildWeekly() {
+    var week = isoWeek();
+    var rnd = seededRng('heroframe:' + week);
+    var mechIdx = Math.floor(rnd() * GH.mechs.length);
+    var stageIdx = Math.floor(rnd() * GH.stages.length);
+    var mods = { rate: 1, ehp: 1, espd: 1, php: 1, salvage: 1, crit: 0, midbossEvery: 0 };
+    var picks = [];
+    var pool = WEEKLY_MODS.slice();
+    for (var i = 0; i < 2; i++) {
+      var m = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
+      m.apply(mods);
+      picks.push(m.label);
+    }
+    var boon = WEEKLY_BOONS[Math.floor(rnd() * WEEKLY_BOONS.length)];
+    boon.apply(mods);
+    picks.push(boon.label);
+    return { week: week, mechIdx: mechIdx, stageIdx: stageIdx, mods: mods, labels: picks };
+  }
+
+  function openWeekly() {
+    GH.audio.card();
+    var wk = buildWeekly();
+    var best = (GH.meta.data.weekly && GH.meta.data.weekly.week === wk.week)
+      ? GH.meta.data.weekly.best : 0;
+    document.getElementById('weekly-brief').innerHTML =
+      '<div class="wk-week">' + wk.week + '</div>' +
+      '<div class="wk-line">Frame: <b>' + GH.mechs[wk.mechIdx].name + '</b> (issued for the week)</div>' +
+      '<div class="wk-line">Stage: <b>' + GH.stages[wk.stageIdx].name + '</b> · endless</div>' +
+      '<div class="wk-mods">' + wk.labels.map(function (l) { return '· ' + l; }).join('<br>') + '</div>' +
+      (best ? '<div class="wk-best">Your best this week: WAVE ' + best + '</div>' : '');
+    GH.game.state = 'stageselect';
+    show('weekly-screen');
+    document.getElementById('btn-weekly-go').onclick = function () {
+      GH.audio.wave();
+      GH.game.mode = 'weekly';
+      lastLaunch = function () {
+        show(null);
+        GH.game.mode = 'weekly';
+        GH.game.startRun(wk.mechIdx, wk.stageIdx, 1, { weekly: wk });
+      };
+      lastLaunch();
+    };
   }
 
   // ----------------------------------------------------------------
@@ -245,7 +369,15 @@
   function bindUI() {
     document.getElementById('btn-start').onclick = function () { enterSelect('classic'); };
     document.getElementById('btn-arena').onclick = function () { enterSelect('arena'); };
+    document.getElementById('btn-weekly').onclick = openWeekly;
     document.getElementById('btn-hangar').onclick = openHangar;
+    document.getElementById('btn-weekly-back').onclick = toTitle;
+    document.getElementById('btn-coop').onclick = function () {
+      GH.game.coop = !GH.game.coop;
+      GH.audio.card();
+      document.getElementById('btn-coop').textContent =
+        'CO-OP P2: ' + (GH.game.coop ? 'ON (IJKL + O, or gamepad)' : 'OFF');
+    };
     document.getElementById('btn-launch').onclick = openStageSelect;
     document.getElementById('btn-select-back').onclick = toTitle;
     document.getElementById('btn-stage-back').onclick = function () { enterSelect(GH.game.mode); };
@@ -253,8 +385,8 @@
     document.getElementById('btn-resume').onclick = togglePause;
     document.getElementById('btn-quit').onclick = toTitle;
     document.getElementById('btn-retry').onclick = function () {
-      show(null);
-      launch(chosenStage);
+      if (lastLaunch) lastLaunch();
+      else { show(null); launch(chosenStage); }
     };
     document.getElementById('btn-menu').onclick = toTitle;
     var muteBtn = document.getElementById('mute-btn');
@@ -271,6 +403,7 @@
     requestAnimationFrame(loop);
     var dt = Math.min(0.05, (now - last) / 1000 || 0.016);
     last = now;
+    pollP2();
     GH.game.update(dt, input, window.innerWidth, window.innerHeight);
     renderer.render(GH.game.scene(), GH.game.camera());
   }
