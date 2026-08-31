@@ -98,11 +98,30 @@ because every map is generated in-memory, crossing a gate is a blink of
 black, **never a loading screen**. Territories carry **fixed danger
 ratings I–IV** — the world doesn't scale to you; you grow into it.
 
-Every territory also hides a **dungeon gate**: a violet maw leading down
-into that territory's DEPTHS — a separate dark map one danger rank
-hotter, garrisoned by guardian packs, holding the territory's **sealed
-vault** mid-depth and its **corrupt-frame lair** at the far end. Beat the
-lair boss down there to claim the shell and its artifact; the exit gate
+Every territory hides **three violet dungeon gates** — 18 dungeons
+world-wide, each a separate dark map one danger rank hotter, drawn from
+six archetypes so no two runs play alike:
+
+- **DEPTHS** — the classic crawl: guardian packs, the territory's
+  **sealed vault** mid-depth, and its **corrupt-frame lair** at the far
+  end (beat it for the shell and its artifact).
+- **HIVE** — extermination: wipe every hostile on the map; the counter
+  tracks what's left.
+- **BASTION** — defense: awaken the territory's ancient relic (a dormant
+  titanframe, the Heartcrystal, the Seed Orb, the Ancient Forge, the
+  Spire Capacitor, the Void Archive) and hold it through four waves that
+  pour from the breaches and gnaw it down.
+- **LABYRINTH** — a true walled maze with solid collision; find the
+  heart chamber.
+- **GAUNTLET** — a timed rush: ride six checkpoint rings in order, each
+  buying you seconds; run out and you start over.
+- **FLUXWAYS** — the floor itself shifts: diagonal safe lanes sweep
+  across a scorching tile field. Read the pattern and cross.
+
+Objective dungeons pay out at a **reward cache** (banked salvage + a gem;
+first clears add a bonus cache) — and every tier-1 clear tears open a red
+**DEEPER gate**: tier II of the same dungeon, harder garrisons, richer
+loot, and in the Depths a corrupt-frame rematch. The exit gate always
 walks you back to the surface.
 
 Hostiles are **territorial**: they idle and wander around their nests
@@ -372,7 +391,8 @@ js/skills.js      pilot skill tree, pilot level, ability definitions
 js/upgrades.js    reward card pool (weapons/traits/protocols/gems)
 js/enemies.js     enemy + midboss + corrupted boss definitions
 js/audio.js       WebAudio procedural SFX
-js/world.js       THE SHATTERED REACH: continent layout, camp, circuit
+js/dungeons.js    dungeon archetypes: maze/flux/gauntlet generators, tiers
+js/world.js       THE SHATTERED REACH: zone graph, layouts, camp, circuit
 js/race.js        TRACE DUEL + SUNSPIRE CIRCUIT
 js/game.js        core loop: combat, waves, expedition, resonances, screens
 js/main.js        renderer, input, screen wiring

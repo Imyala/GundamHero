@@ -51,6 +51,7 @@ GH.meta = (function () {
         lairsDown: {},      // zone id -> true (corrupt frame defeated)
         relaysHeld: {},     // relay id -> true (siege won)
         vaults: {},         // vault id -> true (breached, stays open)
+        dungeons: {},       // dungeon zone id (with tier) -> cleared
         artifacts: {},      // artifact id -> owned
         equipped: null,     // one artifact slot
         exp: null,          // serialized expedition character

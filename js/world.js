@@ -40,14 +40,20 @@ GH.world = (function () {
   W.current = null; // {id, danger, dungeon, parent, size, name}
 
   W.zoneInfo = function (zoneId) {
+    // legacy saves: 'dungeon_<zone>' was the single-dungeon era
     if (zoneId.indexOf('dungeon_') === 0) {
-      var parent = zoneId.slice(8);
-      var pz = W.zoneById(parent);
+      zoneId = GH.dungeons.makeId(zoneId.slice(8), 'depths', 1);
+    }
+    var dg = GH.dungeons.parseId(zoneId);
+    if (dg) {
+      var pz = W.zoneById(dg.zone);
+      var arch = GH.dungeons.ARCHETYPES[dg.arch];
       return {
-        id: zoneId, dungeon: true, parent: parent,
-        danger: Math.min(4, pz.danger + 1),
-        size: W.DUNGEON_SIZE,
-        name: W.stageFor(parent).name + ' DEPTHS'
+        id: zoneId, dungeon: true, parent: dg.zone,
+        arch: dg.arch, tier: dg.tier,
+        danger: Math.min(4, pz.danger + dg.tier),
+        size: arch.size,
+        name: W.stageFor(dg.zone).name + ' ' + arch.name + (dg.tier === 2 ? ' II' : '')
       };
     }
     var zn = W.zoneById(zoneId);
@@ -70,7 +76,11 @@ GH.world = (function () {
   };
 
   W.stageFor = function (zoneId) {
-    if (zoneId && zoneId.indexOf('dungeon_') === 0) zoneId = zoneId.slice(8);
+    if (zoneId) {
+      if (zoneId.indexOf('dungeon_') === 0) zoneId = zoneId.slice(8);
+      var dg = GH.dungeons.parseId(zoneId);
+      if (dg) zoneId = dg.zone;
+    }
     for (var i = 0; i < GH.stages.length; i++) {
       if (GH.stages[i].id === zoneId) return GH.stages[i];
     }
@@ -114,12 +124,20 @@ GH.world = (function () {
         var gp = gatePos(sides[to], size);
         lay.gates.push({ to: to, x: gp.x, z: gp.z, side: sides[to] });
       }
-      // the dungeon gate sits deep in the territory
-      var dgx = (rnd() - 0.5) * (size * 0.5);
-      var dgz = (rnd() - 0.5) * (size * 0.5);
-      if (zoneId === 'wreck') { dgx = -140; dgz = -120; } // clear of the hub
-      lay.dungeonGate = { to: 'dungeon_' + zoneId, x: dgx, z: dgz };
-      lay.gates.push(lay.dungeonGate);
+      // THREE dungeon gates per territory: the depths plus two more
+      // archetypes from the zone's set, scattered deep in the map
+      var archList = ['depths'].concat(GH.dungeons.ZONE_SETS[zoneId] || []);
+      archList.forEach(function (arch, ai) {
+        var dgx = (rnd() - 0.5) * (size * 0.62);
+        var dgz = (rnd() - 0.5) * (size * 0.62);
+        if (zoneId === 'wreck') {
+          // keep the hub's gates clear of camp and circuit
+          if (ai === 0) { dgx = -140; dgz = -120; }
+          if (GH.dist2(dgx, dgz, W.CAMP.x, W.CAMP.z) < 45 * 45) dgz -= 110;
+          if (GH.dist2(dgx, dgz, W.CIRCUIT.x, W.CIRCUIT.z) < 50 * 50) dgx -= 110;
+        }
+        lay.gates.push({ to: GH.dungeons.makeId(zoneId, arch, 1), x: dgx, z: dgz, arch: arch });
+      });
 
       // husk nests scattered wide
       var count = zoneId === 'wreck' ? 8 : 14;
@@ -141,20 +159,101 @@ GH.world = (function () {
       // siege relays hold the middle of two territories
       if (zoneId === 'wreck') lay.relay = { id: 'relay_wreck', zone: zoneId, x: 110, z: -80 };
       if (zoneId === 'storm') lay.relay = { id: 'relay_storm', zone: zoneId, x: -90, z: 100 };
-    } else {
-      // DUNGEON: exit gate south, guardian packs along the hall,
-      // the sealed vault mid-depth, the corrupt-frame lair at the end
-      lay.gates.push({ to: info.parent, x: 0, z: half - 16, exit: true });
-      var packs = 5;
-      for (var p = 0; p < packs; p++) {
-        lay.packs.push({
-          x: (rnd() - 0.5) * (size - 70),
-          z: half - 50 - p * ((size - 90) / packs) + (rnd() - 0.5) * 24,
-          n: 3 + Math.floor(rnd() * 3)
+
+      // landmarks: ruin rings, crashed hulks, sub-biome stains, and
+      // roads running from each travel gate toward the map's heart
+      lay.ruins = [];
+      for (var ru = 0; ru < 3; ru++) {
+        lay.ruins.push({
+          x: (rnd() - 0.5) * (size * 0.7),
+          z: (rnd() - 0.5) * (size * 0.7),
+          kind: ru === 2 ? 'hulk' : 'ring'
         });
       }
-      lay.vault = { id: 'vault_' + info.parent, zone: info.parent, x: (rnd() < 0.5 ? -1 : 1) * (half - 45), z: 0 };
-      lay.lair = { id: 'lair_' + info.parent, zone: info.parent, x: 0, z: -half + 30, boss: W.stageFor(info.parent).unlocks };
+      lay.stains = [];
+      for (var stn = 0; stn < 4; stn++) {
+        lay.stains.push({
+          x: (rnd() - 0.5) * (size * 0.8),
+          z: (rnd() - 0.5) * (size * 0.8),
+          r: 22 + rnd() * 26
+        });
+      }
+    } else {
+      // ---- DUNGEONS: exit gate south, archetype decides the rest ----
+      lay.gates.push({ to: info.parent, x: 0, z: half - 16, exit: true });
+      var arch2 = info.arch;
+
+      if (arch2 === 'depths') {
+        var packs = 5;
+        for (var p = 0; p < packs; p++) {
+          lay.packs.push({
+            x: (rnd() - 0.5) * (size - 70),
+            z: half - 50 - p * ((size - 90) / packs) + (rnd() - 0.5) * 24,
+            n: 3 + Math.floor(rnd() * 3)
+          });
+        }
+        if (info.tier === 1) {
+          lay.vault = { id: 'vault_' + info.parent, zone: info.parent, x: (rnd() < 0.5 ? -1 : 1) * (half - 45), z: 0 };
+          lay.lair = { id: 'lair_' + info.parent, zone: info.parent, x: 0, z: -half + 30, boss: W.stageFor(info.parent).unlocks };
+        } else {
+          // tier 2: no vault — a denser garrison and a corrupt rematch
+          lay.packs.push({ x: 0, z: 0, n: 5 });
+          lay.lair = { id: 'lair2_' + info.parent, zone: info.parent, x: 0, z: -half + 30, boss: W.stageFor(info.parent).unlocks, rematch: true };
+        }
+      } else if (arch2 === 'hive') {
+        var hp2 = 7 + (info.tier === 2 ? 3 : 0);
+        for (var h = 0; h < hp2; h++) {
+          lay.packs.push({
+            x: (rnd() - 0.5) * (size - 60),
+            z: (rnd() - 0.5) * (size - 60),
+            n: 3 + Math.floor(rnd() * 3)
+          });
+        }
+      } else if (arch2 === 'bastion') {
+        lay.objective = {
+          x: 0, z: 0,
+          def: GH.dungeons.OBJECTIVES[info.parent],
+          hp: 500 + info.danger * 150
+        };
+        // attackers pour from four breaches
+        lay.breaches = [
+          { x: -half + 20, z: 0 }, { x: half - 20, z: 0 },
+          { x: 0, z: -half + 20 }, { x: half - 30, z: -half + 30 }
+        ];
+      } else if (arch2 === 'labyrinth') {
+        lay.maze = GH.dungeons.genMaze(zoneId, 21, Math.floor(size / 21));
+        var mid = Math.floor(lay.maze.n / 2);
+        lay.heart = GH.dungeons.mazeCellPos(lay.maze, size, mid, mid);
+        // the entry gate must stand square with the maze mouth
+        var mouth = GH.dungeons.mazeCellPos(lay.maze, size, lay.maze.n - 1, mid);
+        lay.gates[0].x = mouth.x;
+        // lurkers in the corridors
+        for (var lk = 0; lk < 8 + (info.tier === 2 ? 4 : 0); lk++) {
+          var lr, lc, guard = 0;
+          do {
+            lr = 1 + Math.floor(rnd() * (lay.maze.n - 2));
+            lc = 1 + Math.floor(rnd() * (lay.maze.n - 2));
+          } while (lay.maze.grid[lr][lc] && guard++ < 40);
+          var lp = GH.dungeons.mazeCellPos(lay.maze, size, lr, lc);
+          lay.packs.push({ x: lp.x, z: lp.z, n: 1 });
+        }
+      } else if (arch2 === 'gauntlet') {
+        lay.checkpoints = GH.dungeons.genGauntlet(zoneId, size);
+        // harriers along the route
+        lay.checkpoints.forEach(function (cp, ci) {
+          if (ci % 2 === 0) lay.packs.push({ x: cp.x + 8, z: cp.z + 8, n: 2 });
+        });
+      } else if (arch2 === 'fluxways') {
+        lay.flux = GH.dungeons.genFlux(size);
+        lay.chest = { x: 0, z: -half + 22 };
+        lay.packs.push({ x: 0, z: -half + 40, n: 3 }); // the far-side welcome
+      }
+      // every non-depths dungeon pays out at a chest (flux set its own)
+      if (!lay.chest && arch2 !== 'depths') {
+        lay.chest = arch2 === 'labyrinth' ? { x: lay.heart.x, z: lay.heart.z } :
+          arch2 === 'gauntlet' ? { x: lay.checkpoints[lay.checkpoints.length - 1].x, z: lay.checkpoints[lay.checkpoints.length - 1].z } :
+          { x: 0, z: -half + 26 };
+      }
     }
     return lay;
   };
@@ -252,9 +351,11 @@ GH.world = (function () {
       group.add(collar);
     }
 
-    // props: dense enough to feel like terrain, not a floor
+    // props: dense enough to feel like terrain, not a floor.
+    // Mazes and flux floors keep their arenas clean.
     var rnd = zrng('props:' + zoneId);
-    var propCount = info.dungeon ? 46 : 150;
+    var propCount = info.dungeon ?
+      (info.arch === 'labyrinth' || info.arch === 'fluxways' ? 0 : 46) : 150;
     for (var i = 0; i < propCount; i++) {
       var kind = st.props[Math.floor(rnd() * st.props.length)];
       var p = GH.models.props[kind]();
@@ -300,9 +401,105 @@ GH.world = (function () {
       vaultMeshes[lay.vault.id] = vault;
     }
 
+    // ---- archetype set pieces ----
+    var chestMesh = null, objectiveMesh = null, fluxTiles = null, cpMeshes = null;
+    if (lay.maze) {
+      // raise the maze: one shared material, a box per wall cell
+      var wallMat = GH.assets.lambert({ map: tex.wall });
+      var mc = lay.maze.cell;
+      for (var mr = 0; mr < lay.maze.n; mr++) {
+        for (var mcc = 0; mcc < lay.maze.n; mcc++) {
+          if (!lay.maze.grid[mr][mcc]) continue;
+          var wp = GH.dungeons.mazeCellPos(lay.maze, size, mr, mcc);
+          var wall = new THREE.Mesh(new THREE.BoxGeometry(mc, 7, mc), wallMat);
+          wall.position.set(wp.x, 3.5, wp.z);
+          group.add(wall);
+        }
+      }
+    }
+    if (lay.flux) {
+      // the shifting floor: one plate per tile, recolored live
+      fluxTiles = [];
+      var half2 = size / 2;
+      for (var fr = 0; fr < lay.flux.rows; fr++) {
+        for (var fc = 0; fc < lay.flux.cols; fc++) {
+          var tileMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(lay.flux.tile - 0.6, lay.flux.tile - 0.6),
+            new THREE.MeshBasicMaterial({ color: 0x992211, transparent: true, opacity: 0.4, depthWrite: false }));
+          tileMesh.rotation.x = -Math.PI / 2;
+          var tx = -half2 + 20 + (fc + 0.5) * lay.flux.tile;
+          var tz = lay.flux.zTop + (fr + 0.5) * lay.flux.tile;
+          tileMesh.position.set(tx, 0.06, tz);
+          tileMesh.userData.fx = tx;
+          tileMesh.userData.fz = tz;
+          group.add(tileMesh);
+          fluxTiles.push(tileMesh);
+        }
+      }
+    }
+    if (lay.checkpoints) {
+      cpMeshes = [];
+      lay.checkpoints.forEach(function (cp, ci) {
+        var ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.22, 4, 20),
+          GH.assets.basic(ci === lay.checkpoints.length - 1 ? 0xffd050 : 0x60c8ff,
+            { transparent: true, opacity: 0.8 }));
+        ring.rotation.x = Math.PI / 2;
+        ring.position.set(cp.x, 0.4, cp.z);
+        group.add(ring);
+        cpMeshes.push(ring);
+      });
+    }
+    if (lay.objective) {
+      objectiveMesh = GH.models.buildObjective(lay.objective.def.kind);
+      objectiveMesh.position.set(lay.objective.x, 0, lay.objective.z);
+      group.add(objectiveMesh);
+    }
+    if (lay.chest) {
+      chestMesh = GH.models.buildChest();
+      chestMesh.position.set(lay.chest.x, 0, lay.chest.z);
+      group.add(chestMesh);
+    }
+
+    // ---- overworld landmarks: ruins, hulks, stains, roads ----
+    if (!info.dungeon) {
+      (lay.stains || []).forEach(function (stn) {
+        var stain = new THREE.Mesh(new THREE.CircleGeometry(stn.r, 20),
+          new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.16, depthWrite: false }));
+        stain.rotation.x = -Math.PI / 2;
+        stain.position.set(stn.x, 0.03, stn.z);
+        group.add(stain);
+      });
+      (lay.ruins || []).forEach(function (rn) {
+        if (rn.kind === 'hulk') {
+          var hulk = GH.models.buildWreckSite();
+          hulk.scale.setScalar(2.6);
+          hulk.position.set(rn.x, 0, rn.z);
+          group.add(hulk);
+        } else {
+          for (var rp = 0; rp < 7; rp++) {
+            var ra = (rp / 7) * Math.PI * 2;
+            var pillar = GH.models.buildPillar();
+            pillar.position.set(rn.x + Math.cos(ra) * 9, 0, rn.z + Math.sin(ra) * 9);
+            group.add(pillar);
+          }
+        }
+      });
+      // roads: worn strips from each edge gate toward the middle
+      lay.gates.forEach(function (gt) {
+        if (gt.arch) return; // dungeon mouths keep their mystery
+        var len = Math.sqrt(gt.x * gt.x + gt.z * gt.z) * 0.82;
+        var road = new THREE.Mesh(new THREE.PlaneGeometry(6, len),
+          new THREE.MeshBasicMaterial({ color: 0xfff2d0, transparent: true, opacity: 0.1, depthWrite: false }));
+        road.rotation.x = -Math.PI / 2;
+        road.rotation.z = -Math.atan2(gt.x, gt.z);
+        road.position.set(gt.x / 2, 0.04, gt.z / 2);
+        group.add(road);
+      });
+    }
+
     // travel gates
     lay.gates.forEach(function (gt) {
-      var toInfo = gt.to.indexOf('dungeon_') === 0 ? { dungeon: true } : W.zoneInfo(gt.to);
+      var toInfo = W.zoneInfo(gt.to);
       var mesh = GH.models.buildGate(gt.exit ? 'exit' : (toInfo.dungeon ? 'dungeon' : 'travel'));
       mesh.position.set(gt.x, 0, gt.z);
       // gates on the map edge face inward
@@ -342,7 +539,12 @@ GH.world = (function () {
     }
 
     scene.add(group);
-    return { group: group, nestMeshes: nestMeshes, vaultMeshes: vaultMeshes, layout: lay, info: info };
+    return {
+      group: group, nestMeshes: nestMeshes, vaultMeshes: vaultMeshes,
+      chestMesh: chestMesh, objectiveMesh: objectiveMesh,
+      fluxTiles: fluxTiles, cpMeshes: cpMeshes,
+      layout: lay, info: info
+    };
   };
 
   // interact prompts for the loaded zone
@@ -363,6 +565,12 @@ GH.world = (function () {
     }
     if (layout.vault) {
       list.push({ kind: 'vault', id: layout.vault.id, x: layout.vault.x, z: layout.vault.z, label: 'BREACH THE VAULT (FIELD TRIAL)' });
+    }
+    if (layout.objective) {
+      list.push({ kind: 'objective', x: layout.objective.x, z: layout.objective.z, label: 'AWAKEN ' + layout.objective.def.name + ' (DEFENSE)' });
+    }
+    if (layout.chest) {
+      list.push({ kind: 'chest', x: layout.chest.x, z: layout.chest.z, label: 'OPEN THE REWARD CACHE' });
     }
     return list;
   };

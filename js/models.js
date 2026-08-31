@@ -554,8 +554,9 @@ GH.models = (function () {
   // 'exit' (back to the surface, warm gold)
   M.buildGate = function (kind) {
     var g = new THREE.Group();
-    var glow = kind === 'dungeon' ? 0xc050ff : kind === 'exit' ? 0xffd050 : 0x60c8ff;
-    var stone = kind === 'dungeon' ? 0x241f2c : 0x3a4450;
+    var glow = kind === 'dungeon' ? 0xc050ff : kind === 'exit' ? 0xffd050 :
+      kind === 'deeper' ? 0xff4050 : 0x60c8ff;
+    var stone = kind === 'dungeon' || kind === 'deeper' ? 0x241f2c : 0x3a4450;
     var jambL = box(1.0, 5.4, 1.0, stone); jambL.position.set(-2.6, 2.7, 0);
     var jambR = box(1.0, 5.4, 1.0, stone); jambR.position.set(2.6, 2.7, 0);
     var lintel = box(6.6, 1.0, 1.1, stone); lintel.position.y = 5.6;
@@ -572,6 +573,66 @@ GH.models = (function () {
     lampR.position.x = 2.6;
     g.add(lampL, lampR);
     blobShadow(g, 5);
+    return g;
+  };
+
+  // BASTION objectives: the ancient relic on its pedestal, per flavor
+  M.buildObjective = function (kind) {
+    var g = new THREE.Group();
+    var base = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.6, 0.8, 8), mat(0x3a3642));
+    base.position.y = 0.4;
+    g.add(base);
+    var top = null;
+    if (kind === 'mech') {
+      top = M.buildMech({ body: 0x6a6a70, accent: 0x6a6a70, dark: 0x3a3a40, trim: 0x55555c, prop: 'sword' });
+      top.scale.setScalar(1.5);
+      top.position.y = 0.8;
+    } else if (kind === 'crystal') {
+      top = new THREE.Mesh(new THREE.OctahedronGeometry(1.6),
+        mat(0x80d8ff, { emissive: 0x2a5a80, emissiveIntensity: 0.8 }));
+      top.position.y = 2.8;
+    } else if (kind === 'orb') {
+      top = new THREE.Mesh(new THREE.SphereGeometry(1.3, 10, 8),
+        mat(0x90f0a0, { emissive: 0x2a6030, emissiveIntensity: 0.8 }));
+      top.position.y = 2.4;
+    } else if (kind === 'forge') {
+      top = new THREE.Group();
+      var block = box(2.4, 1.4, 1.6, 0x40342c); block.position.y = 1.5;
+      var emberGlow = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.3, 1.2),
+        GH.assets.basic(0xff7030, { transparent: true, opacity: 0.9 }));
+      emberGlow.position.y = 2.3;
+      top.add(block, emberGlow);
+    } else if (kind === 'capacitor') {
+      top = new THREE.Group();
+      [-0.8, 0, 0.8].forEach(function (x) {
+        var coil = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.6, 6),
+          mat(0x9090c0, { emissive: 0x303060, emissiveIntensity: 0.6 }));
+        coil.position.set(x, 2.1, 0);
+        top.add(coil);
+      });
+    } else { // archive
+      top = new THREE.Mesh(new THREE.BoxGeometry(1.2, 3.4, 1.2),
+        mat(0x241f2c, { emissive: 0x50208a, emissiveIntensity: 0.5 }));
+      top.position.y = 2.5;
+    }
+    g.add(top);
+    g.userData.core = top;
+    blobShadow(g, 5);
+    return g;
+  };
+
+  // dungeon reward cache: a heavy chest with a light seam
+  M.buildChest = function () {
+    var g = new THREE.Group();
+    var body = box(2.0, 1.0, 1.3, 0x5a4a2a); body.position.y = 0.5;
+    var lid = box(2.1, 0.5, 1.4, 0x6a5a36); lid.position.y = 1.2;
+    var band = box(2.15, 0.2, 1.45, 0xd8b040); band.position.y = 0.95;
+    var seam = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.1, 1.35),
+      GH.assets.basic(0xffe080, { transparent: true, opacity: 0.9 }));
+    seam.position.y = 1.0;
+    g.add(body, lid, band, seam);
+    g.userData.core = seam;
+    blobShadow(g, 3);
     return g;
   };
 

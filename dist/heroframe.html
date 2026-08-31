@@ -2262,8 +2262,9 @@ GH.models = (function () {
   // 'exit' (back to the surface, warm gold)
   M.buildGate = function (kind) {
     var g = new THREE.Group();
-    var glow = kind === 'dungeon' ? 0xc050ff : kind === 'exit' ? 0xffd050 : 0x60c8ff;
-    var stone = kind === 'dungeon' ? 0x241f2c : 0x3a4450;
+    var glow = kind === 'dungeon' ? 0xc050ff : kind === 'exit' ? 0xffd050 :
+      kind === 'deeper' ? 0xff4050 : 0x60c8ff;
+    var stone = kind === 'dungeon' || kind === 'deeper' ? 0x241f2c : 0x3a4450;
     var jambL = box(1.0, 5.4, 1.0, stone); jambL.position.set(-2.6, 2.7, 0);
     var jambR = box(1.0, 5.4, 1.0, stone); jambR.position.set(2.6, 2.7, 0);
     var lintel = box(6.6, 1.0, 1.1, stone); lintel.position.y = 5.6;
@@ -2280,6 +2281,66 @@ GH.models = (function () {
     lampR.position.x = 2.6;
     g.add(lampL, lampR);
     blobShadow(g, 5);
+    return g;
+  };
+
+  // BASTION objectives: the ancient relic on its pedestal, per flavor
+  M.buildObjective = function (kind) {
+    var g = new THREE.Group();
+    var base = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.6, 0.8, 8), mat(0x3a3642));
+    base.position.y = 0.4;
+    g.add(base);
+    var top = null;
+    if (kind === 'mech') {
+      top = M.buildMech({ body: 0x6a6a70, accent: 0x6a6a70, dark: 0x3a3a40, trim: 0x55555c, prop: 'sword' });
+      top.scale.setScalar(1.5);
+      top.position.y = 0.8;
+    } else if (kind === 'crystal') {
+      top = new THREE.Mesh(new THREE.OctahedronGeometry(1.6),
+        mat(0x80d8ff, { emissive: 0x2a5a80, emissiveIntensity: 0.8 }));
+      top.position.y = 2.8;
+    } else if (kind === 'orb') {
+      top = new THREE.Mesh(new THREE.SphereGeometry(1.3, 10, 8),
+        mat(0x90f0a0, { emissive: 0x2a6030, emissiveIntensity: 0.8 }));
+      top.position.y = 2.4;
+    } else if (kind === 'forge') {
+      top = new THREE.Group();
+      var block = box(2.4, 1.4, 1.6, 0x40342c); block.position.y = 1.5;
+      var emberGlow = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.3, 1.2),
+        GH.assets.basic(0xff7030, { transparent: true, opacity: 0.9 }));
+      emberGlow.position.y = 2.3;
+      top.add(block, emberGlow);
+    } else if (kind === 'capacitor') {
+      top = new THREE.Group();
+      [-0.8, 0, 0.8].forEach(function (x) {
+        var coil = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.6, 6),
+          mat(0x9090c0, { emissive: 0x303060, emissiveIntensity: 0.6 }));
+        coil.position.set(x, 2.1, 0);
+        top.add(coil);
+      });
+    } else { // archive
+      top = new THREE.Mesh(new THREE.BoxGeometry(1.2, 3.4, 1.2),
+        mat(0x241f2c, { emissive: 0x50208a, emissiveIntensity: 0.5 }));
+      top.position.y = 2.5;
+    }
+    g.add(top);
+    g.userData.core = top;
+    blobShadow(g, 5);
+    return g;
+  };
+
+  // dungeon reward cache: a heavy chest with a light seam
+  M.buildChest = function () {
+    var g = new THREE.Group();
+    var body = box(2.0, 1.0, 1.3, 0x5a4a2a); body.position.y = 0.5;
+    var lid = box(2.1, 0.5, 1.4, 0x6a5a36); lid.position.y = 1.2;
+    var band = box(2.15, 0.2, 1.45, 0xd8b040); band.position.y = 0.95;
+    var seam = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.1, 1.35),
+      GH.assets.basic(0xffe080, { transparent: true, opacity: 0.9 }));
+    seam.position.y = 1.0;
+    g.add(body, lid, band, seam);
+    g.userData.core = seam;
+    blobShadow(g, 3);
     return g;
   };
 
@@ -2773,6 +2834,7 @@ GH.meta = (function () {
         lairsDown: {},      // zone id -> true (corrupt frame defeated)
         relaysHeld: {},     // relay id -> true (siege won)
         vaults: {},         // vault id -> true (breached, stays open)
+        dungeons: {},       // dungeon zone id (with tier) -> cleared
         artifacts: {},      // artifact id -> owned
         equipped: null,     // one artifact slot
         exp: null,          // serialized expedition character
@@ -4249,6 +4311,195 @@ GH.music = (function () {
 
 </script>
 <script>
+// HERO FRAME — dungeon archetype data & generators
+// Every territory carries THREE dungeon gates, each leading to a
+// different kind of run (inspired by the classic dungeon-crawler and
+// bullet-hell traditions — shifting floors included). Clearing tier 1
+// opens a red DEEPER gate to tier 2: smaller, hotter, richer.
+//
+//   depths      — the classic crawl: packs, the vault, the lair boss
+//   hive        — EXTERMINATE: wipe every hostile in the map
+//   bastion     — DEFENSE: an ancient objective survives four waves
+//   labyrinth   — a true walled maze; find the heart chamber
+//   gauntlet    — a timed checkpoint rush (skimmer form shines)
+//   fluxways    — the floor itself shifts: ride the safe lanes across
+GH.dungeons = (function () {
+  var D = {};
+
+  // which two extra archetypes each territory offers (gate 0 is always depths)
+  D.ZONE_SETS = {
+    wreck: ['hive', 'gauntlet'],
+    glacier: ['labyrinth', 'bastion'],
+    cloister: ['bastion', 'hive'],
+    ember: ['gauntlet', 'fluxways'],
+    storm: ['fluxways', 'labyrinth'],
+    null: ['labyrinth', 'hive']
+  };
+
+  D.ARCHETYPES = {
+    depths: { name: 'DEPTHS', desc: 'the crawl: packs, the vault, the lair', size: 220 },
+    hive: { name: 'HIVE', desc: 'EXTERMINATE — leave nothing alive', size: 220 },
+    bastion: { name: 'BASTION', desc: 'DEFEND the relic through four waves', size: 200 },
+    labyrinth: { name: 'LABYRINTH', desc: 'find the heart of the maze', size: 230 },
+    gauntlet: { name: 'GAUNTLET', desc: 'a timed rush — ride the checkpoints', size: 260 },
+    fluxways: { name: 'FLUXWAYS', desc: 'the floor shifts — cross on the safe lanes', size: 200 }
+  };
+
+  // what the BASTION relic is, per territory (all original fiction)
+  D.OBJECTIVES = {
+    wreck: { name: 'DORMANT TITANFRAME', kind: 'mech' },
+    glacier: { name: 'THE HEARTCRYSTAL', kind: 'crystal' },
+    cloister: { name: 'THE SEED ORB', kind: 'orb' },
+    ember: { name: 'THE ANCIENT FORGE', kind: 'forge' },
+    storm: { name: 'THE SPIRE CAPACITOR', kind: 'capacitor' },
+    null: { name: 'THE VOID ARCHIVE', kind: 'archive' }
+  };
+
+  // tier scaling: tougher garrisons, richer clears
+  D.tierMult = function (tier) {
+    return { hp: tier === 2 ? 1.7 : 1, dmg: tier === 2 ? 1.35 : 1, loot: tier };
+  };
+
+  // dungeon zone ids: dg_<zone>_<archetype>_t<tier>
+  D.makeId = function (zone, arch, tier) { return 'dg_' + zone + '_' + arch + '_t' + (tier || 1); };
+
+  D.parseId = function (id) {
+    var m = /^dg_([a-z]+)_([a-z]+)_t([12])$/.exec(id);
+    if (!m) return null;
+    return { zone: m[1], arch: m[2], tier: parseInt(m[3], 10) };
+  };
+
+  // seeded rng (self-contained so generators stay pure)
+  function rng(seedStr) {
+    var s = 0;
+    for (var i = 0; i < seedStr.length; i++) s = (Math.imul(s, 31) + seedStr.charCodeAt(i)) >>> 0;
+    s = s || 1;
+    return function () {
+      s ^= s << 13; s >>>= 0;
+      s ^= s >> 17;
+      s ^= s << 5; s >>>= 0;
+      return s / 4294967296;
+    };
+  }
+  D.rng = rng;
+
+  // ---------------------------------------------------------------
+  // LABYRINTH generator: odd-sized grid maze via recursive backtracker.
+  // Returns { n, cell, grid } — grid[r][c] true = wall. The entry
+  // corridor (bottom middle) and heart (center) are always open.
+  // ---------------------------------------------------------------
+  D.genMaze = function (seed, n, cell) {
+    n = n || 21; // odd
+    var rnd = rng('maze:' + seed);
+    var grid = [];
+    for (var r = 0; r < n; r++) {
+      grid.push([]);
+      for (var c = 0; c < n; c++) grid[r].push(true);
+    }
+    // carve from the center on odd cells
+    var stack = [[1, 1]];
+    grid[1][1] = false;
+    var dirs = [[0, 2], [0, -2], [2, 0], [-2, 0]];
+    while (stack.length) {
+      var cur = stack[stack.length - 1];
+      var options = [];
+      for (var d = 0; d < 4; d++) {
+        var nr = cur[0] + dirs[d][0], nc = cur[1] + dirs[d][1];
+        if (nr > 0 && nr < n - 1 && nc > 0 && nc < n - 1 && grid[nr][nc]) options.push(d);
+      }
+      if (!options.length) { stack.pop(); continue; }
+      var pick = options[Math.floor(rnd() * options.length)];
+      var mr = cur[0] + dirs[pick][0] / 2, mc = cur[1] + dirs[pick][1] / 2;
+      var tr = cur[0] + dirs[pick][0], tc = cur[1] + dirs[pick][1];
+      grid[mr][mc] = false;
+      grid[tr][tc] = false;
+      stack.push([tr, tc]);
+    }
+    // gate mouth: open the bottom middle into the maze
+    var mid = Math.floor(n / 2);
+    grid[n - 1][mid] = false;
+    grid[n - 2][mid] = false;
+    // heart chamber: a 3x3 clearing at the center
+    for (var hr = mid - 1; hr <= mid + 1; hr++) {
+      for (var hc = mid - 1; hc <= mid + 1; hc++) grid[hr][hc] = false;
+    }
+    // a few extra breaches so it loops instead of being one true path
+    for (var b = 0; b < Math.floor(n * 0.6); b++) {
+      var rr2 = 1 + Math.floor(rnd() * (n - 2));
+      var cc2 = 1 + Math.floor(rnd() * (n - 2));
+      if ((rr2 % 2 === 1 || cc2 % 2 === 1)) grid[rr2][cc2] = false;
+    }
+    return { n: n, cell: cell || 10, grid: grid };
+  };
+
+  // world position → maze cell lookup (true = blocked)
+  D.mazeBlocked = function (maze, size, x, z) {
+    var half = size / 2;
+    var c = Math.floor((x + half) / maze.cell);
+    var r = Math.floor((z + half) / maze.cell);
+    if (r < 0 || c < 0 || r >= maze.n || c >= maze.n) return false;
+    return maze.grid[r][c];
+  };
+
+  // cell center in world coords
+  D.mazeCellPos = function (maze, size, r, c) {
+    var half = size / 2;
+    return { x: (c + 0.5) * maze.cell - half, z: (r + 0.5) * maze.cell - half };
+  };
+
+  // ---------------------------------------------------------------
+  // GAUNTLET: a winding chain of checkpoints from the entry to the
+  // far chamber. Touch them in order; each adds seconds to the clock.
+  // ---------------------------------------------------------------
+  D.genGauntlet = function (seed, size) {
+    var rnd = rng('rush:' + seed);
+    var half = size / 2;
+    var pts = [];
+    var n = 6;
+    for (var i = 0; i < n; i++) {
+      var t = (i + 1) / (n + 1);
+      pts.push({
+        idx: i,
+        x: (rnd() - 0.5) * (size * 0.72) * (i === n - 1 ? 0.3 : 1),
+        z: (half - 26) - t * (size - 56)
+      });
+    }
+    return pts; // last point is the finish chamber
+  };
+
+  // ---------------------------------------------------------------
+  // FLUXWAYS: a band of shifting tiles. Pattern: diagonal safe lanes
+  // that sweep sideways over time; everything else scorches.
+  // safeAt(cfg, time, x, z) is the single source of truth.
+  // ---------------------------------------------------------------
+  D.genFlux = function (size) {
+    return {
+      tile: 10,
+      cols: Math.floor((size - 40) / 10),
+      rows: Math.floor((size * 0.6) / 10),
+      zTop: -size / 2 + 30,           // band start (far side is the prize)
+      period: 2.2,                     // lane sweep speed
+      laneEvery: 3                     // one safe lane per 3 columns
+    };
+  };
+
+  D.fluxSafe = function (cfg, time, x, z, size) {
+    var half = size / 2;
+    var zIn = z - cfg.zTop;
+    if (zIn < 0 || zIn > cfg.rows * cfg.tile) return true; // outside the band
+    var col = Math.floor((x + half - 20) / cfg.tile);
+    if (col < 0 || col >= cfg.cols) return true;
+    var row = Math.floor(zIn / cfg.tile);
+    var sweep = Math.floor(time / cfg.period);
+    // diagonal lanes: safe when (col + row + sweep) lines up
+    return ((col + row + sweep) % cfg.laneEvery) === 0;
+  };
+
+  return D;
+})();
+
+</script>
+<script>
 // HERO FRAME — THE SHATTERED REACH
 // A zone-streamed world: each territory is its own HUGE map (500×500),
 // linked by travel gates, and every territory hides a gated DUNGEON —
@@ -4291,14 +4542,20 @@ GH.world = (function () {
   W.current = null; // {id, danger, dungeon, parent, size, name}
 
   W.zoneInfo = function (zoneId) {
+    // legacy saves: 'dungeon_<zone>' was the single-dungeon era
     if (zoneId.indexOf('dungeon_') === 0) {
-      var parent = zoneId.slice(8);
-      var pz = W.zoneById(parent);
+      zoneId = GH.dungeons.makeId(zoneId.slice(8), 'depths', 1);
+    }
+    var dg = GH.dungeons.parseId(zoneId);
+    if (dg) {
+      var pz = W.zoneById(dg.zone);
+      var arch = GH.dungeons.ARCHETYPES[dg.arch];
       return {
-        id: zoneId, dungeon: true, parent: parent,
-        danger: Math.min(4, pz.danger + 1),
-        size: W.DUNGEON_SIZE,
-        name: W.stageFor(parent).name + ' DEPTHS'
+        id: zoneId, dungeon: true, parent: dg.zone,
+        arch: dg.arch, tier: dg.tier,
+        danger: Math.min(4, pz.danger + dg.tier),
+        size: arch.size,
+        name: W.stageFor(dg.zone).name + ' ' + arch.name + (dg.tier === 2 ? ' II' : '')
       };
     }
     var zn = W.zoneById(zoneId);
@@ -4321,7 +4578,11 @@ GH.world = (function () {
   };
 
   W.stageFor = function (zoneId) {
-    if (zoneId && zoneId.indexOf('dungeon_') === 0) zoneId = zoneId.slice(8);
+    if (zoneId) {
+      if (zoneId.indexOf('dungeon_') === 0) zoneId = zoneId.slice(8);
+      var dg = GH.dungeons.parseId(zoneId);
+      if (dg) zoneId = dg.zone;
+    }
     for (var i = 0; i < GH.stages.length; i++) {
       if (GH.stages[i].id === zoneId) return GH.stages[i];
     }
@@ -4365,12 +4626,20 @@ GH.world = (function () {
         var gp = gatePos(sides[to], size);
         lay.gates.push({ to: to, x: gp.x, z: gp.z, side: sides[to] });
       }
-      // the dungeon gate sits deep in the territory
-      var dgx = (rnd() - 0.5) * (size * 0.5);
-      var dgz = (rnd() - 0.5) * (size * 0.5);
-      if (zoneId === 'wreck') { dgx = -140; dgz = -120; } // clear of the hub
-      lay.dungeonGate = { to: 'dungeon_' + zoneId, x: dgx, z: dgz };
-      lay.gates.push(lay.dungeonGate);
+      // THREE dungeon gates per territory: the depths plus two more
+      // archetypes from the zone's set, scattered deep in the map
+      var archList = ['depths'].concat(GH.dungeons.ZONE_SETS[zoneId] || []);
+      archList.forEach(function (arch, ai) {
+        var dgx = (rnd() - 0.5) * (size * 0.62);
+        var dgz = (rnd() - 0.5) * (size * 0.62);
+        if (zoneId === 'wreck') {
+          // keep the hub's gates clear of camp and circuit
+          if (ai === 0) { dgx = -140; dgz = -120; }
+          if (GH.dist2(dgx, dgz, W.CAMP.x, W.CAMP.z) < 45 * 45) dgz -= 110;
+          if (GH.dist2(dgx, dgz, W.CIRCUIT.x, W.CIRCUIT.z) < 50 * 50) dgx -= 110;
+        }
+        lay.gates.push({ to: GH.dungeons.makeId(zoneId, arch, 1), x: dgx, z: dgz, arch: arch });
+      });
 
       // husk nests scattered wide
       var count = zoneId === 'wreck' ? 8 : 14;
@@ -4392,20 +4661,101 @@ GH.world = (function () {
       // siege relays hold the middle of two territories
       if (zoneId === 'wreck') lay.relay = { id: 'relay_wreck', zone: zoneId, x: 110, z: -80 };
       if (zoneId === 'storm') lay.relay = { id: 'relay_storm', zone: zoneId, x: -90, z: 100 };
-    } else {
-      // DUNGEON: exit gate south, guardian packs along the hall,
-      // the sealed vault mid-depth, the corrupt-frame lair at the end
-      lay.gates.push({ to: info.parent, x: 0, z: half - 16, exit: true });
-      var packs = 5;
-      for (var p = 0; p < packs; p++) {
-        lay.packs.push({
-          x: (rnd() - 0.5) * (size - 70),
-          z: half - 50 - p * ((size - 90) / packs) + (rnd() - 0.5) * 24,
-          n: 3 + Math.floor(rnd() * 3)
+
+      // landmarks: ruin rings, crashed hulks, sub-biome stains, and
+      // roads running from each travel gate toward the map's heart
+      lay.ruins = [];
+      for (var ru = 0; ru < 3; ru++) {
+        lay.ruins.push({
+          x: (rnd() - 0.5) * (size * 0.7),
+          z: (rnd() - 0.5) * (size * 0.7),
+          kind: ru === 2 ? 'hulk' : 'ring'
         });
       }
-      lay.vault = { id: 'vault_' + info.parent, zone: info.parent, x: (rnd() < 0.5 ? -1 : 1) * (half - 45), z: 0 };
-      lay.lair = { id: 'lair_' + info.parent, zone: info.parent, x: 0, z: -half + 30, boss: W.stageFor(info.parent).unlocks };
+      lay.stains = [];
+      for (var stn = 0; stn < 4; stn++) {
+        lay.stains.push({
+          x: (rnd() - 0.5) * (size * 0.8),
+          z: (rnd() - 0.5) * (size * 0.8),
+          r: 22 + rnd() * 26
+        });
+      }
+    } else {
+      // ---- DUNGEONS: exit gate south, archetype decides the rest ----
+      lay.gates.push({ to: info.parent, x: 0, z: half - 16, exit: true });
+      var arch2 = info.arch;
+
+      if (arch2 === 'depths') {
+        var packs = 5;
+        for (var p = 0; p < packs; p++) {
+          lay.packs.push({
+            x: (rnd() - 0.5) * (size - 70),
+            z: half - 50 - p * ((size - 90) / packs) + (rnd() - 0.5) * 24,
+            n: 3 + Math.floor(rnd() * 3)
+          });
+        }
+        if (info.tier === 1) {
+          lay.vault = { id: 'vault_' + info.parent, zone: info.parent, x: (rnd() < 0.5 ? -1 : 1) * (half - 45), z: 0 };
+          lay.lair = { id: 'lair_' + info.parent, zone: info.parent, x: 0, z: -half + 30, boss: W.stageFor(info.parent).unlocks };
+        } else {
+          // tier 2: no vault — a denser garrison and a corrupt rematch
+          lay.packs.push({ x: 0, z: 0, n: 5 });
+          lay.lair = { id: 'lair2_' + info.parent, zone: info.parent, x: 0, z: -half + 30, boss: W.stageFor(info.parent).unlocks, rematch: true };
+        }
+      } else if (arch2 === 'hive') {
+        var hp2 = 7 + (info.tier === 2 ? 3 : 0);
+        for (var h = 0; h < hp2; h++) {
+          lay.packs.push({
+            x: (rnd() - 0.5) * (size - 60),
+            z: (rnd() - 0.5) * (size - 60),
+            n: 3 + Math.floor(rnd() * 3)
+          });
+        }
+      } else if (arch2 === 'bastion') {
+        lay.objective = {
+          x: 0, z: 0,
+          def: GH.dungeons.OBJECTIVES[info.parent],
+          hp: 500 + info.danger * 150
+        };
+        // attackers pour from four breaches
+        lay.breaches = [
+          { x: -half + 20, z: 0 }, { x: half - 20, z: 0 },
+          { x: 0, z: -half + 20 }, { x: half - 30, z: -half + 30 }
+        ];
+      } else if (arch2 === 'labyrinth') {
+        lay.maze = GH.dungeons.genMaze(zoneId, 21, Math.floor(size / 21));
+        var mid = Math.floor(lay.maze.n / 2);
+        lay.heart = GH.dungeons.mazeCellPos(lay.maze, size, mid, mid);
+        // the entry gate must stand square with the maze mouth
+        var mouth = GH.dungeons.mazeCellPos(lay.maze, size, lay.maze.n - 1, mid);
+        lay.gates[0].x = mouth.x;
+        // lurkers in the corridors
+        for (var lk = 0; lk < 8 + (info.tier === 2 ? 4 : 0); lk++) {
+          var lr, lc, guard = 0;
+          do {
+            lr = 1 + Math.floor(rnd() * (lay.maze.n - 2));
+            lc = 1 + Math.floor(rnd() * (lay.maze.n - 2));
+          } while (lay.maze.grid[lr][lc] && guard++ < 40);
+          var lp = GH.dungeons.mazeCellPos(lay.maze, size, lr, lc);
+          lay.packs.push({ x: lp.x, z: lp.z, n: 1 });
+        }
+      } else if (arch2 === 'gauntlet') {
+        lay.checkpoints = GH.dungeons.genGauntlet(zoneId, size);
+        // harriers along the route
+        lay.checkpoints.forEach(function (cp, ci) {
+          if (ci % 2 === 0) lay.packs.push({ x: cp.x + 8, z: cp.z + 8, n: 2 });
+        });
+      } else if (arch2 === 'fluxways') {
+        lay.flux = GH.dungeons.genFlux(size);
+        lay.chest = { x: 0, z: -half + 22 };
+        lay.packs.push({ x: 0, z: -half + 40, n: 3 }); // the far-side welcome
+      }
+      // every non-depths dungeon pays out at a chest (flux set its own)
+      if (!lay.chest && arch2 !== 'depths') {
+        lay.chest = arch2 === 'labyrinth' ? { x: lay.heart.x, z: lay.heart.z } :
+          arch2 === 'gauntlet' ? { x: lay.checkpoints[lay.checkpoints.length - 1].x, z: lay.checkpoints[lay.checkpoints.length - 1].z } :
+          { x: 0, z: -half + 26 };
+      }
     }
     return lay;
   };
@@ -4503,9 +4853,11 @@ GH.world = (function () {
       group.add(collar);
     }
 
-    // props: dense enough to feel like terrain, not a floor
+    // props: dense enough to feel like terrain, not a floor.
+    // Mazes and flux floors keep their arenas clean.
     var rnd = zrng('props:' + zoneId);
-    var propCount = info.dungeon ? 46 : 150;
+    var propCount = info.dungeon ?
+      (info.arch === 'labyrinth' || info.arch === 'fluxways' ? 0 : 46) : 150;
     for (var i = 0; i < propCount; i++) {
       var kind = st.props[Math.floor(rnd() * st.props.length)];
       var p = GH.models.props[kind]();
@@ -4551,9 +4903,105 @@ GH.world = (function () {
       vaultMeshes[lay.vault.id] = vault;
     }
 
+    // ---- archetype set pieces ----
+    var chestMesh = null, objectiveMesh = null, fluxTiles = null, cpMeshes = null;
+    if (lay.maze) {
+      // raise the maze: one shared material, a box per wall cell
+      var wallMat = GH.assets.lambert({ map: tex.wall });
+      var mc = lay.maze.cell;
+      for (var mr = 0; mr < lay.maze.n; mr++) {
+        for (var mcc = 0; mcc < lay.maze.n; mcc++) {
+          if (!lay.maze.grid[mr][mcc]) continue;
+          var wp = GH.dungeons.mazeCellPos(lay.maze, size, mr, mcc);
+          var wall = new THREE.Mesh(new THREE.BoxGeometry(mc, 7, mc), wallMat);
+          wall.position.set(wp.x, 3.5, wp.z);
+          group.add(wall);
+        }
+      }
+    }
+    if (lay.flux) {
+      // the shifting floor: one plate per tile, recolored live
+      fluxTiles = [];
+      var half2 = size / 2;
+      for (var fr = 0; fr < lay.flux.rows; fr++) {
+        for (var fc = 0; fc < lay.flux.cols; fc++) {
+          var tileMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(lay.flux.tile - 0.6, lay.flux.tile - 0.6),
+            new THREE.MeshBasicMaterial({ color: 0x992211, transparent: true, opacity: 0.4, depthWrite: false }));
+          tileMesh.rotation.x = -Math.PI / 2;
+          var tx = -half2 + 20 + (fc + 0.5) * lay.flux.tile;
+          var tz = lay.flux.zTop + (fr + 0.5) * lay.flux.tile;
+          tileMesh.position.set(tx, 0.06, tz);
+          tileMesh.userData.fx = tx;
+          tileMesh.userData.fz = tz;
+          group.add(tileMesh);
+          fluxTiles.push(tileMesh);
+        }
+      }
+    }
+    if (lay.checkpoints) {
+      cpMeshes = [];
+      lay.checkpoints.forEach(function (cp, ci) {
+        var ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.22, 4, 20),
+          GH.assets.basic(ci === lay.checkpoints.length - 1 ? 0xffd050 : 0x60c8ff,
+            { transparent: true, opacity: 0.8 }));
+        ring.rotation.x = Math.PI / 2;
+        ring.position.set(cp.x, 0.4, cp.z);
+        group.add(ring);
+        cpMeshes.push(ring);
+      });
+    }
+    if (lay.objective) {
+      objectiveMesh = GH.models.buildObjective(lay.objective.def.kind);
+      objectiveMesh.position.set(lay.objective.x, 0, lay.objective.z);
+      group.add(objectiveMesh);
+    }
+    if (lay.chest) {
+      chestMesh = GH.models.buildChest();
+      chestMesh.position.set(lay.chest.x, 0, lay.chest.z);
+      group.add(chestMesh);
+    }
+
+    // ---- overworld landmarks: ruins, hulks, stains, roads ----
+    if (!info.dungeon) {
+      (lay.stains || []).forEach(function (stn) {
+        var stain = new THREE.Mesh(new THREE.CircleGeometry(stn.r, 20),
+          new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.16, depthWrite: false }));
+        stain.rotation.x = -Math.PI / 2;
+        stain.position.set(stn.x, 0.03, stn.z);
+        group.add(stain);
+      });
+      (lay.ruins || []).forEach(function (rn) {
+        if (rn.kind === 'hulk') {
+          var hulk = GH.models.buildWreckSite();
+          hulk.scale.setScalar(2.6);
+          hulk.position.set(rn.x, 0, rn.z);
+          group.add(hulk);
+        } else {
+          for (var rp = 0; rp < 7; rp++) {
+            var ra = (rp / 7) * Math.PI * 2;
+            var pillar = GH.models.buildPillar();
+            pillar.position.set(rn.x + Math.cos(ra) * 9, 0, rn.z + Math.sin(ra) * 9);
+            group.add(pillar);
+          }
+        }
+      });
+      // roads: worn strips from each edge gate toward the middle
+      lay.gates.forEach(function (gt) {
+        if (gt.arch) return; // dungeon mouths keep their mystery
+        var len = Math.sqrt(gt.x * gt.x + gt.z * gt.z) * 0.82;
+        var road = new THREE.Mesh(new THREE.PlaneGeometry(6, len),
+          new THREE.MeshBasicMaterial({ color: 0xfff2d0, transparent: true, opacity: 0.1, depthWrite: false }));
+        road.rotation.x = -Math.PI / 2;
+        road.rotation.z = -Math.atan2(gt.x, gt.z);
+        road.position.set(gt.x / 2, 0.04, gt.z / 2);
+        group.add(road);
+      });
+    }
+
     // travel gates
     lay.gates.forEach(function (gt) {
-      var toInfo = gt.to.indexOf('dungeon_') === 0 ? { dungeon: true } : W.zoneInfo(gt.to);
+      var toInfo = W.zoneInfo(gt.to);
       var mesh = GH.models.buildGate(gt.exit ? 'exit' : (toInfo.dungeon ? 'dungeon' : 'travel'));
       mesh.position.set(gt.x, 0, gt.z);
       // gates on the map edge face inward
@@ -4593,7 +5041,12 @@ GH.world = (function () {
     }
 
     scene.add(group);
-    return { group: group, nestMeshes: nestMeshes, vaultMeshes: vaultMeshes, layout: lay, info: info };
+    return {
+      group: group, nestMeshes: nestMeshes, vaultMeshes: vaultMeshes,
+      chestMesh: chestMesh, objectiveMesh: objectiveMesh,
+      fluxTiles: fluxTiles, cpMeshes: cpMeshes,
+      layout: lay, info: info
+    };
   };
 
   // interact prompts for the loaded zone
@@ -4614,6 +5067,12 @@ GH.world = (function () {
     }
     if (layout.vault) {
       list.push({ kind: 'vault', id: layout.vault.id, x: layout.vault.x, z: layout.vault.z, label: 'BREACH THE VAULT (FIELD TRIAL)' });
+    }
+    if (layout.objective) {
+      list.push({ kind: 'objective', x: layout.objective.x, z: layout.objective.z, label: 'AWAKEN ' + layout.objective.def.name + ' (DEFENSE)' });
+    }
+    if (layout.chest) {
+      list.push({ kind: 'chest', x: layout.chest.x, z: layout.chest.z, label: 'OPEN THE REWARD CACHE' });
     }
     return list;
   };
@@ -5692,6 +6151,16 @@ GH.game = (function () {
         if (GH.progress.grantArtifact(lairArtifacts[e.lairZone])) {
           queueAnnounce('ARTIFACT — ' + GH.progress.artifactById(lairArtifacts[e.lairZone]).name.toUpperCase(), 28);
         }
+        // the depths pay like every other dungeon: cleared + the way down
+        if (dungeonState) {
+          GH.meta.data.world.dungeons[curZone] = true;
+          if (dungeonState.tier === 1) {
+            spawnDeeperGate(e.x, e.z - 12);
+          } else {
+            coinsRun += 60;
+            queueAnnounce('DEPTHS II CONQUERED — +60 SALVAGE', 26);
+          }
+        }
         saveExpedition();
       }
     }
@@ -5802,6 +6271,12 @@ GH.game = (function () {
       if (mate && !mate.down) {
         if (GH.dist2(e.x, e.z, mate.x, mate.z) < GH.dist2(e.x, e.z, player.x, player.z)) tgtP = mate;
       }
+      // BASTION attackers press the relic unless a pilot is in their face
+      if (e.defendObj && dungeonState && dungeonState.defenseActive && worldH.layout.objective) {
+        if (GH.dist2(e.x, e.z, player.x, player.z) > 10 * 10) {
+          tgtP = { x: worldH.layout.objective.x, z: worldH.layout.objective.z };
+        }
+      }
       var dx = tgtP.x - e.x, dz = tgtP.z - e.z;
       var dist = Math.sqrt(dx * dx + dz * dz) || 0.001;
       var nx = dx / dist, nz = dz / dist;
@@ -5845,8 +6320,9 @@ GH.game = (function () {
 
       // territorial AI: out in the Reach, hostiles hold their ground.
       // They wake when you close in (or wound them), give chase, and
-      // walk home when you leave their hunting range.
-      if (expActive && !def.boss) {
+      // walk home when you leave their hunting range. Event spawns
+      // (sieges, defenses, summons, guardians) never stand down.
+      if (expActive && !def.boss && !e.event) {
         var aggroR = def.behavior === 'ranged' ? 16 : 11;
         if (!e.aggro) {
           if (dist < aggroR || e.hp < e.maxHp) {
@@ -5934,7 +6410,7 @@ GH.game = (function () {
           var sid = def.summons || GH.weightedPick(wavePlan.types).id;
           for (var s2 = 0; s2 < (def.summonCount || 3) + (frantic ? 1 : 0); s2++) {
             var smn = spawnEnemy(sid, e.x + GH.rand(-2.5, 2.5), e.z + GH.rand(-2.5, 2.5));
-            if (smn) smn.aggro = true; // summons arrive angry
+            if (smn) { smn.aggro = true; smn.event = true; } // summons arrive angry
           }
         }
       } else if (def.behavior === 'corrupt') {
@@ -5958,6 +6434,7 @@ GH.game = (function () {
         }
       }
 
+      var ePreX = e.x, ePreZ = e.z;
       e.x += (mx * spd + sepX * 4 + e.vx) * dt;
       e.z += (mz * spd + sepZ * 4 + e.vz) * dt;
       e.vx *= Math.pow(0.02, dt);
@@ -5965,6 +6442,12 @@ GH.game = (function () {
       if (expActive) {
         e.x = GH.clamp(e.x, -GH.world.BOUNDS.x, GH.world.BOUNDS.x);
         e.z = GH.clamp(e.z, -GH.world.BOUNDS.z, GH.world.BOUNDS.z);
+        // hostiles respect the maze walls too
+        if (worldH && worldH.layout.maze &&
+          GH.dungeons.mazeBlocked(worldH.layout.maze, zoneNow.size, e.x, e.z)) {
+          e.x = ePreX;
+          e.z = ePreZ;
+        }
       } else {
         e.x = GH.clamp(e.x, -ARENA_R - 3, ARENA_R + 3);
         e.z = GH.clamp(e.z, -ARENA_R - 3, ARENA_R + 3);
@@ -7714,6 +8197,7 @@ GH.game = (function () {
     if (inHazard('vines', player.x, player.z)) spd *= 0.65;
     var onIce = !!inHazard('ice', player.x, player.z);
 
+    var preMoveX = player.x, preMoveZ = player.z; // for maze wall resolution
     if (player.dashTime > 0) {
       player.dashTime -= dt;
       player.x += player.dashX * 26 * dt;
@@ -7752,6 +8236,20 @@ GH.game = (function () {
     if (expActive) {
       player.x = GH.clamp(player.x, -GH.world.BOUNDS.x, GH.world.BOUNDS.x);
       player.z = GH.clamp(player.z, -GH.world.BOUNDS.z, GH.world.BOUNDS.z);
+      // LABYRINTH walls are solid: resolve per axis so you slide along them
+      if (worldH && worldH.layout.maze) {
+        var mzd = worldH.layout.maze;
+        if (GH.dungeons.mazeBlocked(mzd, zoneNow.size, player.x, player.z)) {
+          if (!GH.dungeons.mazeBlocked(mzd, zoneNow.size, player.x, preMoveZ)) {
+            player.z = preMoveZ;
+          } else if (!GH.dungeons.mazeBlocked(mzd, zoneNow.size, preMoveX, player.z)) {
+            player.x = preMoveX;
+          } else {
+            player.x = preMoveX;
+            player.z = preMoveZ;
+          }
+        }
+      }
     } else {
       player.x = GH.clamp(player.x, -ARENA_R, ARENA_R);
       player.z = GH.clamp(player.z, -ARENA_R, ARENA_R);
@@ -7858,13 +8356,15 @@ GH.game = (function () {
 
   function expeditionPlan(zone) {
     var st = GH.world.stageFor(zone.id);
-    // deliberate-combat tuning: fewer bodies, each one worth fighting
+    // deliberate-combat tuning: fewer bodies, each one worth fighting.
+    // Dungeon tiers stack a garrison multiplier on top.
+    var tm = zone.tier ? GH.dungeons.tierMult(zone.tier) : { hp: 1, dmg: 1 };
     return {
       duration: 999, rate: 0,
       types: st.roster(4 + zone.danger * 3),
       boss: null, midboss: null,
-      hpMult: (0.8 + (zone.danger - 1) * 0.9) * 1.5,
-      dmgMult: 0.9 + (zone.danger - 1) * 0.45,
+      hpMult: (0.8 + (zone.danger - 1) * 0.9) * 1.5 * tm.hp,
+      dmgMult: (0.9 + (zone.danger - 1) * 0.45) * tm.dmg,
       overrun: false
     };
   }
@@ -8020,16 +8520,9 @@ GH.game = (function () {
       wreckMesh.position.set(w.wreck.x, 0, w.wreck.z);
       scene.add(wreckMesh);
     }
-    // dungeon garrison stands ready the moment you walk in
-    if (zoneNow.dungeon) {
-      worldH.layout.packs.forEach(function (pk) {
-        for (var pi = 0; pi < pk.n; pi++) {
-          var pa = Math.random() * Math.PI * 2;
-          spawnEnemy(GH.weightedPick(wavePlan.types).id,
-            pk.x + Math.cos(pa) * GH.rand(1, 5), pk.z + Math.sin(pa) * GH.rand(1, 5));
-        }
-      });
-    }
+    // dungeon setup: garrison + the archetype's objective machine
+    dungeonState = null;
+    if (zoneNow.dungeon) initDungeon();
 
     if (fromZoneId) {
       announce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1], 28);
@@ -8041,6 +8534,243 @@ GH.game = (function () {
   function travelZone(gate) {
     saveExpedition();
     loadZone(gate.to, curZone);
+  }
+
+  // ------------------------------------------------------------
+  // DUNGEON ARCHETYPES — each gate leads to a different kind of run
+  // ------------------------------------------------------------
+  var dungeonState = null;
+
+  function initDungeon() {
+    var lay = worldH.layout;
+    dungeonState = {
+      arch: zoneNow.arch, tier: zoneNow.tier,
+      done: false, opened: false, spawned: false,
+      firstClear: !GH.meta.data.world.dungeons[curZone],
+      remaining: 0,
+      cp: 0, timer: 26,
+      defenseActive: false, defenseWon: false, failed: false,
+      wave: 0, waveT: 0, objHp: 0, objMax: 0,
+      fluxTick: 0
+    };
+    // garrison
+    lay.packs.forEach(function (pk) {
+      for (var pi = 0; pi < pk.n; pi++) {
+        var pa = Math.random() * Math.PI * 2;
+        spawnEnemy(GH.weightedPick(wavePlan.types).id,
+          pk.x + Math.cos(pa) * GH.rand(1, 5), pk.z + Math.sin(pa) * GH.rand(1, 5));
+      }
+    });
+    dungeonState.spawned = true;
+    if (lay.objective) {
+      dungeonState.objMax = lay.objective.hp;
+      dungeonState.objHp = lay.objective.hp;
+    }
+    queueAnnounce(GH.dungeons.ARCHETYPES[zoneNow.arch].desc.toUpperCase(), 20);
+  }
+
+  function chestReady() {
+    var ds = dungeonState;
+    if (!ds || ds.opened) return false;
+    if (ds.arch === 'hive' || ds.arch === 'gauntlet' || ds.arch === 'bastion') return ds.done;
+    return true; // labyrinth / fluxways: reaching the chest IS the feat
+  }
+
+  function openChest() {
+    var ds = dungeonState;
+    var lay = worldH.layout;
+    ds.opened = true;
+    var loot = 60 * zoneNow.danger * ds.tier;
+    GH.meta.data.salvage += loot;
+    coinsRun += 20 * ds.tier;
+    spawnPickup('gem:' + GH.pick(GH.gems.typeIds), lay.chest.x + 1.5, lay.chest.z + 1.5);
+    queueAnnounce('CACHE OPENED — +' + loot + ' SALVAGE BANKED', 26);
+    GH.audio.win();
+    if (ds.firstClear) {
+      spawnPickup('cache', lay.chest.x - 1.5, lay.chest.z + 1.5);
+      queueAnnounce('FIRST CLEAR — BONUS CACHE', 22);
+    }
+    GH.meta.data.world.dungeons[curZone] = true;
+    GH.meta.save();
+    if (worldH.chestMesh && worldH.chestMesh.userData.core) {
+      worldH.chestMesh.userData.core.material.opacity = 0.12;
+    }
+    if (ds.tier === 1) spawnDeeperGate(lay.chest.x, lay.chest.z - 10);
+    saveExpedition();
+  }
+
+  // tier 1 cleared: the way down opens
+  function spawnDeeperGate(x, z) {
+    var toId = GH.dungeons.makeId(zoneNow.parent, zoneNow.arch, 2);
+    var mesh = GH.models.buildGate('deeper');
+    var gz = GH.clamp(z, -GH.world.BOUNDS.z + 18, GH.world.BOUNDS.z - 18);
+    mesh.position.set(x, 0, gz);
+    mesh.rotation.y = Math.atan2(-x, -gz);
+    worldH.group.add(mesh);
+    worldH.layout.gates.push({ to: toId, x: x, z: gz, mesh: mesh, deeper: true });
+    queueAnnounce('A DEEPER GATE TEARS OPEN', 28);
+    GH.audio.boss();
+  }
+
+  function dungeonStatusText() {
+    var ds = dungeonState;
+    if (!ds) return null;
+    if (ds.opened) return 'CLEARED';
+    if (ds.arch === 'hive') return ds.done ? 'CACHE UNSEALED' : 'EXTERMINATE — ' + ds.remaining + ' LEFT';
+    if (ds.arch === 'gauntlet') {
+      return ds.done ? 'CACHE UNSEALED'
+        : 'RUSH ' + GH.fmt1(Math.max(0, ds.timer)) + 's · RING ' + (ds.cp + 1) + '/' + worldH.layout.checkpoints.length;
+    }
+    if (ds.arch === 'bastion') {
+      if (ds.done) return 'CACHE UNSEALED';
+      if (ds.failed) return 'RELIC LOST — AWAKEN IT AGAIN';
+      if (ds.defenseActive) return 'WAVE ' + ds.wave + '/4 · RELIC ' + Math.max(0, Math.round(ds.objHp / ds.objMax * 100)) + '%';
+      return 'AWAKEN THE RELIC';
+    }
+    if (ds.arch === 'labyrinth') return 'FIND THE HEART';
+    if (ds.arch === 'fluxways') return 'CROSS ON THE SAFE LANES';
+    return null; // depths reads like the wilds
+  }
+
+  function updateDungeon(dt) {
+    var ds = dungeonState;
+    if (!ds) return;
+    var lay = worldH.layout;
+    if (worldH.chestMesh && worldH.chestMesh.userData.core && !ds.opened) {
+      worldH.chestMesh.userData.core.material.opacity = 0.6 + Math.sin(runTime * 5) * 0.3;
+    }
+
+    if (ds.arch === 'hive' && !ds.done) {
+      var alive = 0;
+      for (var i = 0; i < enemies.length; i++) {
+        if (!enemies[i].dead && !enemies[i].nestId && !enemies[i].def.boss) alive++;
+      }
+      ds.remaining = alive;
+      if (ds.spawned && alive === 0) {
+        ds.done = true;
+        announce('HIVE EXTERMINATED — THE CACHE UNSEALS', 28);
+        GH.audio.win();
+      }
+    } else if (ds.arch === 'gauntlet' && !ds.done) {
+      ds.timer -= dt;
+      var cps = lay.checkpoints;
+      var cur = cps[ds.cp];
+      if (worldH.cpMeshes && worldH.cpMeshes[ds.cp]) {
+        worldH.cpMeshes[ds.cp].rotation.z += dt * 3; // the live ring spins
+        worldH.cpMeshes[ds.cp].scale.setScalar(1 + Math.sin(runTime * 6) * 0.12);
+      }
+      if (cur && GH.dist2(player.x, player.z, cur.x, cur.z) < 4.2 * 4.2) {
+        if (worldH.cpMeshes[ds.cp]) worldH.cpMeshes[ds.cp].material.opacity = 0.15;
+        ds.cp++;
+        ds.timer += 11;
+        GH.audio.coin();
+        if (ds.cp >= cps.length) {
+          ds.done = true;
+          announce('GAUNTLET CLEARED — THE CACHE UNSEALS', 28);
+          GH.audio.win();
+        } else {
+          announce('RING ' + ds.cp + '/' + cps.length, 18);
+        }
+      }
+      if (!ds.done && ds.timer <= 0) {
+        ds.cp = 0;
+        ds.timer = 26;
+        worldH.cpMeshes.forEach(function (m) { m.material.opacity = 0.8; });
+        player.x = 0;
+        player.z = GH.world.BOUNDS.z - 26;
+        announce('OUT OF TIME — RUN IT AGAIN', 24);
+        GH.audio.hit();
+      }
+    } else if (ds.arch === 'fluxways') {
+      var lf = lay.flux;
+      // recolor the shifting tiles from the same truth the damage uses
+      if (worldH.fluxTiles) {
+        for (var ti = 0; ti < worldH.fluxTiles.length; ti++) {
+          var tile = worldH.fluxTiles[ti];
+          var safe = GH.dungeons.fluxSafe(lf, runTime, tile.userData.fx, tile.userData.fz, zoneNow.size);
+          tile.material.color.setHex(safe ? 0x2a8a4a : 0x992211);
+          tile.material.opacity = safe ? 0.22 : 0.4 + Math.sin(runTime * 8) * 0.06;
+        }
+      }
+      if (!GH.dungeons.fluxSafe(lf, runTime, player.x, player.z, zoneNow.size)) {
+        ds.fluxTick -= dt;
+        if (ds.fluxTick <= 0) {
+          ds.fluxTick = 0.5;
+          playerDamage(8 + zoneNow.danger * 4 + player.stats.armor, null, 'arc');
+        }
+      } else {
+        ds.fluxTick = 0.25;
+      }
+    } else if (ds.arch === 'bastion' && ds.defenseActive) {
+      updateDefense(dt);
+    }
+  }
+
+  function startDefense() {
+    var ds = dungeonState;
+    ds.defenseActive = true;
+    ds.failed = false;
+    ds.objHp = ds.objMax;
+    ds.wave = 0;
+    ds.waveT = 4;
+    announce('DEFEND ' + worldH.layout.objective.def.name, 30);
+    GH.music.setBoss(true);
+    GH.audio.boss();
+  }
+
+  function updateDefense(dt) {
+    var ds = dungeonState;
+    var lay = worldH.layout;
+    ds.waveT -= dt;
+    if (ds.waveT <= 0 && ds.wave < 4) {
+      ds.wave++;
+      ds.waveT = 20;
+      var n = 5 + zoneNow.danger * 2 + ds.wave;
+      for (var i = 0; i < n; i++) {
+        var br = lay.breaches[i % lay.breaches.length];
+        var de = spawnEnemy(GH.weightedPick(wavePlan.types).id,
+          br.x + GH.rand(-4, 4), br.z + GH.rand(-4, 4));
+        if (de) { de.aggro = true; de.event = true; de.defendObj = true; }
+      }
+      announce('WAVE ' + ds.wave + '/4', 22);
+    }
+    // attackers grind the relic down when they reach it — but only so
+    // many can crowd the pedestal at once
+    var chewing = 0;
+    for (var ci = 0; ci < enemies.length; ci++) {
+      var ce = enemies[ci];
+      if (ce.dead || !ce.defendObj) continue;
+      if (GH.dist2(ce.x, ce.z, lay.objective.x, lay.objective.z) < 5.5 * 5.5) chewing++;
+    }
+    chewing = Math.min(chewing, 8);
+    if (chewing > 0) ds.objHp -= chewing * (1.5 + zoneNow.danger * 0.8) * dt;
+    // objective mesh groans as it wears
+    if (worldH.objectiveMesh && worldH.objectiveMesh.userData.core) {
+      worldH.objectiveMesh.userData.core.rotation.y += dt * 0.6;
+      worldH.objectiveMesh.position.y = ds.objHp < ds.objMax * 0.35 ? Math.sin(runTime * 20) * 0.05 : 0;
+    }
+    if (ds.objHp <= 0) {
+      ds.defenseActive = false;
+      ds.failed = true;
+      GH.music.setBoss(false);
+      announce('THE RELIC IS LOST — AWAKEN IT TO TRY AGAIN', 28);
+      GH.audio.die();
+      return;
+    }
+    // survived every wave and cleaned the field?
+    if (ds.wave >= 4) {
+      var living = 0;
+      for (var li = 0; li < enemies.length; li++) {
+        if (!enemies[li].dead && enemies[li].defendObj) living++;
+      }
+      if (living === 0) {
+        ds.defenseActive = false;
+        ds.done = true;
+        GH.music.setBoss(false);
+        announce('THE RELIC SURVIVES — THE CACHE UNSEALS', 30);
+        GH.audio.win();
+      }
+    }
   }
 
   G.startExpedition = function (mechIndex) {
@@ -8149,6 +8879,7 @@ GH.game = (function () {
 
     updateWeather(dt);
     updateHarrow(dt);
+    updateDungeon(dt);
 
     // travel gates: walk into the veil and you're through
     if (travelCd > 0) travelCd -= dt;
@@ -8227,8 +8958,9 @@ GH.game = (function () {
     }
 
     // the dungeon lair: crossing the threshold wakes the corrupted frame
+    // (tier-2 rematches wake regardless of the surface scar)
     var lair = worldH.layout.lair;
-    if (lair && !w.lairsDown[lair.zone] && !lair.woke &&
+    if (lair && (lair.rematch || !w.lairsDown[lair.zone]) && !lair.woke &&
       GH.dist2(player.x, player.z, lair.x, lair.z) < 14 * 14) {
       lair.woke = true;
       var lboss = spawnEnemy(lair.boss, lair.x, lair.z + 3);
@@ -8244,7 +8976,10 @@ GH.game = (function () {
       var it = interactables[ii];
       if (it.kind === 'relay' && w.relaysHeld[it.id]) continue;
       if (it.kind === 'vault' && (w.vaults[it.id] || cipherRun)) continue;
-      if (GH.dist2(player.x, player.z, it.x, it.z) < 3.2 * 3.2) { nearInteract = it; break; }
+      if (it.kind === 'chest' && (!dungeonState || dungeonState.opened)) continue;
+      if (it.kind === 'objective' && (!dungeonState || dungeonState.defenseActive || dungeonState.done)) continue;
+      var iR = it.kind === 'objective' ? 5.5 : 3.2; // the relic pedestal is wide
+      if (GH.dist2(player.x, player.z, it.x, it.z) < iR * iR) { nearInteract = it; break; }
     }
     var promptEl = document.getElementById('interact-line');
     if (nearInteract && !siege) {
@@ -8271,6 +9006,14 @@ GH.game = (function () {
       if (nearInteract && !siege) {
         if (nearInteract.kind === 'relay') startSiege(nearInteract);
         else if (nearInteract.kind === 'vault') startVaultTrial(nearInteract);
+        else if (nearInteract.kind === 'objective') startDefense();
+        else if (nearInteract.kind === 'chest') {
+          if (chestReady()) openChest();
+          else {
+            announce('SEALED — FINISH THE ' + GH.dungeons.ARCHETYPES[zoneNow.arch].name, 22);
+            GH.audio.hit();
+          }
+        }
         else if (nearInteract.kind === 'duel' || nearInteract.kind === 'circuit') {
           saveExpedition();
           G.startRace(nearInteract.kind);
@@ -8362,6 +9105,22 @@ GH.game = (function () {
       ctx.rotate(Math.PI / 4);
       ctx.fillRect(-2, -2, 4, 4);
       ctx.restore();
+    }
+    if (worldH.layout.chest) {
+      ctx.fillStyle = dungeonState && dungeonState.opened ? '#4a5a4a' : '#ffd050';
+      ctx.fillRect(sx(worldH.layout.chest.x) - 2, sz(worldH.layout.chest.z) - 2, 4, 4);
+    }
+    if (worldH.layout.objective) {
+      ctx.strokeStyle = '#80d8ff';
+      ctx.beginPath();
+      ctx.arc(sx(worldH.layout.objective.x), sz(worldH.layout.objective.z), 3.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (worldH.layout.checkpoints && dungeonState) {
+      worldH.layout.checkpoints.forEach(function (cp, ci) {
+        ctx.fillStyle = ci < dungeonState.cp ? '#4a5a4a' : ci === dungeonState.cp ? '#60c8ff' : '#2a4a5a';
+        ctx.fillRect(sx(cp.x) - 1.5, sz(cp.z) - 1.5, 3, 3);
+      });
     }
     if (harrowSpot && harrowSpot.zone === curZone) {
       // the roamer's roost pulses red
@@ -8503,7 +9262,7 @@ GH.game = (function () {
           var sgE = spawnEnemy(pick.id,
             siege.relay.x + Math.cos(a) * GH.rand(16, 22),
             siege.relay.z + Math.sin(a) * GH.rand(16, 22));
-          if (sgE) sgE.aggro = true; // siege attackers press the relay
+          if (sgE) { sgE.aggro = true; sgE.event = true; } // siege attackers press the relay
         }
         announce('SIEGE WAVE ' + siege.phase + '/3', 24);
         siege.phase++;
@@ -8651,7 +9410,7 @@ GH.game = (function () {
       var a = Math.random() * Math.PI * 2;
       var vgE = spawnEnemy(GH.weightedPick(plan.types).id,
         v.x + Math.cos(a) * GH.rand(9, 14), v.z + Math.sin(a) * GH.rand(9, 14));
-      if (vgE) vgE.aggro = true; // the guardians wake hostile
+      if (vgE) { vgE.aggro = true; vgE.event = true; } // the guardians wake hostile
     }
     beginCipherStep();
   }
@@ -9340,7 +10099,9 @@ GH.game = (function () {
     el['xp-fill'].style.width = GH.clamp(player.xp / player.xpNeed * 100, 0, 100) + '%';
     el['lvl-text'].textContent = 'LVL ' + player.level;
     if (expActive) {
-      el['wave-timer'].textContent = zoneNow ? 'DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] : '';
+      var dst = dungeonStatusText();
+      el['wave-timer'].textContent = dst ||
+        (zoneNow ? 'DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] : '');
     } else {
       el['wave-timer'].textContent = GH.fmt1(Math.max(0, waveTimer));
     }
@@ -9516,6 +10277,7 @@ GH.game = (function () {
     if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
     if (harrowTotem) { scene.remove(harrowTotem); harrowTotem = null; }
     scene.fog.near = 18; scene.fog.far = 52; // undo whiteout/dungeon gloom
+    dungeonState = null;
     weatherNow = null;
     weatherToday = null;
     harrowSpot = null;
@@ -9966,6 +10728,14 @@ GH.game = (function () {
       zone: zoneNow ? zoneNow.id : null,
       gates: expActive && worldH ? worldH.layout.gates.map(function (g2) { return { to: g2.to, x: Math.round(g2.x), z: Math.round(g2.z) }; }) : null,
       dungeon: zoneNow ? !!zoneNow.dungeon : false,
+      dgState: dungeonState ? {
+        arch: dungeonState.arch, tier: dungeonState.tier, done: dungeonState.done,
+        opened: dungeonState.opened, remaining: dungeonState.remaining,
+        cp: dungeonState.cp, timer: Math.round(dungeonState.timer * 10) / 10,
+        wave: dungeonState.wave, objHp: Math.round(dungeonState.objHp), objMax: dungeonState.objMax,
+        defenseActive: dungeonState.defenseActive, failed: dungeonState.failed
+      } : null,
+      dungeonsCleared: Object.keys(GH.meta.data.world.dungeons || {}),
       px: player ? Math.round(player.x * 10) / 10 : 0,
       pz: player ? Math.round(player.z * 10) / 10 : 0,
       nests: expActive && worldH ? cleanseCount() : null,
@@ -9987,7 +10757,7 @@ GH.game = (function () {
       harrowDay: GH.meta.data.world.harrowDay,
       vaultsOpen: Object.keys(GH.meta.data.world.vaults),
       strafe: player && player.strafeInst ? Math.round(player.strafeInst.timer * 1000) : null,
-      target: target ? { id: target.id, hp: Math.round(target.hp) } : null,
+      target: target ? { id: target.id, hp: Math.round(target.hp), x: Math.round(target.x * 10) / 10, z: Math.round(target.z * 10) / 10 } : null,
       aggroed: enemies.filter(function (e2) { return !e2.dead && e2.aggro && !e2.nestId; }).length,
       energy: player ? Math.round(player.energy) : 0,
       cds: player ? [1, 2, 3, 4].map(function (n) { return Math.round(Math.max(0, player.abilityCds[n]) * 10) / 10; }) : null,
