@@ -33,7 +33,18 @@ GH.meta = (function () {
         totalRuns: 0, totalKills: 0, totalWins: 0
       },
       // stage trials: stageId -> { taskId: true }
-      trials: {}
+      trials: {},
+      // pilot mastery: mechId -> xp
+      mastery: {},
+      // relic season: reset when id changes
+      season: {
+        id: null, pts: 0, done: {}, relics: [], claimed: 0,
+        counters: { kills: 0, sparks: 0, resonances: 0, contracts: 0 },
+        stagesCleared: {}, framesWon: {}
+      },
+      // signal ciphers: dry-streak pity + owned chase cosmetics
+      cipher: { dry: 0, caches: 0 },
+      style: { trail: null, paint: null, drone: null, owned: {} }
     };
   };
 

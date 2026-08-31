@@ -21,9 +21,24 @@ GH.game = (function () {
   var selMechIndex = 0, selPreview = null, selSpin = 0;
   var weekly = null;   // active weekly-challenge modifiers
   var mate = null;     // co-op wingmate (player 2)
+  var cipherRun = null; // active signal-cipher step state
+  var picoDrone = null, picoAngle = 0;
   G.coop = false;
 
   G.hitStop = function (t) { hitStopT = Math.max(hitStopT, t); };
+
+  // season task announcements
+  function seasonTaskNotify(taskId) {
+    var t = GH.progress.seasonAward(taskId);
+    if (t) queueAnnounce('SEASON — ' + t.desc.toUpperCase() + ' (+' + t.pts + ')', 18);
+  }
+  function seasonAwardNotify(awardedIds) {
+    (awardedIds || []).forEach(function (id) {
+      GH.progress.seasonTasks.forEach(function (t) {
+        if (t.id === id) queueAnnounce('SEASON — ' + t.desc.toUpperCase() + ' (+' + t.pts + ')', 18);
+      });
+    });
+  }
 
   // award a stage-trial task; announces the task and any newly-finished tier
   function awardTrial(taskId) {
@@ -264,6 +279,7 @@ GH.game = (function () {
     player.hurtCd = 0.25;
     G.hitStop(0.05);
     shake = Math.min(0.5, shake + 0.18);
+    if (cipherRun && cipherRun.steps[cipherRun.idx].id === 'hold') cipherRun.t = 0;
     G.dmg.spawn(player.x, 2.6, player.z, dmg, 'player', 19);
     GH.audio.hurt();
     if (player.protocols.thorns && srcE && !srcE.dead) {
@@ -426,16 +442,27 @@ GH.game = (function () {
     else if (e.def.mass >= 3) G.hitStop(0.06);
     scene.remove(e.mesh);
 
-    // progression hooks: collection log, contracts, stage trials
+    // progression hooks: collection log, contracts, trials, season, ciphers
     GH.progress.logKill(e.id);
     var cdone = GH.progress.contractKill(e.id, stage.id);
     if (cdone) {
       queueAnnounce('CONTRACT COMPLETE — +' + cdone.salvage + ' SALVAGE, +' + cdone.pts + ' PTS', 22);
       GH.audio.win();
+      seasonAwardNotify(GH.progress.seasonCounter('contracts', 1));
     }
     if (e.id === 'warden') awardTrial('warden');
-    if (e.id === 'carapace') awardTrial('carapace');
+    if (e.id === 'carapace') { awardTrial('carapace'); seasonTaskNotify('carapace'); }
     if (e.def.corrupt && !e.phase2) awardTrial('nobound');
+    if (e.def.corrupt) {
+      seasonTaskNotify('corrupt');
+      if (e.phase2) seasonTaskNotify('unbound');
+    }
+    seasonAwardNotify(GH.progress.seasonCounter('kills', 1));
+    // signal cipher drop (pity-protected; never while one is running)
+    if (!cipherRun && !e.def.boss && GH.progress.cipherRoll()) {
+      spawnPickup('cipher', e.x, e.z);
+      queueAnnounce('SIGNAL CIPHER DETECTED', 22);
+    }
     spawnBurst(e.x, 1, e.z, e.def.boss ? 0xffd060 : 0xc0c0c0, e.def.boss ? 26 : 8);
     // sparks (XP)
     var xp = e.def.xp;
@@ -1380,6 +1407,8 @@ GH.game = (function () {
     else if (type === 'spark2') mesh = GH.models.buildSpark(2);
     else if (type === 'heart') mesh = GH.models.buildHeart();
     else if (type.indexOf('gem:') === 0) mesh = GH.models.buildGemDrop(type.slice(4));
+    else if (type === 'cipher') mesh = GH.models.buildCipher();
+    else if (type === 'cache') mesh = GH.models.buildCache();
     else mesh = GH.models.buildCoin();
     mesh.position.set(x, 0.5, z);
     scene.add(mesh);
@@ -1397,13 +1426,30 @@ GH.game = (function () {
       announce(GH.gems.types[pk.type.slice(4)].name.toUpperCase() + ' GEM', 20);
       if (!silent) GH.audio.levelup();
     }
+    else if (pk.type === 'cipher') {
+      startCipher();
+      if (!silent) GH.audio.levelup();
+    }
+    else if (pk.type === 'cache') {
+      var loot = GH.progress.openCache();
+      coinsRun += loot.salvage;
+      if (loot.unique) {
+        queueAnnounce('CACHE — ' + loot.unique.name.toUpperCase() + ' UNLOCKED', 24);
+      } else if (loot.gem) {
+        player.pendingGems.push(loot.gem);
+        queueAnnounce('CACHE — ' + loot.salvage + ' SALVAGE + A GEM', 22);
+      }
+      if (!silent) GH.audio.win();
+    }
     else { coinsRun++; if (!silent) GH.audio.coin(); }
   }
 
   function sparkGain(v, silent) {
+    if (G.mode !== 'weekly' && GH.progress.hasRelic('gravity')) v *= 1.15;
     gainXP(v);
     sparksRun += v;
     if (sparksRun >= 40) awardTrial('sparks40');
+    seasonAwardNotify(GH.progress.seasonCounter('sparks', v));
     if (!silent) GH.audio.gem();
     // Spark Reactor protocol
     if (player.protocols.reactor && Math.random() < player.protocols.reactor) {
@@ -1618,7 +1664,7 @@ GH.game = (function () {
     // pending boss gems first, then the card pick
     player.pendingGems.forEach(function (t) { rewardQueue.push({ gemType: t }); });
     player.pendingGems = [];
-    rewardQueue.push({ cards: GH.rollRewards(player, waveNum) });
+    rewardQueue.push({ cards: GH.rollRewards(player, waveNum, player.fourthCard ? 4 : 3) });
     document.getElementById('reward-screen').classList.remove('hidden');
     nextRewardStep();
   }
@@ -1751,6 +1797,7 @@ GH.game = (function () {
       announce(GH.gems.resonanceLabel(inst.resonance) + ' RESONANCE', 26);
       GH.progress.logResonance(GH.gems.resonanceLabel(inst.resonance));
       awardTrial('resonance');
+      seasonAwardNotify(GH.progress.seasonCounter('resonances', 1));
     }
     GH.meta.save();
     G._socketChoices = null;
@@ -1781,7 +1828,8 @@ GH.game = (function () {
     player.dashId++;
     player.dashKind = 'boost';
     GH.audio.dash();
-    spawnBurst(player.x, 0.6, player.z, 0xa0c8ff, 6);
+    spawnBurst(player.x, 0.6, player.z, player.trailColor || 0xa0c8ff, 6);
+    if (cipherRun) cipherRun.boosts++;
     // FANG frenzy stacks / VIPER edge
     if (player.def.passive === 'frenzy') {
       player.frenzy.push(4);
@@ -1957,6 +2005,109 @@ GH.game = (function () {
       });
     }
     player.mesh.visible = !(player.hurtCd > 0 && Math.floor(runTime * 24) % 2 === 0);
+  }
+
+  // =================================================================
+  // COSMETICS — repaint accents / recolor thruster flames on a mech
+  // =================================================================
+  function repaintMech(mesh, color) {
+    var parts = mesh.userData.parts;
+    if (!parts) return;
+    // repaint the accent material instances on this mech only
+    var accentHex = null;
+    if (parts.visor && parts.visor.material) accentHex = parts.visor.material.color.getHex();
+    if (accentHex === null) return;
+    var repainted = GH.assets.lambert({ color: color, flatShading: true });
+    mesh.traverse(function (m) {
+      if (m.isMesh && m.material && m.material.color &&
+        m.material.color.getHex() === accentHex && !m.material.map) {
+        m.material = repainted;
+      }
+    });
+  }
+
+  function setFlameColor(mesh, color) {
+    var parts = mesh.userData.parts;
+    if (parts && parts.flames) {
+      parts.flames.forEach(function (fl) {
+        fl.material = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.85 });
+      });
+    }
+  }
+
+  // =================================================================
+  // SIGNAL CIPHERS — mid-run field riddles ending in a loot cache
+  // =================================================================
+  function startCipher() {
+    if (cipherRun) return;
+    cipherRun = { steps: GH.progress.makeCipher(), idx: 0, t: 0, prog: 0, marker: null, killsAt: kills, boosts: 0 };
+    announce('SIGNAL CIPHER INTERCEPTED', 26);
+    beginCipherStep();
+  }
+
+  function beginCipherStep() {
+    var step = cipherRun.steps[cipherRun.idx];
+    cipherRun.t = 0;
+    cipherRun.prog = 0;
+    cipherRun.killsAt = kills;
+    cipherRun.boosts = 0;
+    if (cipherRun.marker) { scene.remove(cipherRun.marker); cipherRun.marker = null; }
+    if (step.id === 'stand') {
+      var a = Math.random() * Math.PI * 2;
+      var r = GH.rand(7, 13);
+      var mx = GH.clamp(player.x + Math.cos(a) * r, -ARENA_R + 3, ARENA_R - 3);
+      var mz = GH.clamp(player.z + Math.sin(a) * r, -ARENA_R + 3, ARENA_R - 3);
+      cipherRun.marker = groundDisc(mx, mz, 2.0, 0x60e8ff, 0.3);
+      cipherRun.mx = mx; cipherRun.mz = mz;
+    }
+  }
+
+  function cipherStepDone() {
+    GH.audio.levelup();
+    cipherRun.idx++;
+    if (cipherRun.idx >= cipherRun.steps.length) {
+      if (cipherRun.marker) scene.remove(cipherRun.marker);
+      cipherRun = null;
+      queueAnnounce('CIPHER SOLVED — CACHE INBOUND', 26);
+      spawnPickup('cache', player.x + GH.rand(-1, 1), player.z + GH.rand(-1, 1));
+    } else {
+      queueAnnounce('CIPHER ' + (cipherRun.idx + 1) + '/' + cipherRun.steps.length, 20);
+      beginCipherStep();
+    }
+  }
+
+  function updateCipher(dt) {
+    if (!cipherRun) return;
+    var step = cipherRun.steps[cipherRun.idx];
+    cipherRun.t += dt;
+    if (step.id === 'stand') {
+      cipherRun.marker.material.opacity = 0.25 + Math.sin(runTime * 6) * 0.1;
+      if (GH.dist2(player.x, player.z, cipherRun.mx, cipherRun.mz) < 4) {
+        cipherRun.prog += dt;
+        if (cipherRun.prog >= 2.5) cipherStepDone();
+      } else {
+        cipherRun.prog = Math.max(0, cipherRun.prog - dt * 0.5);
+      }
+    } else if (step.id === 'burst') {
+      if (kills - cipherRun.killsAt >= 5) cipherStepDone();
+      else if (cipherRun.t > 8) { cipherRun.t = 0; cipherRun.killsAt = kills; } // retry window
+    } else if (step.id === 'sprint') {
+      if (cipherRun.boosts >= 3) cipherStepDone();
+      else if (cipherRun.t > 10) { cipherRun.t = 0; cipherRun.boosts = 0; }
+    } else if (step.id === 'hold') {
+      if (cipherRun.t >= 10) cipherStepDone();
+    }
+  }
+
+  function cipherHudText() {
+    if (!cipherRun) return '';
+    var step = cipherRun.steps[cipherRun.idx];
+    var extra = '';
+    if (step.id === 'stand') extra = ' (' + GH.fmt1(Math.max(0, 2.5 - cipherRun.prog)) + 's)';
+    else if (step.id === 'burst') extra = ' (' + (kills - cipherRun.killsAt) + '/5, ' + GH.fmt1(Math.max(0, 8 - cipherRun.t)) + 's)';
+    else if (step.id === 'sprint') extra = ' (' + cipherRun.boosts + '/3)';
+    else if (step.id === 'hold') extra = ' (' + GH.fmt1(Math.max(0, 10 - cipherRun.t)) + 's)';
+    return 'CIPHER: ' + step.desc + extra;
   }
 
   // =================================================================
@@ -2318,14 +2469,18 @@ GH.game = (function () {
     pumpAnnounceQueue();
     // active contract progress
     var contractEl = document.getElementById('contract-line');
-    var ac = GH.meta.data.broker.active;
-    if (ac && (!ac.stage || ac.stage === stage.id)) {
-      contractEl.textContent = 'CONTRACT: ' + GH.enemyDefs[ac.target].name +
-        ' ' + ac.have + '/' + ac.need;
-    } else if (ac) {
-      contractEl.textContent = 'CONTRACT: ' + GH.progress.stageName(ac.stage) + ' only';
+    if (cipherRun) {
+      contractEl.textContent = cipherHudText();
     } else {
-      contractEl.textContent = '';
+      var ac = GH.meta.data.broker.active;
+      if (ac && (!ac.stage || ac.stage === stage.id)) {
+        contractEl.textContent = 'CONTRACT: ' + GH.enemyDefs[ac.target].name +
+          ' ' + ac.have + '/' + ac.need;
+      } else if (ac) {
+        contractEl.textContent = 'CONTRACT: ' + GH.progress.stageName(ac.stage) + ' only';
+      } else {
+        contractEl.textContent = '';
+      }
     }
   }
 
@@ -2371,6 +2526,11 @@ GH.game = (function () {
     effects.length = 0;
     while (orbitGroup.children.length) orbitGroup.remove(orbitGroup.children[0]);
     if (droneMesh) { scene.remove(droneMesh); droneMesh = null; }
+    if (picoDrone) { scene.remove(picoDrone); picoDrone = null; }
+    if (cipherRun) {
+      if (cipherRun.marker) scene.remove(cipherRun.marker);
+      cipherRun = null;
+    }
     if (player) { scene.remove(player.mesh); player = null; }
     if (mate) { scene.remove(mate.mesh); mate = null; }
     if (selPreview) { scene.remove(selPreview); selPreview = null; }
@@ -2386,6 +2546,52 @@ GH.game = (function () {
     stage = GH.stages[stageIndex];
     applyStageLook(stage);
     player = makePlayer(GH.mechs[mechIndex]);
+
+    // pilot mastery bonuses for this frame
+    var mb = GH.progress.masteryBonus(player.def.id);
+    player.stats.damageMult += mb.damageMult;
+    player.stats.maxHP += mb.maxHP;
+    player.hp = player.stats.maxHP;
+    player.stats.boostRegen += mb.boostRegen;
+    player.fourthCard = mb.fourthCard;
+
+    // chase cosmetics: paint, trail, pico-drone
+    var style = GH.meta.data.style;
+    if (style.paint) {
+      var pc = GH.progress.cosmeticById(style.paint);
+      if (pc) repaintMech(player.mesh, pc.color);
+    }
+    if (style.trail) {
+      var tc = GH.progress.cosmeticById(style.trail);
+      if (tc) {
+        player.trailColor = tc.color;
+        setFlameColor(player.mesh, tc.color);
+      }
+    }
+    if (picoDrone) { scene.remove(picoDrone); picoDrone = null; }
+    if (style.drone) {
+      var dc = GH.progress.cosmeticById(style.drone);
+      if (dc) {
+        picoDrone = GH.models.buildPico(dc.shape);
+        scene.add(picoDrone);
+      }
+    }
+
+    // season relics warp every non-weekly run
+    var relicOn = function (id) {
+      return G.mode !== 'weekly' && GH.progress.hasRelic(id);
+    };
+    var st2 = player.stats;
+    if (relicOn('vamp')) { st2.lifesteal += 8; st2.maxHP = Math.round(st2.maxHP * 0.85); }
+    if (relicOn('overclock')) { st2.atkSpdMult += 0.2; st2.armor -= 2; }
+    if (relicOn('gravity')) { st2.magnet *= 2; }
+    if (relicOn('juggernaut')) { st2.armor += 4; st2.speed *= 0.9; }
+    if (relicOn('glass')) { st2.damageMult += 0.3; st2.maxHP = Math.round(st2.maxHP * 0.75); }
+    if (relicOn('phase')) { st2.boostCost = 0; st2.boostRegen *= 0.65; }
+    if (relicOn('salvager')) { st2.xpGain = Math.max(0.5, st2.xpGain - 0.1); }
+    if (relicOn('twin')) { st2.bonusProj += 1; st2.damageMult -= 0.15; }
+    player.hp = Math.min(player.hp, st2.maxHP);
+    cipherRun = null;
     if (weekly && weekly.mods.php !== 1) {
       player.stats.maxHP = Math.round(player.stats.maxHP * weekly.mods.php);
       player.hp = player.stats.maxHP;
@@ -2480,6 +2686,7 @@ GH.game = (function () {
     var meta = GH.meta;
     var banked = weekly ? Math.round(coinsRun * weekly.mods.salvage) : coinsRun;
     if (GH.progress.trialTier(stage.id) >= 1) banked = Math.round(banked * 1.15);
+    if (G.mode !== 'weekly' && GH.progress.hasRelic('salvager')) banked = Math.round(banked * 1.4);
     var unlockMsg = '';
 
     // IRON CORE: a death erases the profile and engraves the pilot
@@ -2499,6 +2706,27 @@ GH.game = (function () {
     meta.data.collection.totalRuns++;
     if (won) meta.data.collection.totalWins++;
     if (won && G.mode === 'classic') awardTrial('clear');
+
+    // pilot mastery XP: kills + depth, with a victory bonus
+    var mXP = kills + waveNum * 5 + (won ? 120 : 0);
+    var mUps = GH.progress.masteryGain(player.def.id, mXP);
+    var mLvl = GH.progress.masteryLevel(player.def.id);
+    var masteryMsg = 'Mastery <b>+' + mXP + ' XP</b>' +
+      (mUps > 0 ? ' → <b>' + player.def.name + ' Lv ' + mLvl + '</b>' : ' (Lv ' + mLvl + ')') + '\n';
+
+    // season task evaluation from this run
+    var s6 = GH.progress.seasonCheck();
+    if (waveNum >= 10) seasonTaskNotify('w10');
+    if (waveNum >= 15) seasonTaskNotify('w15');
+    if (G.mode === 'arena' && waveNum >= 25) seasonTaskNotify('arena25');
+    if (won && G.mode === 'classic') {
+      seasonTaskNotify('clear1');
+      s6.stagesCleared[stage.id] = true;
+      if (Object.keys(s6.stagesCleared).length >= 3) seasonTaskNotify('clear3');
+      s6.framesWon[player.def.id] = true;
+      if (Object.keys(s6.framesWon).length >= 3) seasonTaskNotify('frames3');
+      if (mate) seasonTaskNotify('coopwin');
+    }
     if (G.mode === 'weekly') {
       var wk = meta.data.weekly || {};
       if (wk.week !== weekly.week || waveNum > (wk.best || 0)) {
@@ -2524,7 +2752,7 @@ GH.game = (function () {
     meta.save();
 
     document.getElementById('end-title').innerHTML = won ? 'ARENA&nbsp;CLEARED' : 'FRAME&nbsp;DESTROYED';
-    document.getElementById('end-stats').innerHTML = unlockMsg +
+    document.getElementById('end-stats').innerHTML = unlockMsg + masteryMsg +
       stage.name + (G.mode === 'arena' ? ' · ARENA' : (G.mode === 'weekly' ? ' · WEEKLY' : '')) +
       ' — reached <b>Wave ' + waveNum + '</b> as <b>' + player.def.name + '</b>' +
       (mate ? ' <i>(co-op)</i>' : '') + '\n' +
@@ -2600,6 +2828,7 @@ GH.game = (function () {
         (GH.meta.data.shells[GH.mechs[n].id] ? '' : ' locked');
     }
     document.getElementById('btn-launch').textContent = unlocked ? 'SELECT STAGE' : 'LOCKED';
+    if (G.onSelectChange) G.onSelectChange();
   };
 
   function buildSelectIcons() {
@@ -2650,6 +2879,15 @@ GH.game = (function () {
     updateMines(dt);
     updatePickups(dt);
     updateEffects(dt);
+    updateCipher(dt);
+    if (picoDrone) {
+      picoAngle += dt * 2.2;
+      picoDrone.position.set(
+        player.x + Math.sin(picoAngle) * 1.7,
+        2.4 + Math.sin(runTime * 3) * 0.15,
+        player.z + Math.cos(picoAngle) * 1.7);
+      picoDrone.rotation.y += dt * 4;
+    }
     updateCamera(dt);
     updateHUD();
     G.dmg.update(dt, viewW, viewH);
@@ -2679,6 +2917,14 @@ GH.game = (function () {
       trialTier: stage ? GH.progress.trialTier(stage.id) : 0,
       collection: GH.progress.completion(),
       sparksRun: sparksRun,
+      mastery: player ? GH.progress.masteryLevel(player.def.id) : 0,
+      masteryTotal: GH.progress.masteryTotal(),
+      seasonPts: GH.meta.data.season.pts,
+      seasonRelics: GH.meta.data.season.relics.slice(),
+      cipher: cipherRun ? cipherRun.steps[cipherRun.idx].id + ' ' + cipherRun.idx + '/' + cipherRun.steps.length : null,
+      cipherDry: GH.meta.data.cipher.dry,
+      caches: GH.meta.data.cipher.caches,
+      cosmetics: Object.keys(GH.meta.data.style.owned).length,
       mate: mate ? { hp: Math.round(mate.hp), down: mate.down, x: Math.round(mate.x * 10) / 10, z: Math.round(mate.z * 10) / 10 } : null
     };
   };

@@ -239,5 +239,283 @@ GH.progress = (function () {
     return { have: have, total: total, pct: total ? Math.round(have / total * 100) : 0 };
   };
 
+  // =================================================================
+  // PILOT MASTERY — per-frame XP earned across every run.
+  // =================================================================
+  P.MASTERY_CAP = 50;
+
+  // cumulative XP required to reach a level
+  function masteryNeed(level) {
+    return Math.round(60 * level + 14 * level * level);
+  }
+
+  P.masteryLevel = function (mechId) {
+    var xp = GH.meta.data.mastery[mechId] || 0;
+    var lvl = 0;
+    while (lvl < P.MASTERY_CAP && xp >= masteryNeed(lvl + 1)) lvl++;
+    return lvl;
+  };
+
+  P.masteryProgress = function (mechId) {
+    var xp = GH.meta.data.mastery[mechId] || 0;
+    var lvl = P.masteryLevel(mechId);
+    if (lvl >= P.MASTERY_CAP) return { lvl: lvl, frac: 1, xp: xp, next: 0 };
+    var lo = masteryNeed(lvl), hi = masteryNeed(lvl + 1);
+    return { lvl: lvl, frac: (xp - lo) / (hi - lo), xp: xp, next: hi - xp };
+  };
+
+  // returns levels gained
+  P.masteryGain = function (mechId, amount) {
+    var before = P.masteryLevel(mechId);
+    GH.meta.data.mastery[mechId] = (GH.meta.data.mastery[mechId] || 0) + Math.round(amount);
+    var after = P.masteryLevel(mechId);
+    return after - before;
+  };
+
+  P.masteryTotal = function () {
+    var t = 0;
+    GH.mechs.forEach(function (m) { t += P.masteryLevel(m.id); });
+    return t;
+  };
+
+  P.masteryMilestones = [
+    { lvl: 10, desc: 'Gilt paint scheme unlocked' },
+    { lvl: 25, desc: '+15% boost recharge on this frame' },
+    { lvl: 40, desc: 'Wave rewards offer a 4th card on this frame' },
+    { lvl: 50, desc: 'MASTER insignia' }
+  ];
+
+  // stat bonuses granted by a frame's mastery level
+  P.masteryBonus = function (mechId) {
+    var lvl = P.masteryLevel(mechId);
+    return {
+      damageMult: lvl * 0.005,
+      maxHP: lvl,
+      boostRegen: lvl >= 25 ? 0.15 : 0,
+      fourthCard: lvl >= 40
+    };
+  };
+
+  // =================================================================
+  // RELIC SEASONS — a monthly task board; point thresholds grant a
+  // choice of run-warping relics that persist all season.
+  // =================================================================
+  var SEASON_WORDS_A = ['IRON', 'EMBER', 'HOLLOW', 'STORM', 'GILDED', 'SILENT', 'CRIMSON', 'PALE', 'BROKEN', 'RADIANT', 'UMBRAL', 'FERAL'];
+  var SEASON_WORDS_B = ['VIGIL', 'MARCH', 'ACCORD', 'REQUIEM', 'SIGNAL', 'HARVEST', 'ECLIPSE', 'FOUNDRY', 'CIRCUIT', 'CROWN', 'TEMPEST', 'RELAY'];
+
+  P.seasonId = function (d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+  };
+
+  function seasonRng(id, salt) {
+    var s = 0;
+    var str = 'hfseason:' + id + ':' + (salt || '');
+    for (var i = 0; i < str.length; i++) s = (Math.imul(s, 31) + str.charCodeAt(i)) >>> 0;
+    s = s || 1;
+    return function () {
+      s ^= s << 13; s >>>= 0;
+      s ^= s >> 17;
+      s ^= s << 5; s >>>= 0;
+      return s / 4294967296;
+    };
+  }
+
+  P.seasonName = function (id) {
+    var rnd = seasonRng(id, 'name');
+    return SEASON_WORDS_A[Math.floor(rnd() * SEASON_WORDS_A.length)] + ' ' +
+      SEASON_WORDS_B[Math.floor(rnd() * SEASON_WORDS_B.length)];
+  };
+
+  P.seasonTasks = [
+    { id: 'w10', pts: 10, desc: 'Reach wave 10 in any run' },
+    { id: 'w15', pts: 15, desc: 'Reach wave 15 in any run' },
+    { id: 'clear1', pts: 25, desc: 'Clear any stage' },
+    { id: 'clear3', pts: 40, desc: 'Clear three different stages' },
+    { id: 'frames3', pts: 40, desc: 'Win with three different frames' },
+    { id: 'kills500', pts: 20, desc: 'Destroy 500 enemies this season' },
+    { id: 'kills2000', pts: 40, desc: 'Destroy 2,000 enemies this season' },
+    { id: 'res1', pts: 15, desc: 'Complete a Resonance' },
+    { id: 'res5', pts: 30, desc: 'Complete five Resonances this season' },
+    { id: 'carapace', pts: 15, desc: 'Destroy a Grave Carapace' },
+    { id: 'corrupt', pts: 25, desc: 'Destroy a corrupted frame' },
+    { id: 'unbound', pts: 20, desc: 'Slay a corrupted frame while it is UNBOUND' },
+    { id: 'arena25', pts: 30, desc: 'Reach wave 25 in the Arena' },
+    { id: 'contracts3', pts: 25, desc: 'Fill three Broker contracts this season' },
+    { id: 'sparks500', pts: 15, desc: 'Gather 500 sparks this season' },
+    { id: 'coopwin', pts: 20, desc: 'Clear a stage in co-op' }
+  ];
+
+  P.seasonThresholds = [30, 80, 150, 250];
+
+  P.relics = [
+    { id: 'vamp', name: 'VAMPIRIC CORE', desc: '+8% lifesteal, but max hull -15%.' },
+    { id: 'overclock', name: 'OVERCLOCK', desc: '+20% attack speed, but -2 armor.' },
+    { id: 'gravity', name: 'GRAVITY WELL', desc: 'Magnet range doubled; sparks worth +15%.' },
+    { id: 'juggernaut', name: 'JUGGERNAUT', desc: '+4 armor, but -10% move speed.' },
+    { id: 'glass', name: 'GLASS CANNON', desc: '+30% damage, but max hull -25%.' },
+    { id: 'phase', name: 'PHASE DRIVE', desc: 'Boost costs nothing, but recharges 35% slower.' },
+    { id: 'salvager', name: 'SALVAGER RIG', desc: '+40% salvage, but -10% XP.' },
+    { id: 'twin', name: 'TWIN FEED', desc: 'Primary +1 projectile, but -15% damage.' }
+  ];
+
+  // ensure season state matches the current month; resets on rollover
+  P.seasonCheck = function () {
+    var id = P.seasonId();
+    var s = GH.meta.data.season;
+    if (s.id !== id) {
+      GH.meta.data.season = {
+        id: id, pts: 0, done: {}, relics: [], claimed: 0,
+        counters: { kills: 0, sparks: 0, resonances: 0, contracts: 0 },
+        stagesCleared: {}, framesWon: {}
+      };
+      GH.meta.save();
+    }
+    return GH.meta.data.season;
+  };
+
+  P.seasonAward = function (taskId) {
+    var s = P.seasonCheck();
+    if (s.done[taskId]) return false;
+    var task = null;
+    P.seasonTasks.forEach(function (t) { if (t.id === taskId) task = t; });
+    if (!task) return false;
+    s.done[taskId] = true;
+    s.pts += task.pts;
+    GH.meta.save();
+    return task;
+  };
+
+  // counter-driven tasks
+  P.seasonCounter = function (key, amount) {
+    var s = P.seasonCheck();
+    s.counters[key] = (s.counters[key] || 0) + amount;
+    var out = [];
+    if (key === 'kills') {
+      if (s.counters.kills >= 500) out.push('kills500');
+      if (s.counters.kills >= 2000) out.push('kills2000');
+    }
+    if (key === 'sparks' && s.counters.sparks >= 500) out.push('sparks500');
+    if (key === 'resonances') {
+      out.push('res1');
+      if (s.counters.resonances >= 5) out.push('res5');
+    }
+    if (key === 'contracts' && s.counters.contracts >= 3) out.push('contracts3');
+    var awarded = [];
+    out.forEach(function (t) { if (P.seasonAward(t)) awarded.push(t); });
+    return awarded;
+  };
+
+  // how many relic picks are available right now
+  P.relicPicksAvailable = function () {
+    var s = P.seasonCheck();
+    var earned = 0;
+    P.seasonThresholds.forEach(function (t) { if (s.pts >= t) earned++; });
+    return earned - s.claimed;
+  };
+
+  // the seeded 1-of-3 offer for the next unclaimed threshold
+  P.relicOffer = function () {
+    var s = P.seasonCheck();
+    var rnd = seasonRng(s.id, 'relics' + s.claimed);
+    var pool = P.relics.filter(function (r) { return s.relics.indexOf(r.id) === -1; });
+    var offer = [];
+    while (offer.length < 3 && pool.length) {
+      offer.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]);
+    }
+    return offer;
+  };
+
+  P.claimRelic = function (relicId) {
+    var s = P.seasonCheck();
+    if (P.relicPicksAvailable() <= 0) return false;
+    if (s.relics.indexOf(relicId) !== -1) return false;
+    s.relics.push(relicId);
+    s.claimed++;
+    GH.meta.save();
+    return true;
+  };
+
+  P.hasRelic = function (id) {
+    return GH.meta.data.season.relics.indexOf(id) !== -1;
+  };
+
+  // =================================================================
+  // SIGNAL CIPHERS — rare field riddles paying chase cosmetics with
+  // rising bad-luck protection on both the drop and the unique roll.
+  // =================================================================
+  P.cosmetics = [
+    { id: 'trail_ember', kind: 'trail', name: 'Ember Trail', color: 0xff7030 },
+    { id: 'trail_verdant', kind: 'trail', name: 'Verdant Trail', color: 0x50e070 },
+    { id: 'trail_void', kind: 'trail', name: 'Void Trail', color: 0xc060ff },
+    { id: 'trail_gold', kind: 'trail', name: 'Gilt Trail', color: 0xffd050 },
+    { id: 'trail_rose', kind: 'trail', name: 'Rose Trail', color: 0xff70b0 },
+    { id: 'paint_gilt', kind: 'paint', name: 'Gilt Plating', color: 0xd8b040 },
+    { id: 'paint_crimson', kind: 'paint', name: 'Crimson Plating', color: 0xd04040 },
+    { id: 'paint_jade', kind: 'paint', name: 'Jade Plating', color: 0x40b080 },
+    { id: 'paint_void', kind: 'paint', name: 'Void Plating', color: 0x8050c0 },
+    { id: 'paint_pearl', kind: 'paint', name: 'Pearl Plating', color: 0xe8e8f0 },
+    { id: 'drone_cube', kind: 'drone', name: 'Pico Cube', shape: 'cube' },
+    { id: 'drone_prism', kind: 'drone', name: 'Pico Prism', shape: 'prism' },
+    { id: 'drone_ring', kind: 'drone', name: 'Pico Ring', shape: 'ring' },
+    { id: 'drone_star', kind: 'drone', name: 'Pico Star', shape: 'star' }
+  ];
+
+  P.cosmeticById = function (id) {
+    for (var i = 0; i < P.cosmetics.length; i++) {
+      if (P.cosmetics[i].id === id) return P.cosmetics[i];
+    }
+    return null;
+  };
+
+  // per-kill drop check with rising pity; only when no cipher is running
+  P.cipherRoll = function () {
+    var c = GH.meta.data.cipher;
+    c.dry++;
+    var chance = 0.003 + Math.floor(c.dry / 50) * 0.004;
+    if (Math.random() < chance) {
+      c.dry = 0;
+      return true;
+    }
+    return false;
+  };
+
+  P.cipherSteps = [
+    { id: 'stand', desc: 'STAND in the marked signal circle' },
+    { id: 'burst', desc: 'DETONATE: destroy 5 hostiles within 8s' },
+    { id: 'sprint', desc: 'SPRINT: boost 3 times within 10s' },
+    { id: 'hold', desc: 'HOLD: take no damage for 10s' }
+  ];
+
+  P.makeCipher = function () {
+    var pool = P.cipherSteps.slice();
+    var steps = [];
+    var n = 2 + (Math.random() < 0.5 ? 1 : 0);
+    while (steps.length < n && pool.length) {
+      steps.push(GH.pick(pool));
+      pool.splice(pool.indexOf(steps[steps.length - 1]), 1);
+    }
+    return steps;
+  };
+
+  // cache reward: guaranteed-new unique while any remain, then salvage/gems
+  P.openCache = function () {
+    var c = GH.meta.data.cipher;
+    c.caches++;
+    var owned = GH.meta.data.style.owned;
+    var unowned = P.cosmetics.filter(function (cs) { return !owned[cs.id]; });
+    var out = { salvage: GH.randInt(30, 80) };
+    if (unowned.length) {
+      var win = GH.pick(unowned);
+      owned[win.id] = true;
+      out.unique = win;
+    } else {
+      out.gem = GH.pick(GH.gems.typeIds);
+    }
+    GH.meta.save();
+    return out;
+  };
+
   return P;
 })();
+

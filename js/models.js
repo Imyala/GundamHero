@@ -435,6 +435,55 @@ GH.models = (function () {
     return m;
   };
 
+  M.buildCipher = function () {
+    // a glowing signal shard
+    var g = new THREE.Group();
+    var core = new THREE.Mesh(new THREE.OctahedronGeometry(0.26),
+      mat(0x60e8ff, { emissive: 0x2080a0, emissiveIntensity: 0.8 }));
+    core.scale.y = 1.6;
+    g.add(core);
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.03, 4, 12),
+      GH.assets.basic(0x60e8ff, { transparent: true, opacity: 0.7 }));
+    ring.rotation.x = Math.PI / 2;
+    g.add(ring);
+    g.userData.spin = core;
+    return g;
+  };
+
+  M.buildCache = function () {
+    // a supply cache crate
+    var g = new THREE.Group();
+    var crate = box(0.55, 0.4, 0.42, 0x8a7040);
+    crate.position.y = 0.05;
+    var lid = box(0.58, 0.12, 0.45, 0xb09050); lid.position.y = 0.3;
+    var band = box(0.6, 0.08, 0.1, 0xf0d060); band.position.y = 0.1;
+    var glow = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.04, 4, 12),
+      GH.assets.basic(0xffd050, { transparent: true, opacity: 0.7 }));
+    glow.rotation.x = Math.PI / 2;
+    glow.position.y = 0.1;
+    g.add(crate, lid, band, glow);
+    return g;
+  };
+
+  M.buildPico = function (shape) {
+    // tiny cosmetic companion drone
+    var g = new THREE.Group();
+    var m;
+    var pm = mat(0xd0e0ff, { emissive: 0x4060a0, emissiveIntensity: 0.5 });
+    if (shape === 'cube') m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), pm);
+    else if (shape === 'prism') m = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.32, 3), pm);
+    else if (shape === 'ring') {
+      m = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.05, 4, 8), pm);
+    } else {
+      m = new THREE.Mesh(new THREE.OctahedronGeometry(0.18), pm);
+    }
+    g.add(m);
+    var winglet = box(0.3, 0.03, 0.08, 0x385868);
+    winglet.position.y = -0.12;
+    g.add(winglet);
+    return g;
+  };
+
   M.buildShrub = function () {
     var g = new THREE.Group();
     var pot = box(0.24, 0.2, 0.24, 0x4a3828); pot.position.y = 0.1;

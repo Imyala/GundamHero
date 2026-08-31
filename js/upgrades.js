@@ -123,15 +123,17 @@ GH.gemCard = function (typeId) {
   };
 };
 
-// Roll 3 distinct cards; from wave 3 onward one slot may be a gem.
-GH.rollRewards = function (player, wave) {
+// Roll distinct cards (3, or 4 for mastered frames); from wave 3 onward one
+// slot may be a gem.
+GH.rollRewards = function (player, wave, count) {
+  count = count || 3;
   var pool = GH.upgrades.slice();
   var picks = [];
   var gemChance = wave >= 3 ? 0.55 : 0;
   if (Math.random() < gemChance) {
     picks.push(GH.gemCard(GH.pick(GH.gems.typeIds)));
   }
-  while (picks.length < 3 && pool.length) {
+  while (picks.length < count && pool.length) {
     var card = GH.weightedPick(pool);
     pool.splice(pool.indexOf(card), 1);
     // don't offer a 6th weapon slot

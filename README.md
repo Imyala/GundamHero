@@ -116,6 +116,34 @@ arena loadout kits — self-reliant progression), and **IRON CORE** (iron rules,
 and a single death *erases the profile* — the fallen pilot is engraved on a
 memorial shown on the title screen).
 
+### Pilot Mastery
+Every run — win or lose — pays mastery XP into the frame you flew (kills +
+depth + a victory bonus). Each of the 50 levels adds a sliver of permanent
+damage and hull for that frame, with milestones at 10 (cosmetics), 25 (+15%
+boost recharge), 40 (**wave rewards offer a 4th card**), and 50 (MASTER
+insignia). Per-frame progress shows on the select screen; total mastery on the
+title screen and in the Collection Log.
+
+### Relic Seasons
+Each calendar month is a named season (deterministically generated — e.g.
+SEASON OF THE UMBRAL RELAY) with a 16-task board spanning every mode: reach
+waves, clear stages, win with different frames, season-long kill/spark/
+resonance/contract counters, co-op and Arena goals. Crossing point thresholds
+(30/80/150/250) grants a seeded 1-of-3 **relic** choice — run-warping
+trade-offs like GLASS CANNON (+30% damage, -25% hull), PHASE DRIVE (free
+boost, slower recharge), or TWIN FEED (+1 projectile, -15% damage) — active
+in every non-Weekly run until the season rolls over.
+
+### Signal Ciphers & chase loot
+Enemies occasionally drop an intercepted **cipher** (with rising bad-luck
+protection, so dry streaks self-correct). Picking it up starts a 2–3 step
+field riddle — stand in the marked circle, destroy 5 hostiles in 8 seconds,
+boost three times, take no damage for 10 seconds — tracked live on the HUD.
+Solving it drops a cache: salvage plus a **guaranteed-new** chase cosmetic
+while any remain (5 thruster-trail colors, 5 accent paint schemes, 4 cosmetic
+pico-drones that orbit your mech), all equipable from the select screen and
+tracked in the Collection Log's CACHE FINDS page.
+
 ### Devotions (meta progression)
 Salvage banked from runs is spent in the **HANGAR** on five permanent paths
 matching the gem affinities; the *active* path also grows a little on every

@@ -241,7 +241,7 @@
   // ----------------------------------------------------------------
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
-    'trials-screen', 'reward-screen', 'pause-screen', 'end-screen'];
+    'trials-screen', 'season-screen', 'reward-screen', 'pause-screen', 'end-screen'];
 
   function show(id) {
     SCREENS.forEach(function (s) {
@@ -251,11 +251,13 @@
 
   function refreshTitle() {
     var comp = GH.progress.completion();
+    var s = GH.progress.seasonCheck();
     document.getElementById('title-salvage').textContent =
-      'SALVAGE BANK: ' + GH.meta.data.salvage + '  ·  SHELLS: ' +
+      'SALVAGE: ' + GH.meta.data.salvage + '  ·  SHELLS: ' +
       Object.keys(GH.meta.data.shells).length + '/' + GH.mechs.length +
       '  ·  LOG: ' + comp.pct + '%' +
-      (GH.meta.data.bestArena ? '  ·  ARENA BEST: WAVE ' + GH.meta.data.bestArena : '');
+      '  ·  MASTERY: ' + GH.progress.masteryTotal() +
+      '  ·  SEASON: ' + s.pts + ' PTS';
     var prof = GH.meta.PROFILES[GH.meta.profile];
     document.getElementById('btn-profile').textContent = 'PILOT: ' + prof.name;
     var memEl = document.getElementById('title-memorial');
@@ -284,8 +286,58 @@
     GH.game.mode = mode;
     show('select-screen');
     document.getElementById('hud').classList.add('hidden');
+    GH.game.onSelectChange = renderSelectExtras;
     GH.game.enterSelect();
     renderP2Row();
+    renderSelectExtras();
+  }
+
+  // mastery readout + style pickers on the select screen
+  function renderSelectExtras() {
+    var def = GH.mechs[GH.game.getSelectedMech()];
+    var mp = GH.progress.masteryProgress(def.id);
+    var pips = '';
+    GH.progress.masteryMilestones.forEach(function (ms) {
+      pips += '<span class="' + (mp.lvl >= ms.lvl ? 'ms-on' : 'ms-off') + '" title="' +
+        ms.desc + '">L' + ms.lvl + '</span>';
+    });
+    document.getElementById('select-mastery').innerHTML =
+      'MASTERY <b>Lv ' + mp.lvl + (mp.lvl >= GH.progress.MASTERY_CAP ? ' ★ MASTER' : '') + '</b>' +
+      '<span class="ms-bar"><span class="ms-fill" style="width:' + Math.round(mp.frac * 100) + '%"></span></span>' +
+      pips;
+
+    // style cyclers (owned cosmetics only)
+    var style = GH.meta.data.style;
+    var wrap = document.getElementById('style-row');
+    var owned = function (kind) {
+      return GH.progress.cosmetics.filter(function (c) { return c.kind === kind && style.owned[c.id]; });
+    };
+    var mkCycler = function (kind, label, current) {
+      var opts = owned(kind);
+      if (!opts.length) return '';
+      var curName = 'Default';
+      if (current) {
+        var cc = GH.progress.cosmeticById(current);
+        if (cc) curName = cc.name;
+      }
+      return '<button class="style-btn" data-kind="' + kind + '">' + label + ': ' + curName + '</button>';
+    };
+    wrap.innerHTML =
+      mkCycler('trail', 'TRAIL', style.trail) +
+      mkCycler('paint', 'PAINT', style.paint) +
+      mkCycler('drone', 'DRONE', style.drone);
+    wrap.querySelectorAll('.style-btn').forEach(function (btn) {
+      btn.onclick = function () {
+        var kind = btn.getAttribute('data-kind');
+        var opts = owned(kind).map(function (c) { return c.id; });
+        opts.unshift(null); // "default / none"
+        var cur = opts.indexOf(style[kind]);
+        style[kind] = opts[(cur + 1) % opts.length];
+        GH.meta.save();
+        GH.audio.card();
+        renderSelectExtras();
+      };
+    });
   }
 
   // P2's own frame picker (visible when co-op is on)
@@ -498,6 +550,82 @@
   }
 
   // ----------------------------------------------------------------
+  // RELIC SEASON
+  function openSeason() {
+    GH.audio.card();
+    GH.game.state = 'hangar';
+    renderSeason();
+    show('season-screen');
+  }
+
+  function renderSeason() {
+    var s = GH.progress.seasonCheck();
+    document.getElementById('season-head').innerHTML =
+      '<span class="sn-name">SEASON OF THE ' + GH.progress.seasonName(s.id) + '</span> · ' +
+      s.id + ' · <b>' + s.pts + ' PTS</b>';
+    // threshold meter
+    var thr = GH.progress.seasonThresholds;
+    var meter = 'Relic thresholds: ' + thr.map(function (t) {
+      return '<span class="' + (s.pts >= t ? 'sn-hit' : 'sn-miss') + '">' + t + '</span>';
+    }).join(' → ');
+    document.getElementById('season-meter').innerHTML = meter;
+
+    // relic area
+    var relicWrap = document.getElementById('season-relics');
+    relicWrap.innerHTML = '';
+    if (s.relics.length) {
+      var activeDiv = document.createElement('div');
+      activeDiv.className = 'sn-active';
+      activeDiv.innerHTML = 'ACTIVE RELICS: ' + s.relics.map(function (id) {
+        var r = null;
+        GH.progress.relics.forEach(function (x) { if (x.id === id) r = x; });
+        return '<b title="' + r.desc + '">' + r.name + '</b>';
+      }).join(' · ');
+      relicWrap.appendChild(activeDiv);
+    }
+    if (GH.progress.relicPicksAvailable() > 0) {
+      var offer = GH.progress.relicOffer();
+      var offerWrap = document.createElement('div');
+      offerWrap.className = 'sn-offer';
+      offerWrap.innerHTML = '<div class="bk-label">CHOOSE A RELIC</div>';
+      var row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.gap = '12px';
+      offer.forEach(function (r) {
+        var card = document.createElement('div');
+        card.className = 'reward-card relic-card';
+        card.innerHTML = '<div class="rc-kind">RELIC</div>' +
+          '<div class="rc-name">' + r.name + '</div>' +
+          '<div class="rc-desc">' + r.desc + '</div>';
+        card.onclick = function () {
+          if (GH.progress.claimRelic(r.id)) {
+            GH.audio.levelup();
+            renderSeason();
+          }
+        };
+        row.appendChild(card);
+      });
+      offerWrap.appendChild(row);
+      relicWrap.appendChild(offerWrap);
+    }
+
+    // task board
+    var body = document.getElementById('season-tasks');
+    var html = '';
+    GH.progress.seasonTasks.forEach(function (t) {
+      var done = !!s.done[t.id];
+      html += '<div class="sn-task' + (done ? ' done' : '') + '">' +
+        (done ? '☑' : '☐') + ' ' + t.desc +
+        '<span class="sn-pts">+' + t.pts + '</span></div>';
+    });
+    body.innerHTML = html;
+    var c = s.counters;
+    document.getElementById('season-counters').textContent =
+      'Season counters — kills: ' + c.kills + ' · sparks: ' + Math.round(c.sparks) +
+      ' · resonances: ' + c.resonances + ' · contracts: ' + c.contracts;
+  }
+
+  // ----------------------------------------------------------------
   // BROKER — hunt contracts
   function openBroker() {
     GH.audio.card();
@@ -617,6 +745,23 @@
         '<div class="lc-name">' + GH.gems.types[t].name + '</div>' +
         '<div class="lc-count">' + (n ? '×' + n : '—') + '</div></div>';
     });
+    html += '</div><div class="log-section">CACHE FINDS (' +
+      GH.meta.data.cipher.caches + ' caches opened)</div><div class="log-grid">';
+    GH.progress.cosmetics.forEach(function (cs) {
+      var got = !!GH.meta.data.style.owned[cs.id];
+      html += '<div class="log-cell' + (got ? ' seen' : '') + '">' +
+        '<div class="lc-name">' + (got ? cs.name : '???') + '</div>' +
+        '<div class="lc-count">' + cs.kind.toUpperCase() + '</div></div>';
+    });
+    html += '</div><div class="log-section">PILOT MASTERY (total ' +
+      GH.progress.masteryTotal() + ')</div><div class="log-grid">';
+    GH.mechs.forEach(function (m) {
+      var lvl = GH.progress.masteryLevel(m.id);
+      html += '<div class="log-cell' + (lvl ? ' seen' : '') + '">' +
+        '<div class="lc-glyph">' + m.icon + '</div>' +
+        '<div class="lc-name">' + m.name + '</div>' +
+        '<div class="lc-count">Lv ' + lvl + (lvl >= 50 ? ' ★' : '') + '</div></div>';
+    });
     html += '</div>';
     body.innerHTML = html;
     show('collection-screen');
@@ -732,6 +877,8 @@
     document.getElementById('btn-broker').onclick = openBroker;
     document.getElementById('btn-collection').onclick = openCollection;
     document.getElementById('btn-trials').onclick = openTrials;
+    document.getElementById('btn-season').onclick = openSeason;
+    document.getElementById('btn-season-back').onclick = toTitle;
     document.getElementById('btn-profile').onclick = cycleProfile;
     document.getElementById('btn-broker-back').onclick = toTitle;
     document.getElementById('btn-collection-back').onclick = toTitle;

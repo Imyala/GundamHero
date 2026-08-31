@@ -603,6 +603,64 @@ html, body {
   color: #90f0a0; text-shadow: 1px 1px 0 #000;
 }
 
+/* ---------------- relic season ---------------- */
+
+#season-screen {
+  background:
+    linear-gradient(rgba(20,30,120,0.25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20,30,120,0.25) 1px, transparent 1px),
+    radial-gradient(ellipse at center, rgba(6,10,40,0.94), rgba(0,0,4,0.97));
+  background-size: 34px 34px, 34px 34px, cover;
+  gap: 10px;
+}
+.season-btn { border-color: #d8a840; color: #ffe8b0; }
+#season-head { font-family: "Times New Roman", serif; font-size: 16px; color: #c0c8e0; }
+#season-head b { color: #f0d888; }
+.sn-name { color: #ffd888; letter-spacing: 2px; font-weight: bold; }
+#season-meter { font-size: 12px; color: #8898c8; }
+.sn-hit { color: #90f0a0; font-weight: bold; }
+.sn-miss { color: #5a6890; }
+.sn-active { font-size: 12px; color: #b8c0d8; margin-bottom: 6px; text-align: center; }
+.sn-active b { color: #ffd888; margin: 0 4px; }
+.sn-offer { text-align: center; }
+.relic-card { width: 180px; min-height: 150px; border-color: #d8a840; }
+#season-tasks {
+  display: grid; grid-template-columns: repeat(2, minmax(280px, 380px));
+  gap: 3px 24px;
+  max-height: 34vh; overflow-y: auto;
+  font-size: 12px; color: #a8b0c8;
+}
+.sn-task.done { color: #90f0a0; }
+.sn-pts { color: #f0d888; margin-left: 8px; }
+#season-counters { font-size: 11px; color: #5a6890; }
+
+/* ---------------- mastery & style ---------------- */
+
+#select-mastery {
+  margin: 6px 0 10px;
+  font-size: 12px; color: #b8c8b8;
+}
+#select-mastery b { color: #f0d888; }
+.ms-bar {
+  display: inline-block; width: 90px; height: 8px;
+  background: #0a0e20; border: 1px solid #4a5888;
+  margin: 0 8px; vertical-align: middle;
+}
+.ms-fill { display: block; height: 100%; background: linear-gradient(#f0d060, #a87010); }
+.ms-on { color: #f0d888; margin-right: 5px; font-size: 10px; }
+.ms-off { color: #4a5888; margin-right: 5px; font-size: 10px; }
+
+#style-row {
+  position: absolute; bottom: 22vh; left: 4%;
+  display: flex; gap: 8px;
+}
+.style-btn {
+  font-family: "Courier New", monospace; font-size: 11px;
+  background: #10182e; color: #c8d8f0; border: 1px solid #4a5888;
+  padding: 4px 10px; cursor: pointer;
+}
+.style-btn:hover { border-color: #f0d060; color: #fff; }
+
 #mute-btn {
   position: absolute; right: 10px; bottom: 8px;
   width: 30px; height: 30px; line-height: 28px;
