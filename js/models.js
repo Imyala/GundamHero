@@ -101,11 +101,95 @@ GH.models = (function () {
 
     // ---- archetype props ----
     addProp(cfg.prop, parts, accent, trim);
+    // ---- pack / mark bolt-ons (workshop variants and relics) ----
+    if (cfg.pack) addBoltOns(cfg, parts, accent, trim, dark);
 
     blobShadow(g, 2.1);
     g.userData.parts = parts;
     return g;
   };
+
+  // Silhouette changes per pack so 135 frames don't all read as eight.
+  // AILE: swept wing binders. SWORD: blade fins on the pauldrons.
+  // LAUNCHER: a shoulder cannon and skirt plates. STORM: a reactor coil
+  // and antenna mast. PHANTOM: a hooded head and cloak plates. RELIC:
+  // horns and a chest core. Marks add crest height and extra trim.
+  function addBoltOns(cfg, parts, accent, trim, dark) {
+    var torso = parts.torso;
+    var pack = cfg.pack;
+    var mark = cfg.mark || 1;
+    if (pack === 'aile') {
+      [-1, 1].forEach(function (side) {
+        var wing = box(0.12, 0.9, 0.5, accent);
+        wing.position.set(side * 0.55, 0.62, -0.5);
+        wing.rotation.z = side * 0.55;
+        wing.rotation.x = -0.25;
+        torso.add(wing);
+      });
+    } else if (pack === 'sword') {
+      [parts.armL, parts.armR].forEach(function (arm, i) {
+        var fin = box(0.08, 0.5, 0.36, accent);
+        fin.position.set((i === 0 ? -1 : 1) * 0.3, 0.42, -0.02);
+        fin.rotation.z = (i === 0 ? 1 : -1) * 0.3;
+        arm.add(fin);
+      });
+    } else if (pack === 'launcher') {
+      var cannon = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 1.1, 6), mat(dark));
+      cannon.rotation.x = Math.PI / 2;
+      cannon.position.set(-0.55, 0.9, 0.1);
+      torso.add(cannon);
+      var cap = box(0.34, 0.24, 0.5, accent); cap.position.set(-0.55, 0.9, -0.3);
+      torso.add(cap);
+      [-1, 1].forEach(function (side) {
+        var skirt = box(0.26, 0.42, 0.5, trim);
+        skirt.position.set(side * 0.5, -0.36, 0);
+        torso.add(skirt);
+      });
+    } else if (pack === 'storm') {
+      var coil = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.05, 4, 8),
+        mat(accent, { emissive: accent, emissiveIntensity: 0.4 }));
+      coil.position.set(0, 0.5, -0.6);
+      torso.add(coil);
+      var mast = box(0.04, 0.7, 0.04, dark); mast.position.set(-0.22, 1.35, -0.12);
+      torso.add(mast);
+      var tip = box(0.1, 0.1, 0.1, accent); tip.position.set(-0.22, 1.72, -0.12);
+      torso.add(tip);
+    } else if (pack === 'phantom') {
+      var hood = box(0.54, 0.16, 0.5, dark); hood.position.set(0, 1.2, -0.04);
+      torso.add(hood);
+      [-1, 1].forEach(function (side) {
+        var cloak = box(0.1, 0.9, 0.5, dark);
+        cloak.position.set(side * 0.62, -0.1, -0.3);
+        torso.add(cloak);
+      });
+    } else if (pack === 'relic') {
+      [-1, 1].forEach(function (side) {
+        var horn = box(0.06, 0.5, 0.08, accent);
+        horn.position.set(side * 0.2, 1.36, 0.05);
+        horn.rotation.z = -side * 0.5;
+        torso.add(horn);
+      });
+      var core = new THREE.Mesh(new THREE.OctahedronGeometry(0.14),
+        mat(accent, { emissive: accent, emissiveIntensity: 0.6 }));
+      core.position.set(0, 0.3, 0.42);
+      torso.add(core);
+      var mantle = box(1.3, 0.14, 0.7, trim); mantle.position.set(0, 0.7, -0.1);
+      torso.add(mantle);
+    }
+    // marks: taller crest, extra shoulder trim per mark
+    if (mark >= 2) {
+      var crest2 = box(0.06, 0.2 + mark * 0.08, 0.3, accent);
+      crest2.position.set(0, 1.42 + mark * 0.03, -0.04);
+      torso.add(crest2);
+    }
+    if (mark >= 3) {
+      [parts.armL, parts.armR].forEach(function (arm, i) {
+        var plate = box(0.54, 0.08, 0.58, accent);
+        plate.position.set((i === 0 ? -1 : 1) * 0.06, 0.46, 0);
+        arm.add(plate);
+      });
+    }
+  }
 
   function addProp(prop, parts, accent, trim) {
     var armL = parts.armL, armR = parts.armR;
@@ -435,6 +519,26 @@ GH.models = (function () {
       mat(0xe83838, { emissive: 0x601010 }));
     m.rotation.x = Math.PI / 2;
     return m;
+  };
+
+  // workshop materials: a grey alloy ingot, and a frame core that glows
+  M.buildAlloy = function () {
+    var m = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 0.2),
+      mat(0xb8c0c8, { emissive: 0x303840, emissiveIntensity: 0.4 }));
+    m.rotation.y = 0.6;
+    return m;
+  };
+  M.buildCore = function () {
+    var g = new THREE.Group();
+    var core = new THREE.Mesh(new THREE.OctahedronGeometry(0.28),
+      mat(0xffb040, { emissive: 0xa05010, emissiveIntensity: 0.9 }));
+    g.add(core);
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.035, 4, 12),
+      mat(0xffe0a0, { emissive: 0x806020 }));
+    ring.rotation.x = Math.PI / 2;
+    g.add(ring);
+    g.userData.core = core;
+    return g;
   };
 
   M.buildCipher = function () {

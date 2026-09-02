@@ -11,6 +11,8 @@
     boostPressed: false,
     boostHeld: false,
     specialPressed: false,
+    // MMO camera: right-mouse drag deltas (pixels) and wheel zoom
+    lookDX: 0, lookDY: 0, zoomDelta: 0, looking: false,
     p2x: 0, p2y: 0, p2Boost: false,
     p2Special: false, p2SpecialPressed: false,
     wardPressed: 0, wardCycle: false,
@@ -31,6 +33,7 @@
     resize();
     window.addEventListener('resize', resize);
 
+    applySettings();
     bindInput();
     bindUI();
     bindTouch();
@@ -50,17 +53,22 @@
     cam.updateProjectionMatrix();
   }
 
+  // settings that live outside the pilot profile (CRT filter, camera)
+  function applySettings() {
+    var st = GH.controls.settings;
+    document.getElementById('crt-overlay').classList.toggle('off', !st.crt);
+  }
+
   // ----------------------------------------------------------------
-  var KEYMAP = {
-    KeyW: 'w', ArrowUp: 'w',
-    KeyA: 'a', ArrowLeft: 'a',
-    KeyS: 's', ArrowDown: 's',
-    KeyD: 'd', ArrowRight: 'd'
-  };
+  // Keyboard: every key resolves to actions through the binding table
+  // (CONTROLS screen). Movement actions map onto input.keys w/a/s/d/q/e
+  // which the sim and the racers read: w/s walk or throttle, a/d turn or
+  // steer, q/e sidestep.
+  var MOVE_KEYS = { forward: 'w', back: 's', turnLeft: 'a', turnRight: 'd', strafeLeft: 'q', strafeRight: 'e' };
   var P2KEYMAP = { KeyI: 'w', KeyJ: 'a', KeyK: 's', KeyL: 'd' };
 
   // Gamepad routing: with co-op ON the first pad is Player 2; solo, it
-  // drives Player 1 (left stick move, right stick aim, A boost, B special).
+  // drives Player 1 (left stick move, right stick turn, A boost, B special).
   function pollPads() {
     var x = (p2keys.d ? 1 : 0) - (p2keys.a ? 1 : 0);
     var y = (p2keys.s ? 1 : 0) - (p2keys.w ? 1 : 0);
@@ -111,6 +119,9 @@
               input._gpTHeld = true;
             }
           } else input._gpTHeld = false;
+          if (btn(9)) { // start: pause
+            if (!input._gpStart) { input._gpStart = true; onEscape(); }
+          } else input._gpStart = false;
         }
         break;
       }
@@ -119,60 +130,74 @@
     input.p2y = GH.clamp(y, -1, 1);
   }
 
+  var rebindWait = null;   // action id waiting for a key on the CONTROLS screen
+
+  function typingInField(e) {
+    var t = e.target;
+    return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
+  }
+
   function bindInput() {
     window.addEventListener('keydown', function (e) {
       GH.audio.unlock();
       if (!GH.music.mode()) GH.music.play('title');
-      var k = KEYMAP[e.code];
-      if (k) { input.keys[k] = true; e.preventDefault(); }
+      if (e.code === 'Escape') { onEscape(); e.preventDefault(); return; }
+      if (typingInField(e)) return;
+      // the CONTROLS screen is listening for a new key
+      if (rebindWait) {
+        if (GH.controls.rebind(rebindWait, e.code)) GH.audio.card();
+        rebindWait = null;
+        renderControls();
+        e.preventDefault();
+        return;
+      }
+      var acts = GH.controls.actionsFor(e.code);
+      var playing = GH.game.state === 'play';
+      for (var ai = 0; ai < acts.length; ai++) {
+        var a = acts[ai];
+        if (MOVE_KEYS[a]) { input.keys[MOVE_KEYS[a]] = true; e.preventDefault(); continue; }
+        if (a === 'boost') {
+          if (playing) input.boostPressed = true;
+          input.boostHeld = true; // skimmer drift hold
+          e.preventDefault();
+        } else if (a === 'special') {
+          input.special = true;
+          if (playing) input.specialPressed = true;
+        } else if (a.indexOf('ability') === 0 && playing) {
+          if (!input.abilityPressed) input.abilityPressed = {};
+          input.abilityPressed[parseInt(a.slice(7), 10)] = true;
+        } else if (a.indexOf('ward') === 0 && a !== 'wardCycle' && playing) {
+          input.wardPressed = parseInt(a.slice(4), 10);
+        } else if (a === 'wardCycle' && playing) input.wardCycle = true;
+        else if (a === 'interact' && playing) input.interactPressed = true;
+        else if (a === 'transform' && playing) input.transformPressed = true;
+        else if (a === 'item' && playing) input.itemPressed = true;
+        else if (a === 'target' && playing) { GH.game.tabTarget(); e.preventDefault(); }
+        else if (a === 'camera' && (playing || GH.game.state === 'race')) GH.game.toggleCamera();
+        else if (a === 'skills' && (playing || GH.game.state === 'title')) openSkills(playing);
+        else if (a === 'map' && (playing || GH.game.state === 'title')) openWorldMap(playing);
+        else if (a === 'pilot' && (playing || GH.game.state === 'title')) openPilot(playing, 'title');
+        else if (a === 'pause') onEscape();
+        else if (a === 'crt') {
+          GH.controls.settings.crt = !GH.controls.settings.crt;
+          GH.controls.save();
+          applySettings();
+        }
+      }
+      if (e.code === 'Tab') e.preventDefault();
+      // co-op P2 keys (arena modes)
       var pk = P2KEYMAP[e.code];
       if (pk) p2keys[pk] = true;
-      if (e.code === 'KeyO' && GH.game.state === 'play') input.p2Boost = true;
+      if (e.code === 'KeyO' && playing) input.p2Boost = true;
       if (e.code === 'KeyU') {
         p2keys.sp = true;
         input.p2Special = true;
-        if (GH.game.state === 'play') input.p2SpecialPressed = true;
+        if (playing) input.p2SpecialPressed = true;
       }
       // co-op reward votes: P2 picks with J/K/L
       if (GH.game.coop && GH.game.state === 'reward') {
         var vn = { KeyJ: 0, KeyK: 1, KeyL: 2 }[e.code];
         if (vn !== undefined) GH.game.pickRewardIndex(vn);
-      }
-      if (e.code === 'Space' && GH.game.state === 'play') {
-        input.boostPressed = true; e.preventDefault();
-      }
-      if (e.code === 'Space') input.boostHeld = true; // skimmer drift hold
-      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
-        input.special = true;
-        if (GH.game.state === 'play') input.specialPressed = true;
-      }
-      if (GH.game.state === 'play') {
-        // abilities on 1-4, wards (protection stances) on Z/X/C
-        var an = { Digit1: 1, Digit2: 2, Digit3: 3, Digit4: 4 }[e.code];
-        if (an) {
-          if (!input.abilityPressed) input.abilityPressed = {};
-          input.abilityPressed[an] = true;
-        }
-        var wn = { KeyZ: 1, KeyX: 2, KeyC: 3 }[e.code];
-        if (wn) input.wardPressed = wn;
-        if (e.code === 'KeyQ') input.wardCycle = true;
-        if (e.code === 'KeyE') input.interactPressed = true;
-        if (e.code === 'KeyT') input.transformPressed = true;
-        if (e.code === 'KeyG') input.itemPressed = true;
-        if (e.code === 'Tab') { GH.game.tabTarget(); e.preventDefault(); }
-      }
-      if (e.code === 'KeyV' && (GH.game.state === 'play' || GH.game.state === 'race')) GH.game.toggleCamera();
-      if (e.code === 'KeyK' &&
-        (GH.game.state === 'play' || GH.game.state === 'title')) {
-        openSkills(GH.game.state === 'play');
-      }
-      if (e.code === 'KeyM' &&
-        (GH.game.state === 'play' || GH.game.state === 'title')) {
-        openWorldMap(GH.game.state === 'play');
-      }
-      if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
-      if (e.code === 'KeyF') {
-        document.getElementById('crt-overlay').classList.toggle('off');
       }
       if (GH.game.state === 'reward') {
         var n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5 }[e.code];
@@ -181,28 +206,39 @@
       if (e.code === 'Enter') {
         if (GH.game.state === 'title') enterSelect('classic');
         else if (GH.game.state === 'select') openStageSelect();
-        else if (GH.game.state === 'stageselect') launch(chosenStage);
+        else if (GH.game.state === 'stageselect' && curScreen === 'stage-screen') launch(chosenStage);
       }
     });
     window.addEventListener('keyup', function (e) {
-      var k = KEYMAP[e.code];
-      if (k) input.keys[k] = false;
+      var acts = GH.controls.actionsFor(e.code);
+      for (var ai = 0; ai < acts.length; ai++) {
+        var a = acts[ai];
+        if (MOVE_KEYS[a]) input.keys[MOVE_KEYS[a]] = false;
+        else if (a === 'special') input.special = false;
+        else if (a === 'boost') input.boostHeld = false;
+      }
       var pk = P2KEYMAP[e.code];
       if (pk) p2keys[pk] = false;
       if (e.code === 'KeyU') { p2keys.sp = false; input.p2Special = false; }
-      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.special = false;
-      if (e.code === 'Space') input.boostHeld = false;
     });
+
+    // Mouse: LEFT attacks / picks a target, RIGHT (held) drags the camera,
+    // the WHEEL zooms — the MMO scheme
     window.addEventListener('mousemove', function (e) {
       input.mouseNDC.set(
         (e.clientX / window.innerWidth) * 2 - 1,
         -(e.clientY / window.innerHeight) * 2 + 1
       );
+      if (input.looking) {
+        input.lookDX += e.movementX || 0;
+        input.lookDY += e.movementY || 0;
+      }
     });
     window.addEventListener('mousedown', function (e) {
       GH.audio.unlock();
       if (!GH.music.mode()) GH.music.play('title');
-      if (e.button === 0 && GH.game.state === 'play') {
+      var st = GH.game.state;
+      if (e.button === 0 && st === 'play') {
         // left click attacks with the equipped weapon; clicking a
         // hostile also marks it as the target (pick your fight)
         input.mouseNDC.set(
@@ -212,26 +248,35 @@
         input.attackPressed = true;
         input.attackHeld = true;
       }
-      if (e.button === 2 && GH.game.state === 'play') {
-        input.special = true;
-        input.specialPressed = true;
+      if (e.button === 2 && (st === 'play' || st === 'race')) {
+        input.looking = true;
+        document.body.classList.add('looking');
+        e.preventDefault();
       }
     });
     window.addEventListener('mouseup', function (e) {
       if (e.button === 0) input.attackHeld = false;
-      if (e.button === 2) input.special = false;
+      if (e.button === 2) { input.looking = false; input.lookDX = 0; input.lookDY = 0; document.body.classList.remove('looking'); }
     });
+    window.addEventListener('wheel', function (e) {
+      if (GH.game.state === 'play' || GH.game.state === 'race') {
+        input.zoomDelta += e.deltaY > 0 ? 1 : -1;
+        e.preventDefault();
+      }
+    }, { passive: false });
     window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     window.addEventListener('blur', function () {
       input.keys = {};
       input.special = false;
       input.attackHeld = false;
+      input.looking = false;
+      document.body.classList.remove('looking');
       if (GH.game.state === 'play') togglePause();
     });
   }
 
   // ----------------------------------------------------------------
-  // Touch controls: left half = move stick, right half = aim stick,
+  // Touch controls: left half = move stick, right half = turn/aim stick,
   // plus BOOST / SPEC buttons. Shown only on coarse-pointer devices.
   var touchCapable = false;
   function bindTouch() {
@@ -300,7 +345,7 @@
     });
     specBtn.addEventListener('pointerup', function () { input.special = false; });
     specBtn.addEventListener('pointercancel', function () { input.special = false; });
-    // tapping the interact prompt works like pressing E
+    // tapping the interact prompt works like pressing the interact key
     document.getElementById('interact-line').addEventListener('pointerdown', function (e) {
       e.preventDefault();
       if (GH.game.state === 'play') input.interactPressed = true;
@@ -308,41 +353,89 @@
   }
 
   // ----------------------------------------------------------------
+  // Screens. show(id) swaps the visible overlay; every meta screen has a
+  // BACK handler, and ESC always calls the one for the screen on top.
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
     'trials-screen', 'season-screen', 'hub-screen', 'save-screen', 'factions-screen',
-    'reward-screen', 'pause-screen', 'end-screen', 'skills-screen', 'map-screen'];
+    'reward-screen', 'pause-screen', 'end-screen', 'skills-screen', 'map-screen',
+    'workshop-screen', 'pilot-screen', 'controls-screen', 'help-screen'];
+  var curScreen = null;
+  var backHandlers = {};
 
   function show(id) {
+    curScreen = id;
     SCREENS.forEach(function (s) {
       document.getElementById(s).classList.toggle('hidden', s !== id);
     });
+    // the HUD sits behind every menu — hide it so nothing overlaps
+    document.body.classList.toggle('menu-open', !!id && id !== 'reward-screen');
+    if (id !== 'controls-screen') rebindWait = null;
+  }
+
+  // ESC: close what's on top. Pause → resume; a menu → its BACK; play → pause.
+  function onEscape() {
+    var st = GH.game.state;
+    if (confirmOpen) { closeConfirm(); return; }
+    if (rebindWait) { rebindWait = null; renderControls(); return; }
+    if (st === 'reward') return; // a choice has to be made
+    if (curScreen && backHandlers[curScreen]) { GH.audio.card(); backHandlers[curScreen](); return; }
+    if (st === 'pause') { togglePause(); return; }
+    if (st === 'race') { GH.game.abortRace(); return; }
+    if (st === 'play') togglePause();
+  }
+
+  // a small in-page confirm box for destructive choices
+  var confirmOpen = false, confirmYes = null;
+  function confirmBox(title, text, yesLabel, onYes) {
+    confirmOpen = true;
+    confirmYes = onYes;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-text').textContent = text;
+    document.getElementById('btn-confirm-yes').textContent = yesLabel || 'CONFIRM';
+    document.getElementById('confirm-screen').classList.remove('hidden');
+  }
+  function closeConfirm() {
+    confirmOpen = false; confirmYes = null;
+    document.getElementById('confirm-screen').classList.add('hidden');
   }
 
   function refreshTitle() {
     var comp = GH.progress.completion();
     var s = GH.progress.seasonCheck();
+    var m = GH.meta.data.mats || { alloy: 0, cores: 0 };
     document.getElementById('title-salvage').textContent =
-      'SALVAGE: ' + GH.meta.data.salvage + '  ·  SHELLS: ' +
-      Object.keys(GH.meta.data.shells).length + '/' + GH.mechs.length +
-      '  ·  LOG: ' + comp.pct + '%' +
-      '  ·  MASTERY: ' + GH.progress.masteryTotal() +
-      '  ·  SEASON: ' + s.pts + ' PTS';
+      'SALVAGE ' + GH.meta.data.salvage + '  ·  ALLOY ' + m.alloy + '  ·  CORES ' + m.cores +
+      '  ·  FRAMES ' + GH.roster.owned() + '/' + GH.roster.TOTAL +
+      '  ·  LOG ' + comp.pct + '%' +
+      '  ·  PILOT LV ' + GH.skills.pilotProgress().lvl +
+      '  ·  SEASON ' + s.pts + ' PTS';
     var prof = GH.meta.PROFILES[GH.meta.profile];
-    document.getElementById('btn-profile').textContent = 'PILOT: ' + prof.name;
+    document.getElementById('btn-profile').textContent = 'PROFILE: ' + prof.name;
+    document.getElementById('btn-profile').title = prof.desc + ' — click to switch profile';
     // expedition button reflects the persistent world
     var w = GH.meta.data.world;
     var nestsDead = Object.keys(w.nests).length;
     var lairsDown = Object.keys(w.lairsDown).length;
     document.getElementById('btn-expedition').textContent =
-      w.exp ? 'THE SHATTERED REACH — RESUME' :
-      (nestsDead || lairsDown) ? 'THE SHATTERED REACH (' + nestsDead + ' nests · ' + lairsDown + ' lairs)' :
-      'THE SHATTERED REACH';
+      w.exp ? 'CONTINUE THE SHATTERED REACH' : 'THE SHATTERED REACH';
+    document.getElementById('exp-desc').textContent = w.exp
+      ? 'Open world · your pilot is saved at ' + (w.exp.zone ? GH.world.stageFor(w.exp.zone).name : 'camp') +
+        ' · Lv ' + w.exp.level + ' ' + (w.exp.mechId ? GH.mechById(w.exp.mechId).name : '')
+      : 'Open world campaign — explore, race, raid dungeons. Your pilot persists between sessions.' +
+        ((nestsDead || lairsDown) ? ' (' + nestsDead + ' nests broken · ' + lairsDown + ' lairs down)' : '');
+    document.getElementById('btn-new-exp').classList.toggle('hidden', !w.exp);
+    // a parked arena run
+    var cont = document.getElementById('btn-continue');
+    var has = GH.game.hasSuspended();
+    cont.classList.toggle('hidden', !has);
+    if (has) cont.textContent = 'CONTINUE RUN — ' + GH.game.suspendedLabel();
+    document.getElementById('title-foot').textContent = GH.controls.summary();
     var memEl = document.getElementById('title-memorial');
     var mem = GH.meta.memorial();
     if (GH.meta.isHardcore() && mem.length) {
-      memEl.textContent = 'MEMORIAL: ' + mem.slice(0, 3).map(function (m) {
-        return m.frame + ' — ' + m.stage + ' w' + m.wave;
+      memEl.textContent = 'MEMORIAL: ' + mem.slice(0, 3).map(function (mm) {
+        return mm.frame + ' — ' + mm.stage + ' w' + mm.wave;
       }).join('  ·  ');
     } else {
       memEl.textContent = '';
@@ -366,7 +459,12 @@
     document.getElementById('hud').classList.add('hidden');
     document.getElementById('btn-launch').textContent =
       mode === 'expedition' ? 'DEPLOY TO THE REACH' : 'SELECT STAGE';
+    document.getElementById('select-mode').textContent =
+      mode === 'expedition' ? 'THE SHATTERED REACH — pick the frame your pilot will fly' :
+      mode === 'arena' ? 'ARENA — ENDLESS — pick a frame, then a stage' :
+      'CLASSIC — 20 WAVES — pick a frame, then a stage';
     GH.game.onSelectChange = renderSelectExtras;
+    GH.game.onOpenWorkshop = function () { workshopReturn = 'select'; openWorkshop(); };
     GH.game.enterSelect();
     renderP2Row();
     renderSelectExtras();
@@ -471,6 +569,8 @@
       var reward = GH.mechById(st.unlocks);
       var tier = GH.progress.trialTier(st.id);
       var tierBadge = tier ? '<span class="sc-trial">TRIAL ' + ['I', 'II', 'III', 'IV'][tier - 1] + '</span>' : '';
+      var rewardLine = GH.meta.data.shells[st.unlocks] ? ''
+        : (reward.kind === 'feat' ? '<br>— defeat to unlock the frame' : '<br>— defeat for blueprint data + 3 cores');
       div.innerHTML =
         '<div class="sc-band" style="background:linear-gradient(' +
         st.sky[0] + ',' + st.sky[1] + ')"></div>' +
@@ -478,8 +578,7 @@
         '<div class="sc-name">' + st.name + '</div>' +
         '<div class="sc-info">' + (unlocked
           ? (arena ? 'Endless waves.<br>How deep can you go?'
-            : 'Wave 20 boss:<br>CORRUPTED ' + reward.name +
-            (GH.meta.data.shells[st.unlocks] ? '' : '<br>— defeat to unlock the frame'))
+            : 'Wave 20 boss:<br>CORRUPTED ' + reward.name + rewardLine)
           : 'Clear the previous stage<br>to unlock') + '</div>' +
         '<div class="sc-best">' + (won ? '★ CLEARED · ' : '') +
         (best ? 'best wave ' + best : '') + ' ' + tierBadge + '</div>';
@@ -645,6 +744,11 @@
     var comp = GH.progress.completion();
     var b = GH.meta.data.broker;
     var cards = [
+      { id: 'hub-workshop', glyph: '⚒', name: 'FRAME WORKSHOP',
+        sub: GH.roster.owned() + '/' + GH.roster.TOTAL + ' frames · build new frames from alloy + cores',
+        open: function () { workshopReturn = 'hub'; openWorkshop(); } },
+      { id: 'hub-pilot', glyph: '☺', name: 'PILOT SHEET',
+        sub: 'character, inventory, materials', open: function () { openPilot(false, 'hub'); } },
       { id: 'hub-map', glyph: '🗺', name: 'WORLD MAP',
         sub: Object.keys(GH.meta.data.world.dgTier || {}).length + '/24 dungeons ascended',
         open: function () { openWorldMap(false); } },
@@ -670,7 +774,11 @@
       { id: 'hub-save', glyph: '⛃', name: 'SAVE CODE',
         sub: 'back up or restore progress', open: openSave },
       { id: 'hub-factions', glyph: '⚑', name: 'THE HOUSES',
-        sub: factionsSub(), open: openFactions }
+        sub: factionsSub(), open: openFactions },
+      { id: 'hub-controls', glyph: '⌨', name: 'CONTROLS',
+        sub: 'rebind keys · camera · CRT filter', open: function () { pilotReturn = false; openControls(); } },
+      { id: 'hub-help', glyph: '?', name: 'HOW TO PLAY',
+        sub: 'controls, modes, how frames unlock', open: function () { pilotReturn = false; openHelp(); } }
     ];
     var wrap = document.getElementById('hub-cards');
     wrap.innerHTML = '';
@@ -997,6 +1105,7 @@
       GH.progress.masteryTotal() + ')</div><div class="log-grid">';
     GH.mechs.forEach(function (m) {
       var lvl = GH.progress.masteryLevel(m.id);
+      if (!lvl && !GH.meta.data.shells[m.id]) return; // 135 exist; only list yours
       html += '<div class="log-cell' + (lvl ? ' seen' : '') + '">' +
         '<div class="lc-glyph">' + m.icon + '</div>' +
         '<div class="lc-name">' + m.name + '</div>' +
@@ -1222,12 +1331,19 @@
     });
   }
 
+
   // ----------------------------------------------------------------
+  // PAUSE — resume, controls, exit (keeps the run), abandon (deletes it)
   function togglePause() {
     if (GH.game.state === 'race') { GH.game.abortRace(); return; }
     if (GH.game.state === 'play') {
       GH.game.state = 'pause';
       document.getElementById('pause-stats').textContent = GH.game.pauseInfo();
+      var exp = GH.game.isExpedition();
+      document.getElementById('btn-exit-run').textContent = exp ? 'EXIT — SAVE & RETURN TO MENU' : 'EXIT RUN — SAVE & RETURN TO MENU';
+      document.getElementById('pause-exit-note').textContent = exp
+        ? 'Exit keeps your pilot exactly where they stand. Abandon deletes this pilot; the world\'s scars stay.'
+        : 'Exit parks this run at the start of wave ' + Math.max(1, GH.game.debugInfo().wave) + ' — CONTINUE RUN on the title brings you back. Abandon deletes it.';
       show('pause-screen');
     } else if (GH.game.state === 'pause') {
       GH.game.state = 'play';
@@ -1236,7 +1352,7 @@
   }
 
   function toTitle() {
-    GH.meta.save(); // abandoned runs still keep their tracking
+    GH.meta.save();
     expEntry = null;
     GH.game.state = 'title';
     document.getElementById('hud').classList.add('hidden');
@@ -1244,10 +1360,34 @@
     show('title-screen');
   }
 
+  // EXIT RUN: save whatever we're flying and go home
+  function exitRun() {
+    GH.game.suspendRun();
+    GH.game.leaveRun();
+    GH.audio.card();
+    toTitle();
+  }
+
+  // ABANDON RUN: delete it, after a confirm
+  function abandonRun(thenSelect) {
+    var exp = GH.game.isExpedition();
+    confirmBox(exp ? 'ABANDON THIS PILOT?' : 'ABANDON THIS RUN?',
+      exp ? 'The saved pilot, their level and their gear are deleted. Nests you broke and lairs you cleared stay cleared.'
+        : 'This run is deleted. Salvage, alloy and cores already banked are kept.',
+      'ABANDON', function () {
+        var mode = GH.game.mode;
+        GH.game.abandonRun();
+        GH.game.leaveRun();
+        GH.audio.hit();
+        if (thenSelect) enterSelect(mode === 'weekly' ? 'classic' : mode);
+        else toTitle();
+      });
+  }
+
   // ----------------------------------------------------------------
   // Expedition camp stations open the meta screens in place; backing
   // out drops you straight back into the world, not the title.
-  var expEntry = null; // which screen the camp station opened
+  var expEntry = null; // which screen the camp station / hotkey opened
 
   function resumeExpedition() {
     expEntry = null;
@@ -1275,26 +1415,345 @@
     }
   }
 
+  function newExpedition() {
+    if (!GH.meta.data.world.exp) { enterSelect('expedition'); return; }
+    confirmBox('START A NEW EXPEDITION?',
+      'Your saved pilot in the Reach is deleted (level, gear, position). The world\'s scars — broken nests, fallen lairs, ascended dungeons — stay.',
+      'NEW EXPEDITION', function () {
+        GH.meta.data.world.exp = null;
+        GH.meta.data.world.wreck = null;
+        GH.meta.save();
+        enterSelect('expedition');
+      });
+  }
+
+  // ----------------------------------------------------------------
+  // FRAME WORKSHOP — the 135. Browse by lineage, see exactly what a
+  // frame costs or which feat earns it, and build it.
+  var workshopReturn = 'hub';
+  var wsLineage = 'aegis';
+  var wsPick = null;
+
+  function openWorkshop() {
+    GH.audio.card();
+    if (GH.game.state === 'play') expEntry = 'workshop';
+    GH.game.state = 'hangar';
+    renderWorkshop();
+    show('workshop-screen');
+  }
+
+  function matsLine() {
+    var m = GH.meta.data.mats;
+    return '<span class="ws-mat">⬡ ALLOY <b>' + m.alloy + '</b></span> <span class="ws-mat">◈ CORES <b>' + m.cores +
+      '</b></span> <span class="ws-mat">$ SALVAGE <b>' + GH.meta.data.salvage + '</b></span>';
+  }
+
+  function renderWorkshop() {
+    document.getElementById('ws-head').innerHTML =
+      'FRAMES OWNED <b>' + GH.roster.owned() + ' / ' + GH.roster.TOTAL + '</b> · ' + matsLine();
+    // lineage tabs
+    var tabs = document.getElementById('ws-tabs');
+    tabs.innerHTML = '';
+    var lineages = GH.roster.BASE.map(function (b) { return { id: b.id, name: b.name, icon: b.icon }; });
+    lineages.push({ id: 'relic', name: 'RELICS', icon: '★' });
+    lineages.forEach(function (ln) {
+      var owned = 0, total = 0;
+      GH.mechs.forEach(function (m) {
+        if ((m.lineage || m.id) !== ln.id) return;
+        total++; if (GH.meta.data.shells[m.id]) owned++;
+      });
+      var t = document.createElement('div');
+      t.className = 'ws-tab' + (wsLineage === ln.id ? ' on' : '');
+      t.innerHTML = '<span class="ws-tab-icon">' + ln.icon + '</span>' + ln.name + '<span class="ws-tab-n">' + owned + '/' + total + '</span>';
+      t.onclick = function () { wsLineage = ln.id; wsPick = null; GH.audio.card(); renderWorkshop(); };
+      tabs.appendChild(t);
+    });
+    // grid
+    var grid = document.getElementById('ws-grid');
+    grid.innerHTML = '';
+    var first = null;
+    GH.mechs.forEach(function (m) {
+      if ((m.lineage || m.id) !== wsLineage) return;
+      var st = GH.roster.status(m.id);
+      var pk = m.pack ? GH.roster.packById(m.pack) : null;
+      var mk = m.mark ? GH.roster.markById(m.mark) : null;
+      var cell = document.createElement('div');
+      cell.className = 'ws-cell' + (st.owned ? ' owned' : (st.canBuild ? ' ready' : (st.feat ? ' feat' : ' locked'))) +
+        (wsPick === m.id ? ' pick' : '');
+      cell.innerHTML =
+        '<div class="ws-icon"' + (pk ? ' style="color:' + pk.css + '"' : '') + '>' + m.icon + '</div>' +
+        '<div class="ws-name">' + m.name + '</div>' +
+        '<div class="ws-sub">' + (pk ? pk.name + ' · ' + mk.name : (m.kind === 'relic' ? 'RELIC' : m.kind === 'starter' ? 'STARTER' : m.kind === 'feat' ? 'FEAT FRAME' : 'BASE FRAME')) + '</div>' +
+        '<div class="ws-state">' + (st.owned ? '✓ OWNED' : st.canBuild ? '⚒ READY TO BUILD' : st.feat ? '★ FEAT' : st.blockers && st.blockers.length ? '🔒 LOCKED' : '⬡ NEED MATERIALS') + '</div>';
+      cell.onclick = function () { wsPick = m.id; GH.audio.card(); renderWorkshop(); };
+      grid.appendChild(cell);
+      if (!first) first = m.id;
+    });
+    if (!wsPick) wsPick = first;
+    renderWorkshopDetail();
+  }
+
+  function renderWorkshopDetail() {
+    var box = document.getElementById('ws-detail');
+    var m = wsPick ? GH.mechById(wsPick) : null;
+    if (!m) { box.innerHTML = ''; return; }
+    var st = GH.roster.status(m.id);
+    var pk = m.pack ? GH.roster.packById(m.pack) : null;
+    var html = '<div class="ws-d-name">' + m.icon + ' ' + m.name + '</div>' +
+      '<div class="ws-d-role">' + m.role + '</div>' +
+      '<div class="ws-d-desc">' + m.desc + '</div>' +
+      '<div class="ws-d-stats">' + m.baseText.replace(/\n/g, ' · ') + '</div>' +
+      '<div class="ws-d-stats">Primary: <b>' + m.weapon.name + '</b> · ' + m.specialText + '</div>';
+    if (pk) html += '<div class="ws-d-pack" style="color:' + pk.css + '">' + pk.glyph + ' ' + pk.name + ' PACK — ' + pk.desc + '</div>';
+    if (st.owned) {
+      html += '<div class="ws-d-status owned">OWNED — pick it on the frame select screen.</div>';
+    } else if (st.feat) {
+      html += '<div class="ws-d-status feat">FEAT FRAME — ' + GH.roster.FEATS[m.id].desc + '</div>';
+    } else if (st.recipe) {
+      var rc = st.recipe, mats = GH.meta.data.mats;
+      var need = function (have, want, label) {
+        return '<span class="' + (have >= want ? 'ws-ok' : 'ws-short') + '">' + label + ' ' + have + '/' + want + '</span>';
+      };
+      html += '<div class="ws-d-bill">BILL: ' + need(mats.alloy, rc.alloy, '⬡ ALLOY') + ' · ' +
+        need(mats.cores, rc.cores, '◈ CORES') + ' · ' + need(GH.meta.data.salvage, rc.salvage, '$ SALVAGE') + '</div>';
+      if (rc.requires) html += '<div class="ws-d-req' + (GH.meta.data.shells[rc.requires] ? ' ws-ok' : ' ws-short') + '">REQUIRES: ' + GH.mechById(rc.requires).name + (GH.meta.data.shells[rc.requires] ? ' ✓' : ' (build it first)') + '</div>';
+      if (rc.feat) {
+        var fp = GH.roster.featProgress(rc.feat);
+        html += '<div class="ws-d-req' + (fp.done ? ' ws-ok' : ' ws-short') + '">FEAT: ' + rc.feat.desc + ' (' + fp.have + '/' + fp.need + ')' + (fp.done ? ' ✓' : '') + '</div>';
+      }
+      html += '<button class="menu-btn small" id="ws-build" ' + (st.canBuild ? '' : 'disabled') + '>' +
+        (st.canBuild ? '⚒ BUILD ' + m.name : st.blockers.length ? 'LOCKED' : 'NOT ENOUGH MATERIALS') + '</button>';
+    }
+    box.innerHTML = html;
+    var bb = document.getElementById('ws-build');
+    if (bb) bb.onclick = function () {
+      if (GH.roster.build(m.id)) {
+        GH.audio.win();
+        renderWorkshop();
+        if (GH.game.refreshPilot) GH.game.refreshPilot();
+      } else GH.audio.hit();
+    };
+  }
+
+  // ----------------------------------------------------------------
+  // PILOT SHEET — the character screen: who you are, what you carry,
+  // and doors to everything that changes it.
+  function openPilot(fromPlay, from) {
+    GH.audio.card();
+    if (from) pilotFrom = from;
+    if (fromPlay) expEntry = 'pilot';
+    if (GH.game.state !== 'play' || fromPlay) GH.game.state = 'hangar';
+    renderPilot();
+    show('pilot-screen');
+  }
+
+  function renderPilot() {
+    var d = GH.meta.data;
+    var pp = GH.skills.pilotProgress();
+    var prof = GH.meta.PROFILES[GH.meta.profile];
+    var f = GH.factions.state();
+    var art = d.world.equipped ? GH.progress.artifactById(d.world.equipped) : null;
+    var devName = { sol: 'Sol', pyre: 'Pyre', keen: 'Keen', verd: 'Verd', ruin: 'Ruin' }[d.activeDevotion] || '—';
+    var live = GH.game.state === 'hangar' && expEntry === 'pilot' && GH.game.debugInfo().hp > 0
+      ? GH.game.pauseInfo() : null;
+    var frames = [];
+    GH.mechs.forEach(function (m) { if (d.shells[m.id]) frames.push(m); });
+    var html =
+      '<div class="pl-col">' +
+      '<div class="pl-block"><div class="pl-h">PILOT</div>' +
+      '<div class="pl-row">Profile <b>' + prof.name + '</b> — ' + prof.desc + '</div>' +
+      '<div class="pl-row">Pilot level <b>' + pp.lvl + '</b> · ' + Math.floor(pp.into) + '/' + Math.ceil(pp.need) + ' XP to next</div>' +
+      '<div class="pl-row">Skill points ready <b class="' + (d.skillPoints ? 'pl-hot' : '') + '">' + d.skillPoints + '</b> · trained ranks <b>' + GH.skills.spentTotal() + '</b></div>' +
+      '<div class="pl-row">Mastery total <b>' + GH.progress.masteryTotal() + '</b> · runs <b>' + d.collection.totalRuns + '</b> · wins <b>' + d.collection.totalWins + '</b> · kills <b>' + d.collection.totalKills + '</b></div>' +
+      '</div>' +
+      '<div class="pl-block"><div class="pl-h">INVENTORY</div>' +
+      '<div class="pl-row">$ Salvage <b>' + d.salvage + '</b></div>' +
+      '<div class="pl-row">⬡ Alloy <b>' + d.mats.alloy + '</b> · ◈ Frame cores <b>' + d.mats.cores + '</b></div>' +
+      '<div class="pl-row">Artifact equipped <b>' + (art ? art.name : 'none') + '</b> (' + Object.keys(d.world.artifacts).length + '/' + GH.progress.artifacts.length + ' found — equip in COLLECTION LOG)</div>' +
+      '<div class="pl-row">Cosmetics owned <b>' + Object.keys(d.style.owned).length + '</b> — set on the frame select screen</div>' +
+      '<div class="pl-row">Active devotion <b>' + devName + '</b> · broker points <b>' + d.broker.points + '</b></div>' +
+      '<div class="pl-row">House: <b>' + factionsSub() + '</b></div>' +
+      '</div>' +
+      (live ? '<div class="pl-block"><div class="pl-h">CURRENT RUN</div><div class="pl-row pl-pre">' + live + '</div></div>' : '') +
+      '</div>' +
+      '<div class="pl-col">' +
+      '<div class="pl-block"><div class="pl-h">FRAMES OWNED — ' + frames.length + ' / ' + GH.roster.TOTAL + '</div><div class="pl-frames">' +
+      frames.map(function (m) {
+        var pk = m.pack ? GH.roster.packById(m.pack) : null;
+        return '<span class="pl-frame" title="' + m.role + '"' + (pk ? ' style="border-color:' + pk.css + '"' : '') + '>' + m.icon + ' ' + m.name + ' <i>Lv' + GH.progress.masteryLevel(m.id) + '</i></span>';
+      }).join('') + '</div></div>' +
+      '<div class="pl-block"><div class="pl-h">GO TO</div><div class="pl-links">' +
+      '<button class="menu-btn tiny" data-go="skills">PILOT TRAINING</button>' +
+      '<button class="menu-btn tiny" data-go="workshop">FRAME WORKSHOP</button>' +
+      '<button class="menu-btn tiny" data-go="collection">COLLECTION LOG</button>' +
+      '<button class="menu-btn tiny" data-go="hangar">DEVOTIONS</button>' +
+      '<button class="menu-btn tiny" data-go="controls">CONTROLS</button>' +
+      '<button class="menu-btn tiny" data-go="help">HOW TO PLAY</button>' +
+      '</div></div></div>';
+    var body = document.getElementById('pilot-body');
+    body.innerHTML = html;
+    body.querySelectorAll('[data-go]').forEach(function (b) {
+      b.onclick = function () {
+        var g = b.getAttribute('data-go');
+        pilotReturn = true;
+        if (g === 'skills') openSkills(false);
+        else if (g === 'workshop') { workshopReturn = 'pilot'; openWorkshop(); }
+        else if (g === 'collection') openCollection();
+        else if (g === 'hangar') openHangar();
+        else if (g === 'controls') openControls();
+        else if (g === 'help') openHelp();
+      };
+    });
+  }
+  var pilotReturn = false;
+
+  // ----------------------------------------------------------------
+  // CONTROLS — rebind any key, tune the camera
+  function openControls() {
+    GH.audio.card();
+    if (GH.game.state === 'play') expEntry = 'controls';
+    if (GH.game.state !== 'pause') GH.game.state = 'hangar';
+    controlsFromPause = GH.game.state === 'pause';
+    renderControls();
+    show('controls-screen');
+  }
+  var controlsFromPause = false;
+
+  function renderControls() {
+    var C = GH.controls;
+    var list = document.getElementById('controls-list');
+    var html = '';
+    var lastGroup = null;
+    C.ACTIONS.forEach(function (a) {
+      if (a.group !== lastGroup) {
+        lastGroup = a.group;
+        html += '<div class="ct-group">' + a.group + '</div>';
+      }
+      var waiting = rebindWait === a.id;
+      html += '<div class="ct-row"><span class="ct-name">' + a.name + '</span>' +
+        '<span class="ct-key' + (waiting ? ' waiting' : '') + (!C.binds[a.id] ? ' unbound' : '') + '" data-act="' + a.id + '">' +
+        (waiting ? 'PRESS A KEY…' : C.label(a.id)) + '</span></div>';
+    });
+    html += '<div class="ct-group">MOUSE (fixed)</div>' +
+      '<div class="ct-row"><span class="ct-name">Attack / pick target</span><span class="ct-key fixed">LEFT CLICK</span></div>' +
+      '<div class="ct-row"><span class="ct-name">Look around (hold and drag)</span><span class="ct-key fixed">RIGHT MOUSE</span></div>' +
+      '<div class="ct-row"><span class="ct-name">Zoom camera</span><span class="ct-key fixed">WHEEL</span></div>' +
+      '<div class="ct-row"><span class="ct-name">Pause / close menu</span><span class="ct-key fixed">ESC</span></div>';
+    list.innerHTML = html;
+    list.querySelectorAll('.ct-key[data-act]').forEach(function (k) {
+      k.onclick = function () {
+        rebindWait = k.getAttribute('data-act');
+        GH.audio.card();
+        renderControls();
+      };
+    });
+    // settings
+    var st = C.settings;
+    document.getElementById('set-sens').value = Math.round(st.sens * 100);
+    document.getElementById('set-sens-val').textContent = Math.round(st.sens * 100) + '%';
+    document.getElementById('set-invert').checked = !!st.invertY;
+    document.getElementById('set-crt').checked = !!st.crt;
+    document.getElementById('set-cam').value = GH.game.camMode();
+    document.getElementById('set-mute').checked = GH.audio.isMuted();
+  }
+
+  // ----------------------------------------------------------------
+  // HELP — how to play, where everything is, how frames are earned
+  function openHelp() {
+    GH.audio.card();
+    if (GH.game.state === 'play') expEntry = 'help';
+    if (GH.game.state !== 'pause') GH.game.state = 'hangar';
+    renderHelp();
+    show('help-screen');
+  }
+
+  function renderHelp() {
+    var L = GH.controls.label;
+    var feats = Object.keys(GH.roster.FEATS).map(function (id) {
+      var own = GH.meta.data.shells[id];
+      return '<li>' + (own ? '☑ ' : '☐ ') + '<b>' + GH.mechById(id).name + '</b> — ' + GH.roster.FEATS[id].desc + '</li>';
+    }).join('');
+    var relics = GH.roster.relics.map(function (m) {
+      var rc = GH.roster.recipes[m.id];
+      var fp = GH.roster.featProgress(rc.feat);
+      return '<li>' + (GH.meta.data.shells[m.id] ? '☑ ' : (fp.done ? '☑ ' : '☐ ')) + '<b>' + m.name + '</b> — ' + rc.feat.desc + ' (' + fp.have + '/' + fp.need + ')</li>';
+    }).join('');
+    document.getElementById('help-body').innerHTML =
+      '<div class="hp-col">' +
+      '<div class="hp-h">CONTROLS</div>' +
+      '<ul><li><b>' + L('forward') + ' / ' + L('back') + '</b> walk forward / back · <b>' + L('turnLeft') + ' / ' + L('turnRight') + '</b> turn · <b>' + L('strafeLeft') + ' / ' + L('strafeRight') + '</b> strafe</li>' +
+      '<li><b>Hold RIGHT MOUSE</b> and drag to look around; <b>WHEEL</b> zooms. <b>' + L('camera') + '</b> switches to the tactical top-down camera (mouse aims there).</li>' +
+      '<li><b>LEFT CLICK</b> attacks and marks the hostile under the cursor as your target. <b>' + L('target') + '</b> cycles targets.</li>' +
+      '<li><b>' + L('ability1') + '–' + L('ability4') + '</b> cast abilities (spend ENERGY). <b>' + L('ward1') + ' ' + L('ward2') + ' ' + L('ward3') + '</b> raise a ward matching the incoming damage.</li>' +
+      '<li><b>' + L('boost') + '</b> dashes (hold to drift in skimmer form). <b>' + L('special') + '</b> fires your frame\'s special, or nitro when driving.</li>' +
+      '<li><b>' + L('transform') + '</b> folds into the skimmer: ' + L('forward') + ' throttle, ' + L('back') + ' brake, ' + L('turnLeft') + '/' + L('turnRight') + ' steer.</li>' +
+      '<li><b>' + L('interact') + '</b> uses gates, chests, camp stations. <b>ESC</b> pauses or closes any menu. Rebind everything under CONTROLS.</li></ul>' +
+      '<div class="hp-h">GAME MODES</div>' +
+      '<ul><li><b>THE SHATTERED REACH</b> — the open world. Your pilot, level and gear are saved automatically; EXIT keeps them, ABANDON deletes them.</li>' +
+      '<li><b>CLASSIC</b> — 20 waves on one stage; the wave-20 boss unlocks the next stage and pays a frame or blueprint data.</li>' +
+      '<li><b>ARENA</b> — endless waves. <b>WEEKLY</b> — a fixed frame and modifiers shared by everyone that week.</li>' +
+      '<li>EXIT RUN from the pause menu parks a CLASSIC/ARENA run; CONTINUE RUN on the title resumes it at that wave.</li></ul>' +
+      '<div class="hp-h">WHERE THINGS ARE</div>' +
+      '<ul><li><b>HANGAR</b> — every progression screen: FRAME WORKSHOP (build frames), PILOT TRAINING (skill tree), DEVOTIONS, BROKER, COLLECTION LOG (artifacts), TRIALS, SEASON, HOUSES, SAVE CODE.</li>' +
+      '<li><b>PILOT</b> — your character sheet and inventory: materials, artifact, cosmetics, frames owned.</li>' +
+      '<li>In the Reach, the camp stations (console, shrine, memorial, broker) open the same screens without leaving the world.</li></ul>' +
+      '</div><div class="hp-col">' +
+      '<div class="hp-h">UNLOCKING FRAMES (' + GH.roster.owned() + ' / ' + GH.roster.TOTAL + ')</div>' +
+      '<ul><li><b>Starters</b>: AEGIS and VULCAN are yours from the first sortie.</li>' +
+      '<li><b>Feat frames</b> (earned, never bought):<ul>' + feats + '</ul></li>' +
+      '<li><b>Built frames</b>: the other ' + (GH.roster.TOTAL - 6) + ' are assembled in the FRAME WORKSHOP from ⬡ ALLOY, ◈ FRAME CORES and $ SALVAGE. Each lineage has five packs (AILE, SWORD, LAUNCHER, STORM, PHANTOM) in three marks — build MK.II before CUSTOM before PROTOTYPE.</li>' +
+      '<li><b>Relic frames</b> need a feat first:<ul>' + relics + '</ul></li></ul>' +
+      '<div class="hp-h">MATERIALS</div><ul>' +
+      GH.roster.SOURCES.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul>' +
+      '<div class="hp-h">TIPS</div>' +
+      '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run CLASSIC to wave 20 for cores.</li>' +
+      '<li>Sparks feed your persistent PILOT LEVEL — every level is a skill point for PILOT TRAINING.</li>' +
+      '<li>Wards cut matched damage by 75%. Watch the colour of what is hitting you.</li>' +
+      '<li>Your save lives in this browser. HANGAR → SAVE CODE exports it; paste it on another machine to restore.</li></ul>' +
+      '</div>';
+  }
+
   function bindUI() {
+    var byId = function (id) { return document.getElementById(id); };
+    // back buttons: the click AND the ESC key share one handler per screen
+    var back = function (screen, btnId, fn) {
+      backHandlers[screen] = fn;
+      if (btnId && byId(btnId)) byId(btnId).onclick = function () { GH.audio.card(); fn(); };
+    };
+
     GH.game.onInteract = function (kind) {
       if (kind === 'broker') { expEntry = 'broker'; openBroker(); }
       else if (kind === 'shrine') { expEntry = 'hangar'; openHangar(); }
       else if (kind === 'memorial') { expEntry = 'collection'; openCollection(); }
       else { expEntry = 'hub'; openHub(); }
     };
-    document.getElementById('btn-expedition').onclick = startOrResumeExpedition;
-    document.getElementById('btn-start').onclick = function () { enterSelect('classic'); };
-    document.getElementById('btn-arena').onclick = function () { enterSelect('arena'); };
-    document.getElementById('btn-weekly').onclick = openWeekly;
-    document.getElementById('btn-hub').onclick = openHub;
-    document.getElementById('btn-hub-back').onclick = metaBack('hub', toTitle);
-    document.getElementById('btn-profile').onclick = cycleProfile;
-    // meta screens live under the hub now (or under a camp station)
-    document.getElementById('btn-season-back').onclick = openHub;
-    document.getElementById('btn-map-back').onclick = metaBack('map', openHub);
-    document.getElementById('btn-fac-back').onclick = metaBack('factions', openHub);
-    document.getElementById('btn-skills-back').onclick = metaBack('skills', openHub);
-    document.getElementById('btn-respec').onclick = function () {
+    byId('btn-expedition').onclick = startOrResumeExpedition;
+    byId('btn-new-exp').onclick = newExpedition;
+    byId('btn-continue').onclick = function () {
+      GH.audio.wave();
+      show(null);
+      lastLaunch = null;
+      if (!GH.game.resumeRun()) toTitle();
+    };
+    byId('btn-start').onclick = function () { enterSelect('classic'); };
+    byId('btn-arena').onclick = function () { enterSelect('arena'); };
+    byId('btn-weekly').onclick = openWeekly;
+    byId('btn-hub').onclick = openHub;
+    byId('btn-title-pilot').onclick = function () { openPilot(false, 'title'); };
+    byId('btn-title-controls').onclick = openControls;
+    byId('btn-title-help').onclick = openHelp;
+    byId('btn-profile').onclick = cycleProfile;
+
+    back('hub-screen', 'btn-hub-back', metaBack('hub', toTitle));
+    back('season-screen', 'btn-season-back', openHub);
+    back('map-screen', 'btn-map-back', metaBack('map', openHub));
+    back('factions-screen', 'btn-fac-back', metaBack('factions', openHub));
+    back('skills-screen', 'btn-skills-back', function () {
+      if (expEntry === 'skills') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else openHub();
+    });
+    byId('btn-respec').onclick = function () {
       if (GH.skills.respec()) {
         GH.audio.win();
         renderSkills();
@@ -1302,13 +1761,65 @@
         GH.audio.hit();
       }
     };
-    document.getElementById('btn-broker-back').onclick = metaBack('broker', openHub);
-    document.getElementById('btn-collection-back').onclick = metaBack('collection', openHub);
-    document.getElementById('btn-trials-back').onclick = openHub;
-    document.getElementById('btn-hangar-back').onclick = metaBack('hangar', openHub);
-    document.getElementById('btn-save-back').onclick = openHub;
-    document.getElementById('btn-save-copy').onclick = function () {
-      var ta = document.getElementById('save-export');
+    back('broker-screen', 'btn-broker-back', metaBack('broker', openHub));
+    back('collection-screen', 'btn-collection-back', function () {
+      if (expEntry === 'collection') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else openHub();
+    });
+    back('trials-screen', 'btn-trials-back', openHub);
+    back('hangar-screen', 'btn-hangar-back', function () {
+      if (expEntry === 'hangar') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else openHub();
+    });
+    back('save-screen', 'btn-save-back', openHub);
+    back('workshop-screen', 'btn-ws-back', function () {
+      if (expEntry === 'workshop') resumeExpedition();
+      else if (workshopReturn === 'select') { workshopReturn = 'hub'; enterSelect(GH.game.mode); }
+      else if (workshopReturn === 'pilot') { workshopReturn = 'hub'; openPilot(false); }
+      else openHub();
+    });
+    back('pilot-screen', 'btn-pilot-back', function () {
+      if (expEntry === 'pilot') resumeExpedition();
+      else if (pilotFrom === 'hub') openHub();
+      else toTitle();
+    });
+    back('controls-screen', 'btn-controls-back', function () {
+      rebindWait = null;
+      if (controlsFromPause) { controlsFromPause = false; show('pause-screen'); return; }
+      if (expEntry === 'controls') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else toTitle();
+    });
+    back('help-screen', 'btn-help-back', function () {
+      if (GH.game.state === 'pause') { show('pause-screen'); return; }
+      if (expEntry === 'help') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else toTitle();
+    });
+    byId('btn-controls-reset').onclick = function () {
+      GH.controls.reset();
+      applySettings();
+      GH.audio.card();
+      renderControls();
+    };
+    byId('set-sens').oninput = function () {
+      GH.controls.settings.sens = parseInt(this.value, 10) / 100;
+      byId('set-sens-val').textContent = this.value + '%';
+      GH.controls.save();
+    };
+    byId('set-invert').onchange = function () { GH.controls.settings.invertY = this.checked; GH.controls.save(); };
+    byId('set-crt').onchange = function () { GH.controls.settings.crt = this.checked; GH.controls.save(); applySettings(); };
+    byId('set-cam').onchange = function () { GH.game.setCamMode(this.value); };
+    byId('set-mute').onchange = function () {
+      GH.audio.unlock();
+      GH.audio.setMuted(this.checked);
+      byId('mute-btn').classList.toggle('off', this.checked);
+    };
+
+    byId('btn-save-copy').onclick = function () {
+      var ta = byId('save-export');
       ta.select();
       var ok = false;
       try {
@@ -1319,53 +1830,67 @@
           ok = document.execCommand('copy');
         }
       } catch (e) { /* fall through */ }
-      document.getElementById('save-feedback').textContent =
+      byId('save-feedback').textContent =
         ok ? 'Copied — keep it somewhere safe.' : 'Select the code and copy it manually.';
       GH.audio.card();
     };
-    document.getElementById('btn-save-import').onclick = function () {
-      var res = GH.meta.importCode(document.getElementById('save-import').value);
-      var fb = document.getElementById('save-feedback');
+    byId('btn-save-import').onclick = function () {
+      var res = GH.meta.importCode(byId('save-import').value);
+      var fb = byId('save-feedback');
       if (res.ok) {
         fb.textContent = 'Restored ' + res.profiles + ' profile(s) from ' + (res.saved || 'save') + '.';
         GH.audio.win();
         refreshTitle();
-        document.getElementById('save-export').value = GH.meta.exportCode();
+        byId('save-export').value = GH.meta.exportCode();
       } else {
         fb.textContent = res.error;
         GH.audio.hit();
       }
     };
-    document.getElementById('btn-weekly-back').onclick = toTitle;
-    document.getElementById('btn-preset-back').onclick = function () {
+    back('weekly-screen', 'btn-weekly-back', toTitle);
+    back('preset-screen', 'btn-preset-back', function () {
       GH.game.state = 'stageselect';
       renderStageList();
       show('stage-screen');
-    };
-    document.getElementById('btn-coop').onclick = function () {
+    });
+    byId('btn-coop').onclick = function () {
       GH.game.coop = !GH.game.coop;
       GH.audio.card();
-      document.getElementById('btn-coop').textContent =
+      byId('btn-coop').textContent =
         'CO-OP P2: ' + (GH.game.coop ? 'ON (IJKL + O boost + U special)' : 'OFF');
       renderP2Row();
     };
-    document.getElementById('btn-launch').onclick = openStageSelect;
-    document.getElementById('btn-select-back').onclick = toTitle;
-    document.getElementById('btn-stage-back').onclick = function () { enterSelect(GH.game.mode); };
-    document.getElementById('btn-resume').onclick = togglePause;
-    document.getElementById('btn-quit').onclick = toTitle;
-    document.getElementById('btn-retry').onclick = function () {
+    byId('btn-launch').onclick = openStageSelect;
+    byId('btn-select-workshop').onclick = function () { workshopReturn = 'select'; openWorkshop(); };
+    back('select-screen', 'btn-select-back', toTitle);
+    back('stage-screen', 'btn-stage-back', function () { enterSelect(GH.game.mode); });
+
+    // pause menu
+    byId('btn-resume').onclick = togglePause;
+    byId('btn-pause-controls').onclick = openControls;
+    byId('btn-pause-help').onclick = openHelp;
+    byId('btn-exit-run').onclick = exitRun;
+    byId('btn-new-run').onclick = function () { abandonRun(true); };
+    byId('btn-quit').onclick = function () { abandonRun(false); };
+    backHandlers['pause-screen'] = togglePause;
+
+    // confirm box
+    byId('btn-confirm-yes').onclick = function () { var fn = confirmYes; closeConfirm(); if (fn) fn(); };
+    byId('btn-confirm-no').onclick = closeConfirm;
+
+    byId('btn-retry').onclick = function () {
       if (lastLaunch) lastLaunch();
       else { show(null); launch(chosenStage); }
     };
-    document.getElementById('btn-menu').onclick = toTitle;
-    var muteBtn = document.getElementById('mute-btn');
+    byId('btn-menu').onclick = toTitle;
+    var muteBtn = byId('mute-btn');
     muteBtn.onclick = function () {
       GH.audio.unlock();
       GH.audio.setMuted(!GH.audio.isMuted());
       muteBtn.classList.toggle('off', GH.audio.isMuted());
     };
   }
+  var pilotFrom = 'title';
 
   // ----------------------------------------------------------------
   var last = 0;

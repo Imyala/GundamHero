@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HERO FRAME — a mech arena survivor</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -82,22 +83,34 @@
     <div class="title-grid"></div>
     <h1 class="game-title">HERO&nbsp;FRAME</h1>
     <div class="title-sub">A MECH ARENA SURVIVOR</div>
-    <button id="btn-expedition" class="menu-btn">THE SHATTERED REACH</button>
-    <button id="btn-start" class="menu-btn small">CLASSIC</button>
-    <button id="btn-arena" class="menu-btn small">ARENA — ENDLESS</button>
-    <button id="btn-weekly" class="menu-btn small">WEEKLY CHALLENGE</button>
-    <div class="title-row">
-      <button id="btn-hub" class="menu-btn small">HANGAR</button>
-      <button id="btn-profile" class="menu-btn tiny profile-btn">PILOT: STANDARD</button>
+    <div class="title-menu">
+      <button id="btn-continue" class="menu-btn small continue-btn hidden">CONTINUE RUN</button>
+      <button id="btn-expedition" class="menu-btn">THE SHATTERED REACH</button>
+      <div id="exp-desc" class="menu-desc"></div>
+      <button id="btn-new-exp" class="menu-btn tiny hidden">NEW EXPEDITION (delete saved pilot)</button>
+      <div class="title-row">
+        <div class="title-choice"><button id="btn-start" class="menu-btn small">CLASSIC</button><div class="menu-desc">20 waves · beat the boss to earn a frame</div></div>
+        <div class="title-choice"><button id="btn-arena" class="menu-btn small">ARENA</button><div class="menu-desc">endless waves · farm alloy</div></div>
+        <div class="title-choice"><button id="btn-weekly" class="menu-btn small">WEEKLY</button><div class="menu-desc">one fixed challenge for everyone</div></div>
+      </div>
+      <div class="title-row">
+        <button id="btn-hub" class="menu-btn small">HANGAR</button>
+        <button id="btn-title-pilot" class="menu-btn small">PILOT</button>
+        <button id="btn-title-controls" class="menu-btn small">CONTROLS</button>
+        <button id="btn-title-help" class="menu-btn small">HOW TO PLAY</button>
+        <button id="btn-profile" class="menu-btn tiny profile-btn">PROFILE: STANDARD</button>
+      </div>
+      <div class="menu-desc">HANGAR: build frames, train your pilot, devotions, contracts, collection · PILOT: your character sheet &amp; inventory</div>
     </div>
     <div id="title-salvage"></div>
     <div id="title-memorial"></div>
-    <div class="title-foot">WASD move &nbsp;·&nbsp; CLICK attack / target &nbsp;·&nbsp; TAB cycle target &nbsp;·&nbsp; 1–4 abilities &nbsp;·&nbsp; Z X C wards &nbsp;·&nbsp; SPACE boost / drift &nbsp;·&nbsp; SHIFT special / nitro &nbsp;·&nbsp; T transform &nbsp;·&nbsp; V camera &nbsp;·&nbsp; G race item &nbsp;·&nbsp; K skill tree</div>
+    <div id="title-foot" class="title-foot"></div>
   </div>
 
   <!-- ===================== PLAYER SELECT ===================== -->
   <div id="select-screen" class="screen hidden">
-    <h2 class="select-title">PLAYER&nbsp;&nbsp;SELECT</h2>
+    <div class="screen-head"><button id="btn-select-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">PLAYER&nbsp;&nbsp;SELECT</h2><span class="esc-hint">ESC closes</span></div>
+    <div id="select-mode" class="screen-sub"></div>
     <div id="select-panel">
       <div id="select-name">FRAME</div>
       <div id="select-role"></div>
@@ -106,124 +119,114 @@
       <div id="select-stats"></div>
     </div>
     <div id="style-row"></div>
-    <div id="select-icons"></div>
+    <div id="select-rack">
+      <div id="select-count" class="rack-label"></div>
+      <div id="select-icons"></div>
+      <button id="btn-select-workshop" class="menu-btn tiny">⚒ OPEN THE WORKSHOP — BUILD MORE FRAMES</button>
+    </div>
     <div id="p2-select-row" class="hidden"></div>
     <button id="btn-launch" class="menu-btn">SELECT STAGE</button>
     <button id="btn-coop" class="menu-btn tiny coop-btn">CO-OP P2: OFF</button>
-    <button id="btn-select-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== ARENA LOADOUT ===================== -->
   <div id="preset-screen" class="screen hidden">
-    <h2 class="select-title">LOADOUT</h2>
+    <div class="screen-head"><button id="btn-preset-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">LOADOUT</h2><span class="esc-hint">ESC closes</span></div>
     <div id="preset-list"></div>
-    <button id="btn-preset-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== WEEKLY CHALLENGE ===================== -->
   <div id="weekly-screen" class="screen hidden">
-    <h2 class="select-title">WEEKLY&nbsp;CHALLENGE</h2>
+    <div class="screen-head"><button id="btn-weekly-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">WEEKLY&nbsp;CHALLENGE</h2><span class="esc-hint">ESC closes</span></div>
     <div id="weekly-brief"></div>
     <button id="btn-weekly-go" class="menu-btn">DEPLOY</button>
-    <button id="btn-weekly-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== STAGE SELECT ===================== -->
   <div id="stage-screen" class="screen hidden">
-    <h2 class="select-title">STAGE&nbsp;&nbsp;SELECT</h2>
+    <div class="screen-head"><button id="btn-stage-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;&nbsp;SELECT</h2><span class="esc-hint">ESC closes</span></div>
     <div id="stage-list"></div>
-    <button id="btn-stage-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== HANGAR / DEVOTIONS ===================== -->
   <div id="hangar-screen" class="screen hidden">
-    <h2 class="select-title">DEVOTIONS</h2>
+    <div class="screen-head"><button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">DEVOTIONS</h2><span class="esc-hint">ESC closes</span></div>
     <div id="hangar-salvage"></div>
     <div id="hangar-note">Spend salvage on permanent paths. The ACTIVE path also grows every level-up in a run.</div>
     <div id="devotion-list"></div>
-    <button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== HANGAR HUB ===================== -->
   <div id="hub-screen" class="screen hidden">
-    <h2 class="select-title">HANGAR</h2>
+    <div class="screen-head"><button id="btn-hub-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">HANGAR</h2><span class="esc-hint">ESC closes</span></div>
     <div id="hub-cards"></div>
-    <button id="btn-hub-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== FACTIONS ===================== -->
   <div id="factions-screen" class="screen hidden">
-    <h2 class="select-title">THE&nbsp;HOUSES</h2>
+    <div class="screen-head"><button id="btn-fac-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;HOUSES</h2><span class="esc-hint">ESC closes</span></div>
     <div id="fac-head"></div>
     <div id="fac-cards"></div>
     <div id="fac-banner"></div>
-    <button id="btn-fac-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== SAVE CODE ===================== -->
   <div id="save-screen" class="screen hidden">
-    <h2 class="select-title">SAVE&nbsp;CODE</h2>
+    <div class="screen-head"><button id="btn-save-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">SAVE&nbsp;CODE</h2><span class="esc-hint">ESC closes</span></div>
     <div class="save-note">Your progress lives in this browser. Copy this code somewhere safe, or paste one to restore.</div>
     <textarea id="save-export" readonly spellcheck="false"></textarea>
     <button id="btn-save-copy" class="menu-btn small">COPY CODE</button>
     <textarea id="save-import" placeholder="paste a save code here…" spellcheck="false"></textarea>
     <button id="btn-save-import" class="menu-btn small">IMPORT</button>
     <div id="save-feedback"></div>
-    <button id="btn-save-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== RELIC SEASON ===================== -->
   <div id="season-screen" class="screen hidden">
-    <h2 class="select-title">RELIC&nbsp;SEASON</h2>
+    <div class="screen-head"><button id="btn-season-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">RELIC&nbsp;SEASON</h2><span class="esc-hint">ESC closes</span></div>
     <div id="season-head"></div>
     <div id="season-meter"></div>
     <div id="season-relics"></div>
     <div id="season-tasks"></div>
     <div id="season-counters"></div>
-    <button id="btn-season-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== BROKER ===================== -->
   <div id="broker-screen" class="screen hidden">
-    <h2 class="select-title">THE&nbsp;BROKER</h2>
+    <div class="screen-head"><button id="btn-broker-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;BROKER</h2><span class="esc-hint">ESC closes</span></div>
     <div id="broker-status"></div>
     <div id="broker-contract"></div>
     <div id="broker-shop"></div>
-    <button id="btn-broker-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== COLLECTION LOG ===================== -->
   <div id="collection-screen" class="screen hidden">
-    <h2 class="select-title">COLLECTION&nbsp;LOG</h2>
+    <div class="screen-head"><button id="btn-collection-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">COLLECTION&nbsp;LOG</h2><span class="esc-hint">ESC closes</span></div>
     <div id="log-head"></div>
     <div id="log-body"></div>
-    <button id="btn-collection-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== WORLD MAP ===================== -->
   <div id="map-screen" class="screen hidden">
-    <h2 class="select-title">THE&nbsp;SHATTERED&nbsp;REACH</h2>
+    <div class="screen-head"><button id="btn-map-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;SHATTERED&nbsp;REACH</h2><span class="esc-hint">ESC closes</span></div>
     <div id="map-head"></div>
     <div id="map-zones"></div>
-    <button id="btn-map-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== SKILL TREE ===================== -->
   <div id="skills-screen" class="screen hidden">
-    <h2 class="select-title">PILOT&nbsp;TRAINING</h2>
+    <div class="screen-head"><button id="btn-skills-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">PILOT&nbsp;TRAINING</h2><span class="esc-hint">ESC closes</span></div>
     <div id="skills-head"></div>
     <div id="skills-tree"></div>
     <div class="title-row">
       <button id="btn-respec" class="menu-btn tiny">RESPEC · 200 SALVAGE</button>
-      <button id="btn-skills-back" class="menu-btn tiny back-btn">◄ BACK</button>
     </div>
   </div>
 
   <!-- ===================== STAGE TRIALS ===================== -->
   <div id="trials-screen" class="screen hidden">
-    <h2 class="select-title">STAGE&nbsp;TRIALS</h2>
+    <div class="screen-head"><button id="btn-trials-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;TRIALS</h2><span class="esc-hint">ESC closes</span></div>
     <div id="trials-body"></div>
-    <button id="btn-trials-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== WAVE REWARD ===================== -->
@@ -238,7 +241,16 @@
     <h2 class="reward-title">PAUSED</h2>
     <div id="pause-stats"></div>
     <button id="btn-resume" class="menu-btn">RESUME</button>
-    <button id="btn-quit" class="menu-btn small">ABANDON RUN</button>
+    <div class="title-row">
+      <button id="btn-pause-controls" class="menu-btn small">CONTROLS</button>
+      <button id="btn-pause-help" class="menu-btn small">HOW TO PLAY</button>
+    </div>
+    <button id="btn-exit-run" class="menu-btn small">EXIT RUN — SAVE &amp; RETURN TO MENU</button>
+    <div class="title-row">
+      <button id="btn-new-run" class="menu-btn tiny">NEW RUN (abandon this one)</button>
+      <button id="btn-quit" class="menu-btn tiny danger-btn">ABANDON RUN (delete)</button>
+    </div>
+    <div id="pause-exit-note" class="menu-desc"></div>
   </div>
 
   <!-- ===================== GAME OVER / VICTORY ===================== -->
@@ -247,6 +259,62 @@
     <div id="end-stats"></div>
     <button id="btn-retry" class="menu-btn">RETRY</button>
     <button id="btn-menu" class="menu-btn small">MAIN MENU</button>
+  </div>
+
+  <!-- ===================== FRAME WORKSHOP ===================== -->
+  <div id="workshop-screen" class="screen hidden">
+    <div class="screen-head"><button id="btn-ws-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">FRAME&nbsp;WORKSHOP</h2><span class="esc-hint">ESC closes</span></div>
+    <div id="ws-head"></div>
+    <div id="ws-tabs"></div>
+    <div id="ws-body">
+      <div id="ws-grid"></div>
+      <div id="ws-detail"></div>
+    </div>
+    <div class="menu-desc">Frames need ⬡ ALLOY (drops from hostiles, elites, caches), ◈ FRAME CORES (bosses, wardens, stage clears) and $ SALVAGE. Build MK.II → CUSTOM → PROTOTYPE.</div>
+  </div>
+
+  <!-- ===================== PILOT SHEET ===================== -->
+  <div id="pilot-screen" class="screen hidden">
+    <div class="screen-head"><button id="btn-pilot-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">PILOT&nbsp;SHEET</h2><span class="esc-hint">ESC closes</span></div>
+    <div id="pilot-body"></div>
+  </div>
+
+  <!-- ===================== CONTROLS ===================== -->
+  <div id="controls-screen" class="screen hidden">
+    <div class="screen-head"><button id="btn-controls-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">CONTROLS</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub">Click a key to rebind it, then press the new key. ESC cancels.</div>
+    <div id="controls-body">
+      <div id="controls-list"></div>
+      <div id="controls-settings">
+        <div class="ct-group">CAMERA &amp; DISPLAY</div>
+        <label class="ct-set">Mouse look sensitivity <input type="range" id="set-sens" min="20" max="300" step="10"> <span id="set-sens-val">100%</span></label>
+        <label class="ct-set"><input type="checkbox" id="set-invert"> Invert vertical look</label>
+        <label class="ct-set">Camera <select id="set-cam"><option value="chase">Chase (MMO)</option><option value="top">Tactical (top-down)</option></select></label>
+        <label class="ct-set"><input type="checkbox" id="set-crt"> CRT scanline filter</label>
+        <label class="ct-set"><input type="checkbox" id="set-mute"> Mute sound</label>
+        <div class="ct-group">DEFAULT SCHEME</div>
+        <div class="ct-note">W/S walk · A/D turn · Q/E strafe · hold RIGHT MOUSE to look · WHEEL zoom · LEFT CLICK attack · 1–4 abilities · Z/X/C wards · SPACE boost · SHIFT special · T transform · F interact · V camera · K training · M map · P pilot</div>
+        <button id="btn-controls-reset" class="menu-btn tiny">RESET TO DEFAULTS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== HELP ===================== -->
+  <div id="help-screen" class="screen hidden">
+    <div class="screen-head"><button id="btn-help-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">HOW&nbsp;TO&nbsp;PLAY</h2><span class="esc-hint">ESC closes</span></div>
+    <div id="help-body"></div>
+  </div>
+
+  <!-- ===================== CONFIRM ===================== -->
+  <div id="confirm-screen" class="screen hidden">
+    <div id="confirm-box">
+      <div id="confirm-title" class="reward-title">ARE YOU SURE?</div>
+      <div id="confirm-text"></div>
+      <div class="title-row">
+        <button id="btn-confirm-yes" class="menu-btn small danger-btn">CONFIRM</button>
+        <button id="btn-confirm-no" class="menu-btn small">CANCEL</button>
+      </div>
+    </div>
   </div>
 
   <!-- touch controls (coarse-pointer devices only) -->
@@ -273,11 +341,13 @@
 <script src="js/structures.js"></script>
 <script src="js/factions.js"></script>
 <script src="js/mechs.js"></script>
+<script src="js/controls.js"></script>
 <script src="js/meta.js"></script>
 <script src="js/upgrades.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/progress.js"></script>
 <script src="js/skills.js"></script>
+<script src="js/roster.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/music.js"></script>
 <script src="js/dungeons.js"></script>

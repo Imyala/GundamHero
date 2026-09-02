@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HERO FRAME — a mech arena survivor</title>
+<link rel="icon" href="data:,">
 <style>
 /* HERO FRAME — PS1-flavoured UI */
 
@@ -1007,6 +1008,180 @@ html, body {
 #crosshair::before { left: 50%; top: -6px; width: 1px; height: 6px; }
 #crosshair::after { left: -6px; top: 50%; width: 6px; height: 1px; }
 
+/* ---------------- screen headers (BACK never overlaps content) ---------------- */
+
+.screen { padding-top: 68px; }
+#title-screen { padding-top: 0; }
+.screen-head {
+  position: absolute; top: 0; left: 0; right: 0; height: 58px;
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 16px;
+  background: linear-gradient(rgba(6, 10, 30, 0.97), rgba(4, 6, 20, 0.97));
+  border-bottom: 2px solid #c8b060;
+  box-shadow: 0 2px 0 #000, 0 4px 14px rgba(0,0,0,0.6);
+  z-index: 12;
+}
+.screen-head .select-title {
+  font-size: clamp(18px, 2.6vw, 28px); letter-spacing: 6px; margin: 0;
+  flex: 1; text-align: center;
+}
+.screen-head .back-btn { position: static; }
+.esc-hint { font-size: 11px; color: #8090c0; letter-spacing: 1px; min-width: 70px; text-align: right; }
+.screen-sub { font-size: 12px; color: #9ab0e0; letter-spacing: 1px; text-align: center; z-index: 1; }
+/* the HUD sits behind menus; hide it so nothing overlaps */
+body.menu-open #hud, body.menu-open #crosshair, body.menu-open #minimap, body.menu-open #hotbar { visibility: hidden !important; }
+body.looking { cursor: none; }
+body.looking #crosshair { opacity: 0.4; }
+
+/* ---------------- title menu ---------------- */
+
+.title-menu { display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 1; }
+.menu-desc { font-size: 11px; color: #8898c8; text-align: center; max-width: 560px; line-height: 1.4; z-index: 1; }
+.title-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.title-choice .menu-desc { max-width: 170px; }
+.continue-btn { border-color: #60e890; color: #c8ffe0; }
+.danger-btn { border-color: #c04040; color: #ffc0c0; }
+.danger-btn:hover { background: linear-gradient(#7a2a2a, #481010); }
+
+/* ---------------- frame select rack ---------------- */
+
+#select-rack {
+  position: absolute; bottom: 7vh; left: 4%; width: min(60%, 760px);
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+}
+.rack-label { font-size: 11px; color: #9ab0e0; letter-spacing: 1px; }
+#select-icons { position: static; display: flex; flex-wrap: wrap; gap: 6px; max-height: 22vh; overflow-y: auto; padding: 2px; }
+.mech-icon.build-more { border-style: dashed; color: #ffd050; font-size: 30px; filter: none; }
+.mech-icon.build-more:hover { background: #2a2410; }
+
+/* ---------------- pause ---------------- */
+
+#pause-screen .menu-desc { max-width: 520px; }
+
+/* ---------------- frame workshop ---------------- */
+
+#workshop-screen { justify-content: flex-start; gap: 10px; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
+#ws-head { font-family: "Times New Roman", serif; font-size: 14px; color: #c8c8d8; letter-spacing: 1px; }
+#ws-head b { color: #f0d888; }
+.ws-mat { margin-left: 10px; }
+#ws-tabs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 1100px; }
+.ws-tab {
+  padding: 5px 10px; border: 1px solid #3a4456; background: rgba(10, 14, 30, 0.9);
+  font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px; letter-spacing: 1px;
+  color: #c0c8e0; cursor: pointer; display: flex; align-items: center; gap: 6px;
+}
+.ws-tab.on { border-color: #f0d060; color: #fff; background: #1a2450; }
+.ws-tab-n { font-size: 10px; color: #8898c8; font-weight: normal; }
+#ws-body { display: flex; gap: 14px; width: min(96vw, 1180px); flex: 1; min-height: 0; }
+#ws-grid {
+  flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px; overflow-y: auto; padding: 4px; align-content: start; max-height: calc(100vh - 230px);
+}
+.ws-cell {
+  background: rgba(10, 14, 30, 0.9); border: 1px solid #3a4456; padding: 8px; cursor: pointer;
+  text-align: center;
+}
+.ws-cell.owned { border-color: #60c890; }
+.ws-cell.ready { border-color: #ffd050; box-shadow: 0 0 8px rgba(255, 208, 80, 0.35); }
+.ws-cell.feat { border-color: #c090ff; }
+.ws-cell.locked { opacity: 0.6; }
+.ws-cell.pick { background: #1a2450; border-width: 2px; }
+.ws-icon { font-size: 26px; }
+.ws-name { font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px; color: #f0f0f6; letter-spacing: 1px; }
+.ws-sub { font-size: 10px; color: #8898c8; margin-top: 2px; }
+.ws-state { font-size: 10px; color: #c0c8e0; margin-top: 4px; letter-spacing: 1px; }
+.ws-cell.owned .ws-state { color: #60c890; }
+.ws-cell.ready .ws-state { color: #ffd050; }
+#ws-detail {
+  width: 320px; background: rgba(2, 4, 12, 0.9); border: 2px solid #d8d8d8; box-shadow: 0 0 0 2px #000;
+  padding: 12px 14px; font-size: 12px; line-height: 1.45; overflow-y: auto; max-height: calc(100vh - 230px);
+}
+.ws-d-name { font-family: "Times New Roman", serif; font-weight: bold; font-size: 18px; color: #fff; letter-spacing: 2px; }
+.ws-d-role { font-size: 11px; color: #90a8d0; letter-spacing: 2px; margin-bottom: 8px; }
+.ws-d-desc { color: #c8c8c8; margin-bottom: 8px; }
+.ws-d-stats { color: #b8c8b8; margin-bottom: 6px; }
+.ws-d-stats b { color: #f0e0a0; }
+.ws-d-pack { margin-bottom: 8px; }
+.ws-d-bill, .ws-d-req { margin: 6px 0; font-weight: bold; }
+.ws-ok { color: #60c890; }
+.ws-short { color: #ff8080; }
+.ws-d-status { margin-top: 8px; font-weight: bold; }
+.ws-d-status.owned { color: #60c890; }
+.ws-d-status.feat { color: #c090ff; }
+#ws-build { margin-top: 10px; width: 100%; }
+#ws-build:disabled { opacity: 0.45; cursor: default; }
+@media (max-width: 800px) { #ws-body { flex-direction: column; } #ws-detail { width: 100%; max-height: 40vh; } }
+
+/* ---------------- pilot sheet ---------------- */
+
+#pilot-screen { justify-content: flex-start; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
+#pilot-body { display: flex; gap: 16px; width: min(96vw, 1100px); flex-wrap: wrap; overflow-y: auto; max-height: calc(100vh - 90px); }
+.pl-col { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 12px; }
+.pl-block { background: rgba(2, 4, 12, 0.9); border: 2px solid #8090b8; box-shadow: 0 0 0 2px #000; padding: 10px 14px; font-size: 12px; line-height: 1.6; }
+.pl-h { font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px; letter-spacing: 2px; color: #f0d888; margin-bottom: 4px; }
+.pl-row b { color: #fff; }
+.pl-hot { color: #ffd050 !important; }
+.pl-pre { white-space: pre-line; }
+.pl-frames { display: flex; flex-wrap: wrap; gap: 4px; max-height: 32vh; overflow-y: auto; }
+.pl-frame { border: 1px solid #3a4456; padding: 2px 6px; font-size: 11px; color: #d0d8f0; }
+.pl-frame i { color: #8898c8; font-style: normal; }
+.pl-links { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------------- controls ---------------- */
+
+#controls-screen { justify-content: flex-start; gap: 10px; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
+#controls-body { display: flex; gap: 18px; width: min(96vw, 1000px); flex: 1; min-height: 0; }
+#controls-list { flex: 1; overflow-y: auto; max-height: calc(100vh - 150px); padding-right: 6px; }
+#controls-settings { width: 300px; font-size: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ct-group { font-family: "Times New Roman", serif; font-weight: bold; letter-spacing: 2px; color: #f0d888; margin: 10px 0 4px; font-size: 14px; }
+.ct-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid #1c2236; font-size: 12px; }
+.ct-name { color: #d0d8f0; }
+.ct-key {
+  min-width: 96px; text-align: center; padding: 3px 8px; border: 1px solid #8090b8; background: #0a0e20;
+  font-family: "Times New Roman", serif; font-weight: bold; color: #f0e0b0; cursor: pointer; letter-spacing: 1px;
+}
+.ct-key:hover { border-color: #f0d060; color: #fff; }
+.ct-key.waiting { border-color: #ffd050; color: #ffd050; animation: ct-blink 0.8s infinite; }
+.ct-key.unbound { color: #ff8080; }
+.ct-key.fixed { cursor: default; opacity: 0.7; }
+@keyframes ct-blink { 50% { opacity: 0.4; } }
+.ct-set { display: flex; align-items: center; gap: 8px; color: #d0d8f0; cursor: pointer; }
+.ct-set input[type=range] { flex: 1; }
+.ct-set select { background: #0a0e20; color: #f0e0b0; border: 1px solid #8090b8; font-family: inherit; }
+.ct-note { font-size: 11px; color: #8898c8; line-height: 1.5; }
+@media (max-width: 760px) { #controls-body { flex-direction: column; } #controls-settings { width: 100%; } }
+
+/* ---------------- help ---------------- */
+
+#help-screen { justify-content: flex-start; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
+#help-body { display: flex; gap: 20px; width: min(96vw, 1100px); overflow-y: auto; max-height: calc(100vh - 90px); font-size: 12px; line-height: 1.55; color: #c8d0e8; flex-wrap: wrap; }
+.hp-col { flex: 1; min-width: 300px; }
+.hp-h { font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px; letter-spacing: 2px; color: #f0d888; margin: 10px 0 4px; }
+#help-body ul { padding-left: 18px; margin: 0 0 6px; }
+#help-body ul ul { margin-top: 2px; }
+#help-body b { color: #fff; }
+
+/* ---------------- confirm ---------------- */
+
+#confirm-screen { background: rgba(2, 3, 10, 0.7); z-index: 40; padding-top: 0; }
+#confirm-box {
+  background: rgba(6, 10, 30, 0.98); border: 2px solid #c8b060; box-shadow: 0 0 0 2px #000, 0 0 30px #000;
+  padding: 22px 28px; max-width: 520px; text-align: center; display: flex; flex-direction: column; gap: 14px; align-items: center;
+}
+#confirm-title { font-size: clamp(22px, 3vw, 32px); letter-spacing: 4px; }
+#confirm-text { font-size: 13px; color: #c0c8e0; line-height: 1.5; }
+#select-screen { padding-top: 70px; }
+#select-mode { margin-top: 2px; }
+
+/* legibility: every meta screen sits on a dark backdrop, even over a live world */
+#skills-screen, #map-screen, #hub-screen, #hangar-screen, #broker-screen, #collection-screen,
+#trials-screen, #season-screen, #factions-screen, #save-screen, #weekly-screen, #stage-screen, #preset-screen {
+  background: radial-gradient(ellipse at center, rgba(6, 10, 40, 0.94), rgba(0, 0, 4, 0.97));
+}
+#select-panel { top: 11%; max-height: 50vh; overflow-y: auto; }
+#select-rack { bottom: 3vh; }
+.coop-btn { top: 68px !important; }
+
 </style>
 </head>
 <body>
@@ -1085,22 +1260,34 @@ html, body {
     <div class="title-grid"></div>
     <h1 class="game-title">HERO&nbsp;FRAME</h1>
     <div class="title-sub">A MECH ARENA SURVIVOR</div>
-    <button id="btn-expedition" class="menu-btn">THE SHATTERED REACH</button>
-    <button id="btn-start" class="menu-btn small">CLASSIC</button>
-    <button id="btn-arena" class="menu-btn small">ARENA — ENDLESS</button>
-    <button id="btn-weekly" class="menu-btn small">WEEKLY CHALLENGE</button>
-    <div class="title-row">
-      <button id="btn-hub" class="menu-btn small">HANGAR</button>
-      <button id="btn-profile" class="menu-btn tiny profile-btn">PILOT: STANDARD</button>
+    <div class="title-menu">
+      <button id="btn-continue" class="menu-btn small continue-btn hidden">CONTINUE RUN</button>
+      <button id="btn-expedition" class="menu-btn">THE SHATTERED REACH</button>
+      <div id="exp-desc" class="menu-desc"></div>
+      <button id="btn-new-exp" class="menu-btn tiny hidden">NEW EXPEDITION (delete saved pilot)</button>
+      <div class="title-row">
+        <div class="title-choice"><button id="btn-start" class="menu-btn small">CLASSIC</button><div class="menu-desc">20 waves · beat the boss to earn a frame</div></div>
+        <div class="title-choice"><button id="btn-arena" class="menu-btn small">ARENA</button><div class="menu-desc">endless waves · farm alloy</div></div>
+        <div class="title-choice"><button id="btn-weekly" class="menu-btn small">WEEKLY</button><div class="menu-desc">one fixed challenge for everyone</div></div>
+      </div>
+      <div class="title-row">
+        <button id="btn-hub" class="menu-btn small">HANGAR</button>
+        <button id="btn-title-pilot" class="menu-btn small">PILOT</button>
+        <button id="btn-title-controls" class="menu-btn small">CONTROLS</button>
+        <button id="btn-title-help" class="menu-btn small">HOW TO PLAY</button>
+        <button id="btn-profile" class="menu-btn tiny profile-btn">PROFILE: STANDARD</button>
+      </div>
+      <div class="menu-desc">HANGAR: build frames, train your pilot, devotions, contracts, collection · PILOT: your character sheet &amp; inventory</div>
     </div>
     <div id="title-salvage"></div>
     <div id="title-memorial"></div>
-    <div class="title-foot">WASD move &nbsp;·&nbsp; CLICK attack / target &nbsp;·&nbsp; TAB cycle target &nbsp;·&nbsp; 1–4 abilities &nbsp;·&nbsp; Z X C wards &nbsp;·&nbsp; SPACE boost / drift &nbsp;·&nbsp; SHIFT special / nitro &nbsp;·&nbsp; T transform &nbsp;·&nbsp; V camera &nbsp;·&nbsp; G race item &nbsp;·&nbsp; K skill tree</div>
+    <div id="title-foot" class="title-foot"></div>
   </div>
 
   <!-- ===================== PLAYER SELECT ===================== -->
   <div id="select-screen" class="screen hidden">
-    <h2 class="select-title">PLAYER&nbsp;&nbsp;SELECT</h2>
+    <div class="screen-head"><button id="btn-select-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">PLAYER&nbsp;&nbsp;SELECT</h2><span class="esc-hint">ESC closes</span></div>
+    <div id="select-mode" class="screen-sub"></div>
     <div id="select-panel">
       <div id="select-name">FRAME</div>
       <div id="select-role"></div>
@@ -1109,124 +1296,114 @@ html, body {
       <div id="select-stats"></div>
     </div>
     <div id="style-row"></div>
-    <div id="select-icons"></div>
+    <div id="select-rack">
+      <div id="select-count" class="rack-label"></div>
+      <div id="select-icons"></div>
+      <button id="btn-select-workshop" class="menu-btn tiny">⚒ OPEN THE WORKSHOP — BUILD MORE FRAMES</button>
+    </div>
     <div id="p2-select-row" class="hidden"></div>
     <button id="btn-launch" class="menu-btn">SELECT STAGE</button>
     <button id="btn-coop" class="menu-btn tiny coop-btn">CO-OP P2: OFF</button>
-    <button id="btn-select-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== ARENA LOADOUT ===================== -->
   <div id="preset-screen" class="screen hidden">
-    <h2 class="select-title">LOADOUT</h2>
+    <div class="screen-head"><button id="btn-preset-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">LOADOUT</h2><span class="esc-hint">ESC closes</span></div>
     <div id="preset-list"></div>
-    <button id="btn-preset-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== WEEKLY CHALLENGE ===================== -->
   <div id="weekly-screen" class="screen hidden">
-    <h2 class="select-title">WEEKLY&nbsp;CHALLENGE</h2>
+    <div class="screen-head"><button id="btn-weekly-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">WEEKLY&nbsp;CHALLENGE</h2><span class="esc-hint">ESC closes</span></div>
     <div id="weekly-brief"></div>
     <button id="btn-weekly-go" class="menu-btn">DEPLOY</button>
-    <button id="btn-weekly-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== STAGE SELECT ===================== -->
   <div id="stage-screen" class="screen hidden">
-    <h2 class="select-title">STAGE&nbsp;&nbsp;SELECT</h2>
+    <div class="screen-head"><button id="btn-stage-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;&nbsp;SELECT</h2><span class="esc-hint">ESC closes</span></div>
     <div id="stage-list"></div>
-    <button id="btn-stage-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== HANGAR / DEVOTIONS ===================== -->
   <div id="hangar-screen" class="screen hidden">
-    <h2 class="select-title">DEVOTIONS</h2>
+    <div class="screen-head"><button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">DEVOTIONS</h2><span class="esc-hint">ESC closes</span></div>
     <div id="hangar-salvage"></div>
     <div id="hangar-note">Spend salvage on permanent paths. The ACTIVE path also grows every level-up in a run.</div>
     <div id="devotion-list"></div>
-    <button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== HANGAR HUB ===================== -->
   <div id="hub-screen" class="screen hidden">
-    <h2 class="select-title">HANGAR</h2>
+    <div class="screen-head"><button id="btn-hub-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">HANGAR</h2><span class="esc-hint">ESC closes</span></div>
     <div id="hub-cards"></div>
-    <button id="btn-hub-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== FACTIONS ===================== -->
   <div id="factions-screen" class="screen hidden">
-    <h2 class="select-title">THE&nbsp;HOUSES</h2>
+    <div class="screen-head"><button id="btn-fac-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;HOUSES</h2><span class="esc-hint">ESC closes</span></div>
     <div id="fac-head"></div>
     <div id="fac-cards"></div>
     <div id="fac-banner"></div>
-    <button id="btn-fac-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== SAVE CODE ===================== -->
   <div id="save-screen" class="screen hidden">
-    <h2 class="select-title">SAVE&nbsp;CODE</h2>
+    <div class="screen-head"><button id="btn-save-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">SAVE&nbsp;CODE</h2><span class="esc-hint">ESC closes</span></div>
     <div class="save-note">Your progress lives in this browser. Copy this code somewhere safe, or paste one to restore.</div>
     <textarea id="save-export" readonly spellcheck="false"></textarea>
     <button id="btn-save-copy" class="menu-btn small">COPY CODE</button>
     <textarea id="save-import" placeholder="paste a save code here…" spellcheck="false"></textarea>
     <button id="btn-save-import" class="menu-btn small">IMPORT</button>
     <div id="save-feedback"></div>
-    <button id="btn-save-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== RELIC SEASON ===================== -->
   <div id="season-screen" class="screen hidden">
-    <h2 class="select-title">RELIC&nbsp;SEASON</h2>
+    <div class="screen-head"><button id="btn-season-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">RELIC&nbsp;SEASON</h2><span class="esc-hint">ESC closes</span></div>
     <div id="season-head"></div>
     <div id="season-meter"></div>
     <div id="season-relics"></div>
     <div id="season-tasks"></div>
     <div id="season-counters"></div>
-    <button id="btn-season-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== BROKER ===================== -->
   <div id="broker-screen" class="screen hidden">
-    <h2 class="select-title">THE&nbsp;BROKER</h2>
+    <div class="screen-head"><button id="btn-broker-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;BROKER</h2><span class="esc-hint">ESC closes</span></div>
     <div id="broker-status"></div>
     <div id="broker-contract"></div>
     <div id="broker-shop"></div>
-    <button id="btn-broker-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== COLLECTION LOG ===================== -->
   <div id="collection-screen" class="screen hidden">
-    <h2 class="select-title">COLLECTION&nbsp;LOG</h2>
+    <div class="screen-head"><button id="btn-collection-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">COLLECTION&nbsp;LOG</h2><span class="esc-hint">ESC closes</span></div>
     <div id="log-head"></div>
     <div id="log-body"></div>
-    <button id="btn-collection-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== WORLD MAP ===================== -->
   <div id="map-screen" class="screen hidden">
-    <h2 class="select-title">THE&nbsp;SHATTERED&nbsp;REACH</h2>
+    <div class="screen-head"><button id="btn-map-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;SHATTERED&nbsp;REACH</h2><span class="esc-hint">ESC closes</span></div>
     <div id="map-head"></div>
     <div id="map-zones"></div>
-    <button id="btn-map-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== SKILL TREE ===================== -->
   <div id="skills-screen" class="screen hidden">
-    <h2 class="select-title">PILOT&nbsp;TRAINING</h2>
+    <div class="screen-head"><button id="btn-skills-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">PILOT&nbsp;TRAINING</h2><span class="esc-hint">ESC closes</span></div>
     <div id="skills-head"></div>
     <div id="skills-tree"></div>
     <div class="title-row">
       <button id="btn-respec" class="menu-btn tiny">RESPEC · 200 SALVAGE</button>
-      <button id="btn-skills-back" class="menu-btn tiny back-btn">◄ BACK</button>
     </div>
   </div>
 
   <!-- ===================== STAGE TRIALS ===================== -->
   <div id="trials-screen" class="screen hidden">
-    <h2 class="select-title">STAGE&nbsp;TRIALS</h2>
+    <div class="screen-head"><button id="btn-trials-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;TRIALS</h2><span class="esc-hint">ESC closes</span></div>
     <div id="trials-body"></div>
-    <button id="btn-trials-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== WAVE REWARD ===================== -->
@@ -1241,7 +1418,16 @@ html, body {
     <h2 class="reward-title">PAUSED</h2>
     <div id="pause-stats"></div>
     <button id="btn-resume" class="menu-btn">RESUME</button>
-    <button id="btn-quit" class="menu-btn small">ABANDON RUN</button>
+    <div class="title-row">
+      <button id="btn-pause-controls" class="menu-btn small">CONTROLS</button>
+      <button id="btn-pause-help" class="menu-btn small">HOW TO PLAY</button>
+    </div>
+    <button id="btn-exit-run" class="menu-btn small">EXIT RUN — SAVE &amp; RETURN TO MENU</button>
+    <div class="title-row">
+      <button id="btn-new-run" class="menu-btn tiny">NEW RUN (abandon this one)</button>
+      <button id="btn-quit" class="menu-btn tiny danger-btn">ABANDON RUN (delete)</button>
+    </div>
+    <div id="pause-exit-note" class="menu-desc"></div>
   </div>
 
   <!-- ===================== GAME OVER / VICTORY ===================== -->
@@ -1250,6 +1436,62 @@ html, body {
     <div id="end-stats"></div>
     <button id="btn-retry" class="menu-btn">RETRY</button>
     <button id="btn-menu" class="menu-btn small">MAIN MENU</button>
+  </div>
+
+  <!-- ===================== FRAME WORKSHOP ===================== -->
+  <div id="workshop-screen" class="screen hidden">
+    <div class="screen-head"><button id="btn-ws-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">FRAME&nbsp;WORKSHOP</h2><span class="esc-hint">ESC closes</span></div>
+    <div id="ws-head"></div>
+    <div id="ws-tabs"></div>
+    <div id="ws-body">
+      <div id="ws-grid"></div>
+      <div id="ws-detail"></div>
+    </div>
+    <div class="menu-desc">Frames need ⬡ ALLOY (drops from hostiles, elites, caches), ◈ FRAME CORES (bosses, wardens, stage clears) and $ SALVAGE. Build MK.II → CUSTOM → PROTOTYPE.</div>
+  </div>
+
+  <!-- ===================== PILOT SHEET ===================== -->
+  <div id="pilot-screen" class="screen hidden">
+    <div class="screen-head"><button id="btn-pilot-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">PILOT&nbsp;SHEET</h2><span class="esc-hint">ESC closes</span></div>
+    <div id="pilot-body"></div>
+  </div>
+
+  <!-- ===================== CONTROLS ===================== -->
+  <div id="controls-screen" class="screen hidden">
+    <div class="screen-head"><button id="btn-controls-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">CONTROLS</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub">Click a key to rebind it, then press the new key. ESC cancels.</div>
+    <div id="controls-body">
+      <div id="controls-list"></div>
+      <div id="controls-settings">
+        <div class="ct-group">CAMERA &amp; DISPLAY</div>
+        <label class="ct-set">Mouse look sensitivity <input type="range" id="set-sens" min="20" max="300" step="10"> <span id="set-sens-val">100%</span></label>
+        <label class="ct-set"><input type="checkbox" id="set-invert"> Invert vertical look</label>
+        <label class="ct-set">Camera <select id="set-cam"><option value="chase">Chase (MMO)</option><option value="top">Tactical (top-down)</option></select></label>
+        <label class="ct-set"><input type="checkbox" id="set-crt"> CRT scanline filter</label>
+        <label class="ct-set"><input type="checkbox" id="set-mute"> Mute sound</label>
+        <div class="ct-group">DEFAULT SCHEME</div>
+        <div class="ct-note">W/S walk · A/D turn · Q/E strafe · hold RIGHT MOUSE to look · WHEEL zoom · LEFT CLICK attack · 1–4 abilities · Z/X/C wards · SPACE boost · SHIFT special · T transform · F interact · V camera · K training · M map · P pilot</div>
+        <button id="btn-controls-reset" class="menu-btn tiny">RESET TO DEFAULTS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== HELP ===================== -->
+  <div id="help-screen" class="screen hidden">
+    <div class="screen-head"><button id="btn-help-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">HOW&nbsp;TO&nbsp;PLAY</h2><span class="esc-hint">ESC closes</span></div>
+    <div id="help-body"></div>
+  </div>
+
+  <!-- ===================== CONFIRM ===================== -->
+  <div id="confirm-screen" class="screen hidden">
+    <div id="confirm-box">
+      <div id="confirm-title" class="reward-title">ARE YOU SURE?</div>
+      <div id="confirm-text"></div>
+      <div class="title-row">
+        <button id="btn-confirm-yes" class="menu-btn small danger-btn">CONFIRM</button>
+        <button id="btn-confirm-no" class="menu-btn small">CANCEL</button>
+      </div>
+    </div>
   </div>
 
   <!-- touch controls (coarse-pointer devices only) -->
@@ -2100,11 +2342,95 @@ GH.models = (function () {
 
     // ---- archetype props ----
     addProp(cfg.prop, parts, accent, trim);
+    // ---- pack / mark bolt-ons (workshop variants and relics) ----
+    if (cfg.pack) addBoltOns(cfg, parts, accent, trim, dark);
 
     blobShadow(g, 2.1);
     g.userData.parts = parts;
     return g;
   };
+
+  // Silhouette changes per pack so 135 frames don't all read as eight.
+  // AILE: swept wing binders. SWORD: blade fins on the pauldrons.
+  // LAUNCHER: a shoulder cannon and skirt plates. STORM: a reactor coil
+  // and antenna mast. PHANTOM: a hooded head and cloak plates. RELIC:
+  // horns and a chest core. Marks add crest height and extra trim.
+  function addBoltOns(cfg, parts, accent, trim, dark) {
+    var torso = parts.torso;
+    var pack = cfg.pack;
+    var mark = cfg.mark || 1;
+    if (pack === 'aile') {
+      [-1, 1].forEach(function (side) {
+        var wing = box(0.12, 0.9, 0.5, accent);
+        wing.position.set(side * 0.55, 0.62, -0.5);
+        wing.rotation.z = side * 0.55;
+        wing.rotation.x = -0.25;
+        torso.add(wing);
+      });
+    } else if (pack === 'sword') {
+      [parts.armL, parts.armR].forEach(function (arm, i) {
+        var fin = box(0.08, 0.5, 0.36, accent);
+        fin.position.set((i === 0 ? -1 : 1) * 0.3, 0.42, -0.02);
+        fin.rotation.z = (i === 0 ? 1 : -1) * 0.3;
+        arm.add(fin);
+      });
+    } else if (pack === 'launcher') {
+      var cannon = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 1.1, 6), mat(dark));
+      cannon.rotation.x = Math.PI / 2;
+      cannon.position.set(-0.55, 0.9, 0.1);
+      torso.add(cannon);
+      var cap = box(0.34, 0.24, 0.5, accent); cap.position.set(-0.55, 0.9, -0.3);
+      torso.add(cap);
+      [-1, 1].forEach(function (side) {
+        var skirt = box(0.26, 0.42, 0.5, trim);
+        skirt.position.set(side * 0.5, -0.36, 0);
+        torso.add(skirt);
+      });
+    } else if (pack === 'storm') {
+      var coil = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.05, 4, 8),
+        mat(accent, { emissive: accent, emissiveIntensity: 0.4 }));
+      coil.position.set(0, 0.5, -0.6);
+      torso.add(coil);
+      var mast = box(0.04, 0.7, 0.04, dark); mast.position.set(-0.22, 1.35, -0.12);
+      torso.add(mast);
+      var tip = box(0.1, 0.1, 0.1, accent); tip.position.set(-0.22, 1.72, -0.12);
+      torso.add(tip);
+    } else if (pack === 'phantom') {
+      var hood = box(0.54, 0.16, 0.5, dark); hood.position.set(0, 1.2, -0.04);
+      torso.add(hood);
+      [-1, 1].forEach(function (side) {
+        var cloak = box(0.1, 0.9, 0.5, dark);
+        cloak.position.set(side * 0.62, -0.1, -0.3);
+        torso.add(cloak);
+      });
+    } else if (pack === 'relic') {
+      [-1, 1].forEach(function (side) {
+        var horn = box(0.06, 0.5, 0.08, accent);
+        horn.position.set(side * 0.2, 1.36, 0.05);
+        horn.rotation.z = -side * 0.5;
+        torso.add(horn);
+      });
+      var core = new THREE.Mesh(new THREE.OctahedronGeometry(0.14),
+        mat(accent, { emissive: accent, emissiveIntensity: 0.6 }));
+      core.position.set(0, 0.3, 0.42);
+      torso.add(core);
+      var mantle = box(1.3, 0.14, 0.7, trim); mantle.position.set(0, 0.7, -0.1);
+      torso.add(mantle);
+    }
+    // marks: taller crest, extra shoulder trim per mark
+    if (mark >= 2) {
+      var crest2 = box(0.06, 0.2 + mark * 0.08, 0.3, accent);
+      crest2.position.set(0, 1.42 + mark * 0.03, -0.04);
+      torso.add(crest2);
+    }
+    if (mark >= 3) {
+      [parts.armL, parts.armR].forEach(function (arm, i) {
+        var plate = box(0.54, 0.08, 0.58, accent);
+        plate.position.set((i === 0 ? -1 : 1) * 0.06, 0.46, 0);
+        arm.add(plate);
+      });
+    }
+  }
 
   function addProp(prop, parts, accent, trim) {
     var armL = parts.armL, armR = parts.armR;
@@ -2434,6 +2760,26 @@ GH.models = (function () {
       mat(0xe83838, { emissive: 0x601010 }));
     m.rotation.x = Math.PI / 2;
     return m;
+  };
+
+  // workshop materials: a grey alloy ingot, and a frame core that glows
+  M.buildAlloy = function () {
+    var m = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 0.2),
+      mat(0xb8c0c8, { emissive: 0x303840, emissiveIntensity: 0.4 }));
+    m.rotation.y = 0.6;
+    return m;
+  };
+  M.buildCore = function () {
+    var g = new THREE.Group();
+    var core = new THREE.Mesh(new THREE.OctahedronGeometry(0.28),
+      mat(0xffb040, { emissive: 0xa05010, emissiveIntensity: 0.9 }));
+    g.add(core);
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.035, 4, 12),
+      mat(0xffe0a0, { emissive: 0x806020 }));
+    ring.rotation.x = Math.PI / 2;
+    g.add(ring);
+    g.userData.core = core;
+    return g;
   };
 
   M.buildCipher = function () {
@@ -5714,6 +6060,135 @@ GH.elements = {
 
 </script>
 <script>
+// HERO FRAME — key bindings and control settings.
+// MMO-style defaults: W/S walk, A/D turn, Q/E strafe, hold RIGHT MOUSE to
+// look around, wheel to zoom. Every action can be rebound on the
+// CONTROLS screen; bindings persist in localStorage independent of the
+// pilot profile.
+GH.controls = (function () {
+  var C = {};
+
+  C.ACTIONS = [
+    { id: 'forward', name: 'Move forward', def: 'KeyW', group: 'MOVEMENT' },
+    { id: 'back', name: 'Move backward', def: 'KeyS', group: 'MOVEMENT' },
+    { id: 'turnLeft', name: 'Turn left', def: 'KeyA', group: 'MOVEMENT' },
+    { id: 'turnRight', name: 'Turn right', def: 'KeyD', group: 'MOVEMENT' },
+    { id: 'strafeLeft', name: 'Strafe left', def: 'KeyQ', group: 'MOVEMENT' },
+    { id: 'strafeRight', name: 'Strafe right', def: 'KeyE', group: 'MOVEMENT' },
+    { id: 'boost', name: 'Boost dash / drift (hold)', def: 'Space', group: 'MOVEMENT' },
+    { id: 'transform', name: 'Transform (frame ⇄ skimmer)', def: 'KeyT', group: 'MOVEMENT' },
+    { id: 'special', name: 'Frame special / nitro', def: 'ShiftLeft', group: 'COMBAT' },
+    { id: 'target', name: 'Cycle target', def: 'Tab', group: 'COMBAT' },
+    { id: 'ability1', name: 'Ability 1 — RUPTURE', def: 'Digit1', group: 'COMBAT' },
+    { id: 'ability2', name: 'Ability 2 — SWEEP', def: 'Digit2', group: 'COMBAT' },
+    { id: 'ability3', name: 'Ability 3 — SHACKLE', def: 'Digit3', group: 'COMBAT' },
+    { id: 'ability4', name: 'Ability 4 — OVERLOAD', def: 'Digit4', group: 'COMBAT' },
+    { id: 'ward1', name: 'Ward — KINETIC', def: 'KeyZ', group: 'COMBAT' },
+    { id: 'ward2', name: 'Ward — BALLISTIC', def: 'KeyX', group: 'COMBAT' },
+    { id: 'ward3', name: 'Ward — ARC', def: 'KeyC', group: 'COMBAT' },
+    { id: 'wardCycle', name: 'Cycle ward', def: 'KeyR', group: 'COMBAT' },
+    { id: 'interact', name: 'Interact / use', def: 'KeyF', group: 'WORLD' },
+    { id: 'item', name: 'Use race item', def: 'KeyG', group: 'WORLD' },
+    { id: 'camera', name: 'Toggle camera (chase / tactical)', def: 'KeyV', group: 'WORLD' },
+    { id: 'skills', name: 'Pilot training (skill tree)', def: 'KeyK', group: 'MENUS' },
+    { id: 'map', name: 'World map', def: 'KeyM', group: 'MENUS' },
+    { id: 'pilot', name: 'Pilot sheet (character)', def: 'KeyP', group: 'MENUS' },
+    { id: 'pause', name: 'Pause (ESC always works)', def: 'Backquote', group: 'MENUS' },
+    { id: 'crt', name: 'Toggle CRT filter', def: 'KeyH', group: 'MENUS' }
+  ];
+
+  // arrow keys always mirror the four walk/turn actions unless the
+  // player has bound them to something else
+  var ARROW_ALIASES = { ArrowUp: 'forward', ArrowDown: 'back', ArrowLeft: 'turnLeft', ArrowRight: 'turnRight' };
+
+  C.binds = {};
+  C.settings = { sens: 1.0, invertY: false, crt: true, mouseTurn: true };
+
+  var STORE_KEY = 'hf_controls_v1';
+
+  C.load = function () {
+    C.ACTIONS.forEach(function (a) { C.binds[a.id] = a.def; });
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var d = JSON.parse(raw);
+        if (d.binds) for (var k in d.binds) if (C.binds[k] !== undefined) C.binds[k] = d.binds[k];
+        if (d.settings) for (var s in d.settings) if (C.settings[s] !== undefined) C.settings[s] = d.settings[s];
+      }
+    } catch (e) { /* storage unavailable */ }
+  };
+
+  C.save = function () {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ binds: C.binds, settings: C.settings })); }
+    catch (e) { /* ignore */ }
+  };
+
+  C.reset = function () {
+    C.ACTIONS.forEach(function (a) { C.binds[a.id] = a.def; });
+    C.settings = { sens: 1.0, invertY: false, crt: true, mouseTurn: true };
+    C.save();
+  };
+
+  C.code = function (id) { return C.binds[id]; };
+
+  // every action a physical key currently triggers
+  C.actionsFor = function (code) {
+    var out = [];
+    for (var id in C.binds) if (C.binds[id] === code) out.push(id);
+    if (!out.length && ARROW_ALIASES[code]) out.push(ARROW_ALIASES[code]);
+    return out;
+  };
+
+  C.is = function (code, id) { return C.actionsFor(code).indexOf(id) !== -1; };
+
+  // rebinding: a key already used elsewhere is taken from that action
+  // (the old action falls back to unbound) so no key ever fires twice
+  C.rebind = function (id, code) {
+    if (!code || code === 'Escape') return false;
+    for (var k in C.binds) if (k !== id && C.binds[k] === code) C.binds[k] = null;
+    C.binds[id] = code;
+    C.save();
+    return true;
+  };
+
+  var NAMES = {
+    Space: 'SPACE', ShiftLeft: 'L-SHIFT', ShiftRight: 'R-SHIFT', ControlLeft: 'L-CTRL', ControlRight: 'R-CTRL',
+    AltLeft: 'L-ALT', AltRight: 'R-ALT', Tab: 'TAB', Escape: 'ESC', Enter: 'ENTER', Backquote: '`',
+    ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Backspace: 'BKSP', CapsLock: 'CAPS',
+    Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',',
+    Period: '.', Slash: '/', Backslash: '\\', Delete: 'DEL', Insert: 'INS', Home: 'HOME', End: 'END',
+    PageUp: 'PGUP', PageDown: 'PGDN', Mouse1: 'MOUSE 3', Mouse3: 'MOUSE 4', Mouse4: 'MOUSE 5'
+  };
+
+  C.keyLabel = function (code) {
+    if (!code) return '—';
+    if (NAMES[code]) return NAMES[code];
+    if (code.indexOf('Key') === 0 && code.length === 4) return code.slice(3);
+    if (code.indexOf('Digit') === 0) return code.slice(5);
+    if (code.indexOf('Numpad') === 0) return 'NUM ' + code.slice(6);
+    if (code.indexOf('F') === 0 && code.length <= 3) return code;
+    return code.toUpperCase();
+  };
+
+  C.label = function (id) { return C.keyLabel(C.binds[id]); };
+
+  // one-line control summary for the title / help screens
+  C.summary = function () {
+    var L = C.label;
+    return L('forward') + '/' + L('back') + ' walk · ' + L('turnLeft') + '/' + L('turnRight') + ' turn · ' +
+      L('strafeLeft') + '/' + L('strafeRight') + ' strafe · RIGHT-MOUSE drag looks · WHEEL zooms · ' +
+      'LEFT-CLICK attack / target · ' + L('target') + ' cycle target · ' +
+      L('ability1') + '–' + L('ability4') + ' abilities · ' + L('ward1') + ' ' + L('ward2') + ' ' + L('ward3') + ' wards · ' +
+      L('boost') + ' boost / drift · ' + L('special') + ' special / nitro · ' + L('transform') + ' transform · ' +
+      L('interact') + ' interact · ' + L('camera') + ' camera · ' + L('skills') + ' training · ' + L('map') + ' map · ESC menu';
+  };
+
+  C.load();
+  return C;
+})();
+
+</script>
+<script>
 // HERO FRAME — persistent meta progression (localStorage)
 // Pilot profiles (Standard / Iron Frame / Iron Core), salvage bank, shell &
 // stage unlocks, devotions, contracts, collection log, stage trials, records.
@@ -5731,6 +6206,12 @@ GH.meta = (function () {
     return {
       salvage: 0,
       shells: { aegis: true, vulcan: true },
+      // frame workshop materials: ALLOY (common) and FRAME CORES (bosses)
+      mats: { alloy: 0, cores: 0 },
+      // one-off feats (relic prerequisites): harrow, ...
+      feats: {},
+      // a CLASSIC / ARENA / WEEKLY run left mid-way with EXIT RUN
+      suspended: null,
       stages: 1,
       devotion: { sol: 0, pyre: 0, keen: 0, verd: 0, ruin: 0 },
       activeDevotion: 'sol',
@@ -5948,6 +6429,10 @@ GH.meta = (function () {
       if (p.get('unlock') === 'all') {
         GH.mechs.forEach(function (m) { M.data.shells[m.id] = true; });
         M.data.stages = 6;
+      }
+      if (p.get('mats')) {
+        var mv = parseInt(p.get('mats'), 10) || 0;
+        M.data.mats.alloy += mv; M.data.mats.cores += Math.round(mv / 20);
       }
       if (p.get('salvage')) M.data.salvage += parseInt(p.get('salvage'), 10) || 0;
       if (p.get('weakboss') === '1') GH.devWeakBoss = true;
@@ -7206,6 +7691,325 @@ GH.skills = (function () {
   };
 
   return S;
+})();
+
+</script>
+<script>
+// HERO FRAME — the full 135-frame roster.
+// 8 base frames (mechs.js) + 120 lineage variants (8 lineages × 5 packs ×
+// 3 marks) + 7 RELIC frames. Two starters are free, four base frames are
+// earned by feats, everything else is BUILT in the Frame Workshop from
+// ALLOY and FRAME CORES recovered in the field.
+GH.roster = (function () {
+  var R = {};
+
+  R.STARTERS = ['aegis', 'vulcan'];
+
+  // ---------------------------------------------------------------
+  // Feat frames: earned by doing something, not by spending
+  // ---------------------------------------------------------------
+  R.FEATS = {
+    fang: { stage: 'wreck', desc: 'Clear TIDE WRECKAGE in CLASSIC — bring down CORRUPTED FANG on wave 20 (or its lair in the Reach).' },
+    hexen: { stage: 'glacier', desc: 'Clear GLACIER HOLLOW in CLASSIC — bring down CORRUPTED HEXEN on wave 20 (or its lair in the Reach).' },
+    viper: { stage: 'cloister', desc: 'Clear VERDANT CLOISTER in CLASSIC — bring down CORRUPTED VIPER on wave 20 (or its lair in the Reach).' },
+    morrow: { stage: 'ember', desc: 'Clear EMBER FURNACE in CLASSIC — bring down CORRUPTED MORROW on wave 20 (or its lair in the Reach).' }
+  };
+
+  // ---------------------------------------------------------------
+  // Packs: what a variant is FOR. Each pack leans the stats one way,
+  // recolours the accent, and bolts a silhouette onto the frame.
+  // ---------------------------------------------------------------
+  R.PACKS = [
+    { id: 'aile', name: 'AILE', glyph: '▲', css: '#80d8ff', accent: 0x60c8ff,
+      desc: 'Mobility pack: lighter plate, hotter servos. Faster, a little thinner.',
+      stats: { speed: 1.12, maxHP: 0.92, armor: -1, crit: 2 }, weapon: { interval: 0.93 }, vector: 'bike' },
+    { id: 'sword', name: 'SWORD', glyph: '⚔', css: '#ff9070', accent: 0xff6040,
+      desc: 'Strike pack: overcharged actuators. Hits harder and reaches farther.',
+      stats: { maxHP: 1.0, crit: 3 }, weapon: { damage: 1.15, range: 1.12, aoe: 1.1 } },
+    { id: 'launcher', name: 'LAUNCHER', glyph: '◆', css: '#f0c060', accent: 0xf0a030,
+      desc: 'Siege pack: layered plating and stabilisers. Tough and slow.',
+      stats: { maxHP: 1.22, armor: 3, block: 3, speed: 0.9 }, weapon: { damage: 1.06 }, vector: 'tank' },
+    { id: 'storm', name: 'STORM', glyph: '϶', css: '#c090ff', accent: 0xa060ff,
+      desc: 'Element pack: a reactor tuned for arc and flame. Sharp crits, elemental bite.',
+      stats: { crit: 6, maxHP: 0.96 }, weapon: { damage: 1.04 }, elemMult: 1.2 },
+    { id: 'phantom', name: 'PHANTOM', glyph: '☾', css: '#9ae8c0', accent: 0x60e8a0,
+      desc: 'Hunter pack: siphon coils and a quiet drive. Lifesteal, speed, precision.',
+      stats: { lifesteal: 5, crit: 4, speed: 1.05, maxHP: 0.94 }, weapon: { interval: 0.97 } }
+  ];
+
+  R.MARKS = [
+    { id: 'mk2', name: 'MK.II', roman: 'II', mult: 1.06, cost: { alloy: 60, cores: 0, salvage: 80 } },
+    { id: 'custom', name: 'CUSTOM', roman: 'III', mult: 1.14, cost: { alloy: 150, cores: 2, salvage: 200 } },
+    { id: 'proto', name: 'PROTOTYPE', roman: 'IV', mult: 1.24, cost: { alloy: 320, cores: 5, salvage: 450 } }
+  ];
+
+  // 8 lineages × 5 packs × 3 marks: one codename each, in that order
+  var CODENAMES = [
+    // AEGIS
+    'KESTREL', 'GOSHAWK', 'PEREGRINE', 'CLAYMORE', 'ESPADON', 'DURENDAL', 'RAMPART', 'BASTILLE', 'CITADEL',
+    'THUNDERHEAD', 'STORMWALL', 'TEMPEST', 'VESPER', 'NOCTURNE', 'GLOAMING',
+    // VULCAN
+    'SWIFT', 'MARTIN', 'HARRIER', 'BAYONET', 'HALBERD', 'PARTISAN', 'BULWARK', 'REDOUBT', 'BARBICAN',
+    'FULMINE', 'SFERICS', 'CORONA', 'WRAITH', 'REVENANT', 'SPECTRE',
+    // FANG
+    'LYNX', 'OCELOT', 'CARACAL', 'SABRE', 'KUKRI', 'TALWAR', 'GARRISON', 'PALISADE', 'BULWARK-9',
+    'STATIC', 'FLASHOVER', 'ARCLIGHT', 'STALKER', 'SHADE', 'UMBRA',
+    // HEXEN
+    'SPARROW', 'STARLING', 'WAXWING', 'ATHAME', 'GLAIVE', 'RUNEBLADE', 'REDOUBT-X', 'OBELISK', 'MONOLITH',
+    'ZEPHYR', 'SIROCCO', 'MISTRAL', 'HALLOW', 'SEANCE', 'ELEGY',
+    // VIPER
+    'ADDER', 'KRAIT', 'MAMBA', 'STILETTO', 'RONDEL', 'MISERICORDE', 'CARAPACE', 'PAVISE', 'TESTUDO',
+    'VOLTAIC', 'IONSTORM', 'PLASMID', 'GHOST', 'WISP', 'PHANTASM',
+    // MORROW
+    'ROOK', 'RAVEN', 'CORVID', 'REAPER-K', 'SICKLE', 'HARVESTER', 'MAUSOLEUM', 'OSSUARY', 'CATACOMB',
+    'EMBER', 'PYRECLAST', 'CINDER', 'SHROUD', 'PALL', 'REQUIEM',
+    // STRIX
+    'MERLIN', 'SAKER', 'GYRFALCON', 'LANCEA', 'PILUM', 'SARISSA', 'AEGISLANCE', 'BARRIER', 'BREAKWATER',
+    'FULGUR', 'LEVIN', 'BOLTSTRIKE', 'NIGHTJAR', 'HAWKMOTH', 'LUNA',
+    // TITAN
+    'CONDOR', 'ALBATROSS', 'ROC', 'MAUL', 'WARHAMMER', 'MACE', 'FORTRESS', 'KEEP', 'DONJON',
+    'CALDERA', 'MAGMA', 'FURNACE', 'JUGGERNAUT', 'COLOSSUS', 'BEHEMOTH'
+  ];
+
+  // ---------------------------------------------------------------
+  // Seven RELIC frames: unique end-game builds
+  // ---------------------------------------------------------------
+  var RELICS = [
+    { id: 'relic_moonlight', name: 'MOONLIGHT', icon: '☽', base: 'aegis', vector: 'disc', prop: 'sword',
+      role: 'Relic frame · sword saint', model: { body: 0xe8e8f0, accent: 0xc0e0ff, dark: 0x303848, trim: 0x8090b0 },
+      stats: { maxHP: 170, speed: 19, armor: 7, block: 18, crit: 14, lifesteal: 4 },
+      weapon: { damage: 1.5, interval: 0.8, range: 1.25, knockback: 1.4 },
+      desc: 'A white relic that eats its pilot slowly and gives back everything. The finest blade in the hangar.',
+      feat: { kind: 'stages', n: 6, desc: 'Clear all six CLASSIC stages.' } },
+    { id: 'relic_ark', name: 'ARK HULL', icon: '⛫', base: 'titan', vector: 'tank', prop: 'mortar',
+      role: 'Relic frame · walking fortress', model: { body: 0x3a3a48, accent: 0xff6020, dark: 0x181820, trim: 0x707080 },
+      stats: { maxHP: 260, speed: 12, armor: 14, block: 8, crit: 4, lifesteal: 0 },
+      weapon: { damage: 1.6, interval: 0.9, aoe: 1.3 },
+      desc: 'A captured siege hull folded into a frame. Nothing walks slower; nothing walks through it.',
+      feat: { kind: 'nests', n: 12, desc: 'Break 12 nests in the Shattered Reach.' } },
+    { id: 'relic_corebreaker', name: 'COREBREAKER', icon: '⟁', base: 'fang', vector: 'bike', prop: 'claws',
+      role: 'Relic frame · hype engine', model: { body: 0xc02030, accent: 0xffd040, dark: 0x301010, trim: 0xe08030 },
+      stats: { maxHP: 130, speed: 21, armor: 3, block: 0, crit: 18, lifesteal: 8 },
+      weapon: { damage: 1.7, interval: 0.95, range: 1.1 },
+      desc: 'Drills for hands and a stolen red mid-frame. Every boost is a battle cry.',
+      feat: { kind: 'dungeonTier', n: 3, desc: 'Ascend any dungeon to tier 3.' } },
+    { id: 'relic_seer', name: 'SEER', icon: '◎', base: 'hexen', vector: 'disc', prop: 'staff',
+      role: 'Relic frame · remote weapons', model: { body: 0xf0d8f0, accent: 0xff70c0, dark: 0x402040, trim: 0xa070c0 },
+      stats: { maxHP: 120, speed: 18, armor: 3, block: 0, crit: 16, lifesteal: 0 },
+      weapon: { damage: 1.35, interval: 0.75, homing: 2, aoe: 1.2 }, elemMult: 1.35,
+      desc: 'Hidden eyes and sweeping binders. Its shots think for themselves.',
+      feat: { kind: 'pilot', n: 12, desc: 'Reach pilot level 12.' } },
+    { id: 'relic_crimson', name: 'CRIMSON', icon: '☄', base: 'viper', vector: 'bike', prop: 'daggers',
+      role: 'Relic frame · the rival', model: { body: 0xb01828, accent: 0xffe060, dark: 0x300810, trim: 0x702030 },
+      stats: { maxHP: 125, speed: 21, armor: 4, block: 2, crit: 24, lifesteal: 3 },
+      weapon: { damage: 1.5, interval: 0.85 },
+      desc: 'Three times faster, they said. Painted red until you beat it — and then it is yours.',
+      feat: { kind: 'harrow', n: 1, desc: 'Bring down THE HARROW.' } },
+    { id: 'relic_keyhead', name: 'KEYHEAD', icon: '⌘', base: 'strix', vector: 'bike', prop: 'lance',
+      role: 'Relic frame · spike-dock trainer', model: { body: 0x50c050, accent: 0xffffff, dark: 0x183018, trim: 0x90e090 },
+      stats: { maxHP: 110, speed: 23, armor: 2, block: 6, crit: 22, lifesteal: 0 },
+      weapon: { damage: 1.4, interval: 0.8, range: 1.15 },
+      desc: 'The smallest relic and the fastest thing on the ground. A drill-pod with a lance.',
+      feat: { kind: 'race', n: 1, desc: 'Win the SUNSPIRE CIRCUIT or a TRACE DUEL.' } },
+    { id: 'relic_revenant', name: 'REVENANT-13', icon: '♆', base: 'morrow', vector: 'disc', prop: 'scythe',
+      role: 'Relic frame · bio-organic', model: { body: 0x6040a0, accent: 0x60ff80, dark: 0x201040, trim: 0xa080e0 },
+      stats: { maxHP: 150, speed: 18, armor: 5, block: 0, crit: 10, lifesteal: 20 },
+      weapon: { damage: 1.55, interval: 0.85, range: 1.2 },
+      desc: 'Grown, not built. Four arms, one hunger. Wounds feed it faster than any reactor could.',
+      feat: { kind: 'mastery', n: 20, desc: 'Reach a total pilot mastery of 20 (any frames).' } }
+  ];
+  var RELIC_COST = { alloy: 500, cores: 12, salvage: 1000 };
+
+  // ---------------------------------------------------------------
+  // Generation
+  // ---------------------------------------------------------------
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  function scaleWeapon(w, pack, mult) {
+    var out = clone(w);
+    if (out.damage !== undefined) out.damage = Math.round(out.damage * mult * (pack.damage || 1) * 10) / 10;
+    if (out.interval !== undefined && pack.interval) out.interval = Math.round(out.interval * pack.interval * 1000) / 1000;
+    if (out.range !== undefined && pack.range) out.range = Math.round(out.range * pack.range * 100) / 100;
+    if (out.aoe !== undefined && pack.aoe) out.aoe = Math.round(out.aoe * pack.aoe * 100) / 100;
+    if (out.knockback !== undefined && pack.knockback) out.knockback = Math.round(out.knockback * pack.knockback * 10) / 10;
+    if (pack.homing && out.homing !== undefined) out.homing += pack.homing;
+    return out;
+  }
+
+  function fmtStats(s) {
+    return '+' + s.speed + ' Speed\n+' + s.armor + ' Armor Rating\n' + s.maxHP + ' Max Health\n+' +
+      s.block + '% Block\n+' + s.crit + '% Crit' + (s.lifesteal ? '\n+' + s.lifesteal + '% Lifesteal' : '');
+  }
+
+  function lighten(c, f) {
+    var r = Math.min(255, Math.round(((c >> 16) & 255) * f)), g = Math.min(255, Math.round(((c >> 8) & 255) * f)),
+      b = Math.min(255, Math.round((c & 255) * f));
+    return (r << 16) | (g << 8) | b;
+  }
+
+  R.BASE = GH.mechs.slice();
+  R.byBase = {};
+  R.recipes = {};   // frame id -> { alloy, cores, salvage, requires: id|null, feat: {..}|null }
+  R.variants = [];
+  R.relics = [];
+
+  var ci = 0;
+  R.BASE.forEach(function (base) {
+    R.byBase[base.id] = [];
+    base.lineage = base.id;
+    base.kind = R.STARTERS.indexOf(base.id) !== -1 ? 'starter' : (R.FEATS[base.id] ? 'feat' : 'craft');
+    if (base.kind === 'craft') {
+      R.recipes[base.id] = base.id === 'strix'
+        ? { alloy: 200, cores: 3, salvage: 300, requires: null, feat: null }
+        : { alloy: 260, cores: 4, salvage: 400, requires: null, feat: null };
+    }
+    R.PACKS.forEach(function (pack) {
+      var prev = base.id;
+      R.MARKS.forEach(function (mark, mi) {
+        var code = CODENAMES[ci++] || (base.name + '-' + pack.id + mi);
+        var m = mark.mult;
+        var bs = base.stats;
+        var ps = pack.stats;
+        var stats = {
+          maxHP: Math.round(bs.maxHP * m * (ps.maxHP || 1)),
+          speed: Math.round(bs.speed * (ps.speed || 1) * (1 + (m - 1) * 0.3) * 10) / 10,
+          armor: Math.max(0, Math.round(bs.armor * m + (ps.armor || 0))),
+          block: Math.max(0, bs.block + (ps.block || 0) + mi),
+          crit: bs.crit + (ps.crit || 0) + mi,
+          lifesteal: bs.lifesteal + (ps.lifesteal || 0)
+        };
+        var def = {
+          id: base.id + '_' + pack.id + '_' + mark.id,
+          lineage: base.id, pack: pack.id, mark: mark.id, kind: 'craft',
+          vector: pack.vector || base.vector,
+          name: base.name + ' ' + code,
+          role: base.role.split('·')[0].trim() + ' · ' + pack.name + ' PACK · ' + mark.name,
+          icon: base.icon,
+          desc: pack.desc + ' ' + mark.name + ' refit of the ' + base.name + ' line: ' +
+            base.desc.split('.')[0] + '.',
+          model: {
+            body: base.model.body, accent: pack.accent,
+            dark: base.model.dark, trim: lighten(base.model.trim, 1 + mi * 0.18),
+            prop: base.model.prop, pack: pack.id, mark: mi + 1
+          },
+          stats: stats,
+          levelUp: clone(base.levelUp),
+          levelText: base.levelText,
+          baseText: fmtStats(stats) + '\n' + pack.name + ' pack · ' + mark.name,
+          weapon: scaleWeapon(base.weapon, pack.weapon || {}, m),
+          special: base.special, specialText: base.specialText,
+          passive: base.passive,
+          hudStats: base.hudStats,
+          elemMult: (base.id === 'hexen' ? 1.15 : 1) * (pack.elemMult || 1)
+        };
+        R.recipes[def.id] = { alloy: mark.cost.alloy, cores: mark.cost.cores, salvage: mark.cost.salvage, requires: prev, feat: null };
+        prev = def.id;
+        R.variants.push(def);
+        R.byBase[base.id].push(def);
+        GH.mechs.push(def);
+      });
+    });
+  });
+
+  RELICS.forEach(function (rl) {
+    var base = GH.mechById(rl.base);
+    var def = {
+      id: rl.id, lineage: 'relic', kind: 'relic', vector: rl.vector,
+      name: rl.name, role: rl.role, icon: rl.icon, desc: rl.desc,
+      model: { body: rl.model.body, accent: rl.model.accent, dark: rl.model.dark, trim: rl.model.trim, prop: rl.prop, pack: 'relic', mark: 4 },
+      stats: rl.stats,
+      levelUp: clone(base.levelUp), levelText: base.levelText,
+      baseText: fmtStats(rl.stats) + '\nRELIC — ' + rl.feat.desc,
+      weapon: scaleWeapon(base.weapon, rl.weapon, 1),
+      special: base.special, specialText: base.specialText, passive: base.passive,
+      hudStats: base.hudStats, elemMult: rl.elemMult || 1
+    };
+    R.recipes[def.id] = { alloy: RELIC_COST.alloy, cores: RELIC_COST.cores, salvage: RELIC_COST.salvage, requires: null, feat: rl.feat };
+    R.relics.push(def);
+    GH.mechs.push(def);
+  });
+
+  R.TOTAL = GH.mechs.length; // 135
+
+  // ---------------------------------------------------------------
+  // Feat checks (used for relic prerequisites and the help screen)
+  // ---------------------------------------------------------------
+  R.featProgress = function (feat) {
+    var d = GH.meta.data, w = d.world;
+    var have = 0;
+    if (feat.kind === 'stages') have = Object.keys(d.victories || {}).length;
+    else if (feat.kind === 'nests') have = Object.keys(w.nests || {}).length;
+    else if (feat.kind === 'dungeonTier') { for (var k in (w.dgTier || {})) have = Math.max(have, w.dgTier[k]); }
+    else if (feat.kind === 'pilot') have = GH.skills.pilotProgress().lvl;
+    else if (feat.kind === 'harrow') have = d.feats && d.feats.harrow ? 1 : 0;
+    else if (feat.kind === 'race') have = (w.duelWins || 0) + (w.raceBest ? 1 : 0) > 0 ? 1 : 0;
+    else if (feat.kind === 'mastery') have = GH.progress.masteryTotal();
+    return { have: Math.min(have, feat.n), need: feat.n, done: have >= feat.n };
+  };
+
+  // why a frame isn't yours yet, and whether it can be built right now
+  R.status = function (id) {
+    var d = GH.meta.data;
+    if (d.shells[id]) return { owned: true, text: 'OWNED' };
+    var def = GH.mechById(id);
+    if (def.kind === 'feat') {
+      var f = R.FEATS[id];
+      return { owned: false, feat: true, text: 'FEAT: ' + f.desc };
+    }
+    var rc = R.recipes[id];
+    if (!rc) return { owned: false, text: 'UNAVAILABLE' };
+    var mats = d.mats || { alloy: 0, cores: 0 };
+    var blockers = [];
+    if (rc.requires && !d.shells[rc.requires]) blockers.push('needs ' + GH.mechById(rc.requires).name + ' first');
+    if (rc.feat) {
+      var fp = R.featProgress(rc.feat);
+      if (!fp.done) blockers.push(rc.feat.desc + ' (' + fp.have + '/' + fp.need + ')');
+    }
+    var canPay = mats.alloy >= rc.alloy && mats.cores >= rc.cores && d.salvage >= rc.salvage;
+    return {
+      owned: false, recipe: rc, blockers: blockers, canPay: canPay,
+      canBuild: !blockers.length && canPay,
+      text: blockers.length ? 'LOCKED — ' + blockers.join('; ') : (canPay ? 'READY TO BUILD' : 'NEEDS MATERIALS')
+    };
+  };
+
+  R.build = function (id) {
+    var st = R.status(id);
+    if (st.owned || !st.canBuild) return false;
+    var d = GH.meta.data;
+    d.mats.alloy -= st.recipe.alloy;
+    d.mats.cores -= st.recipe.cores;
+    d.salvage -= st.recipe.salvage;
+    d.shells[id] = true;
+    d.collection.built = (d.collection.built || 0) + 1;
+    GH.meta.save();
+    return true;
+  };
+
+  R.owned = function () {
+    var n = 0;
+    GH.mechs.forEach(function (m) { if (GH.meta.data.shells[m.id]) n++; });
+    return n;
+  };
+
+  R.packById = function (id) {
+    for (var i = 0; i < R.PACKS.length; i++) if (R.PACKS[i].id === id) return R.PACKS[i];
+    return null;
+  };
+  R.markById = function (id) {
+    for (var i = 0; i < R.MARKS.length; i++) if (R.MARKS[i].id === id) return R.MARKS[i];
+    return null;
+  };
+
+  // where materials come from — shown in the workshop and the help screen
+  R.SOURCES = [
+    'ALLOY drops from any hostile (about one kill in eight), always from elites, and in piles from bosses, nests, dungeon caches and cleared stages.',
+    'FRAME CORES come from bosses: wave-20 corrupted frames, wardens, THE HARROW, dungeon reward caches, and every CLASSIC stage clear.',
+    'SALVAGE is the coin you already bank at the end of every run and at the survivor camp.',
+    'Each pack climbs MK.II → CUSTOM → PROTOTYPE: build the earlier mark first. RELIC frames need a feat plus a heavy bill of cores.'
+  ];
+
+  return R;
 })();
 
 </script>
@@ -9486,22 +10290,23 @@ GH.game = (function () {
       }
     }
     var seen = GH.meta.data.seenHints;
+    var L = GH.controls.label;
     if (expActive && runTime > 12) {
-      showHint('transform', 'Press T to TRANSFORM — the skimmer is fast and mounts strafe cannons, but its hull is thin');
+      showHint('transform', 'Press ' + L('transform') + ' to TRANSFORM — the skimmer is fast and mounts strafe cannons, but its hull is thin');
     }
     if (seen.__done) return;
     if (waveNum === 1) {
-      if (runTime > 0.5) showHint('move', 'WASD to move · LEFT CLICK to attack (hold to keep attacking) — clicking a hostile marks it as your target');
-      if (runTime > 8) showHint('ability', 'Press 1 to cast RUPTURE on your target — abilities spend the blue ENERGY bar');
-      if (sparksRun > 0) showHint('sparks', 'SPARKS feed your level AND your persistent PILOT LEVEL — skill points are spent in the tree [K]');
+      if (runTime > 0.5) showHint('move', L('forward') + '/' + L('back') + ' walk · ' + L('turnLeft') + '/' + L('turnRight') + ' turn · hold RIGHT MOUSE to look around · LEFT CLICK attacks and marks a target');
+      if (runTime > 8) showHint('ability', 'Press ' + L('ability1') + ' to cast RUPTURE on your target — abilities spend the blue ENERGY bar');
+      if (sparksRun > 0) showHint('sparks', 'SPARKS feed your level AND your persistent PILOT LEVEL — skill points are spent in PILOT TRAINING [' + L('skills') + ']');
     }
     if (waveNum === 2) {
       if (waveTimer < wavePlan.duration - 2) {
-        showHint('wards', 'Press Z / X / C to raise a WARD — match it to the incoming damage to cut it 75%');
+        showHint('wards', 'Press ' + L('ward1') + ' / ' + L('ward2') + ' / ' + L('ward3') + ' to raise a WARD — match it to the incoming damage to cut it 75%');
       }
     }
     if (waveNum === 3) {
-      showHint('special', 'SHIFT or right-click fires your frame’s SPECIAL');
+      showHint('special', L('special') + ' fires your frame’s SPECIAL · ALLOY and FRAME CORES you pick up build new frames in the HANGAR WORKSHOP');
       if (seen.special) { seen.__done = true; GH.meta.save(); }
     }
   }
@@ -9543,13 +10348,21 @@ GH.game = (function () {
   var camMode = 'chase';
   try { camMode = localStorage.getItem('hf_cam') || 'chase'; } catch (e) { /* no storage */ }
   var camYaw = Math.PI;
+  var camPitch = 0;      // right-mouse drag tilts the chase camera
+  var camDist = 1;       // wheel zoom (0.55 .. 1.9)
   var camPrevX = 0, camPrevZ = 0;
   G.camMode = function () { return camMode; };
-  G.toggleCamera = function () {
-    camMode = camMode === 'chase' ? 'top' : 'chase';
+  G.setCamMode = function (m) {
+    camMode = m === 'top' ? 'top' : 'chase';
     try { localStorage.setItem('hf_cam', camMode); } catch (e) { /* no storage */ }
     if (player) camYaw = player.speederOn && player.drive ? player.drive.heading : (player.facing || Math.PI);
-    announce(camMode === 'chase' ? 'CHASE CAMERA — MOUSE TURNS, WASD FOLLOWS THE VIEW' : 'TACTICAL CAMERA', 20);
+  };
+  G.toggleCamera = function () {
+    G.setCamMode(camMode === 'chase' ? 'top' : 'chase');
+    var L = GH.controls.label;
+    announce(camMode === 'chase'
+      ? 'CHASE CAMERA — ' + L('turnLeft') + '/' + L('turnRight') + ' TURN · RIGHT-MOUSE LOOKS'
+      : 'TACTICAL CAMERA — MOUSE AIMS, ' + L('forward') + L('turnLeft') + L('back') + L('turnRight') + ' MOVES', 20);
   };
   var tmpV3 = new THREE.Vector3();
 
@@ -9744,7 +10557,7 @@ GH.game = (function () {
         regen: dev.regen, magnet: 3.2 * (1 + dev.magnet), xpGain: 1 + dev.xpGain,
         bonusProj: skl.cleave ? 1 : 0,
         boostRegen: 0.35 + dev.boostRegen + skl.boostRegen, boostCost: 0.34,
-        elemMult: mechDef.id === 'hexen' ? 1.15 : 1,
+        elemMult: mechDef.elemMult || (mechDef.id === 'hexen' ? 1.15 : 1),
         energyMax: skl.energyMax, energyRegen: skl.energyRegen
       },
       skillBon: skl,
@@ -10114,11 +10927,14 @@ GH.game = (function () {
         queueAnnounce('NEST BROKEN — ' + cc.dead + '/' + cc.total + ' CLEANSED', 24);
         GH.audio.win();
         coinsRun += 25;
+        grantMats(8 + (zoneNow ? zoneNow.danger * 3 : 0), Math.random() < 0.3 ? 1 : 0, false);
         saveExpedition();
       }
       // THE HARROW falls — locked out until it re-roosts tomorrow
       if (e.id === 'harrow') {
         GH.meta.data.world.harrowDay = GH.world.dayStamp();
+        GH.meta.data.feats.harrow = true;
+        grantMats(40, 3, false);
         harrowSpot = null;
         harrowUp = false;
         coinsRun += 150;
@@ -10140,9 +10956,9 @@ GH.game = (function () {
       if (e.def.corrupt && e.lairZone) {
         GH.meta.data.world.lairsDown[e.lairZone] = true;
         var shellId = GH.world.stageFor(e.lairZone).unlocks;
-        if (GH.meta.unlockShell(shellId)) {
-          queueAnnounce(GH.mechById(shellId).name + ' FRAME RECOVERED', 30);
-        }
+        var lairMsg = frameReward(shellId);
+        if (lairMsg) queueAnnounce(lairMsg.replace(/<[^>]+>/g, '').replace(/\n/g, ''), 30);
+        if (GH.mechById(shellId).kind === 'feat') GH.meta.data.victories[e.lairZone] = true;
         GH.factions.deed(curZone, 'lair', 8);
         var lairArtifacts = {
           wreck: 'bulwark_fragment', glacier: 'glacier_core', cloister: 'harvest_coil',
@@ -10214,6 +11030,15 @@ GH.game = (function () {
     if (e.elite) {
       spawnPickup('coin', e.x, e.z);
       spawnPickup('spark1', e.x + 0.5, e.z);
+      spawnPickup('alloy', e.x - 0.5, e.z + 0.4);
+    } else if (!e.def.boss && !e.nestId && Math.random() < 0.12) {
+      spawnPickup('alloy', e.x + GH.rand(-0.5, 0.5), e.z + GH.rand(-0.5, 0.5));
+    }
+    if (e.def.boss) {
+      // wardens and other mid-bosses drop a core; true bosses drop two
+      var coreN = e.def.mid ? 1 : 2;
+      for (var cn = 0; cn < coreN; cn++) spawnPickup('core', e.x + cn * 1.2 - 0.6, e.z - 1.2);
+      for (var an = 0; an < (e.def.corrupt ? 8 : 4); an++) spawnPickup('alloy', e.x + GH.rand(-2, 2), e.z + GH.rand(-2, 2));
     }
     if (e.def.boss && expActive) awardCards(3);
     else if (e.elite && expActive && Math.random() < 0.25) awardCards(2);
@@ -11792,6 +12617,8 @@ GH.game = (function () {
     else if (type.indexOf('gem:') === 0) mesh = GH.models.buildGemDrop(type.slice(4));
     else if (type === 'cipher') mesh = GH.models.buildCipher();
     else if (type === 'cache') mesh = GH.models.buildCache();
+    else if (type === 'alloy') mesh = GH.models.buildAlloy();
+    else if (type === 'core') mesh = GH.models.buildCore();
     else mesh = GH.models.buildCoin();
     mesh.position.set(x, 0.5 + gy(x, z), z);
     scene.add(mesh);
@@ -11824,7 +12651,36 @@ GH.game = (function () {
       }
       if (!silent) GH.audio.win();
     }
+    else if (pk.type === 'alloy') { grantMats(GH.rand(1, 3) | 0 || 1, 0, silent); }
+    else if (pk.type === 'core') { grantMats(0, 1, silent); }
     else { coinsRun++; if (!silent) GH.audio.coin(); }
+  }
+
+  // workshop materials bank the moment they're picked up (a death never
+  // takes them back); cores are rare enough to announce
+  var alloyRun = 0, coresRun = 0;
+  function grantMats(alloy, cores, silent) {
+    var m = GH.meta.data.mats;
+    if (alloy > 0) { m.alloy += alloy; alloyRun += alloy; if (!silent) GH.audio.coin(); }
+    if (cores > 0) {
+      m.cores += cores; coresRun += cores;
+      if (!silent) { queueAnnounce('FRAME CORE RECOVERED — ' + m.cores + ' BANKED', 22); GH.audio.levelup(); }
+    }
+    GH.meta.save();
+  }
+  G.matsRun = function () { return { alloy: alloyRun, cores: coresRun }; };
+
+  // a stage or lair reward: feat frames unlock outright, everything
+  // else pays workshop materials toward building it
+  function frameReward(shellId) {
+    var def = GH.mechById(shellId);
+    if (def.kind === 'feat' || GH.roster.STARTERS.indexOf(shellId) !== -1) {
+      if (GH.meta.unlockShell(shellId)) return '<b>' + def.name + ' FRAME RECOVERED</b> — new frame unlocked!\n';
+      return '';
+    }
+    grantMats(80, 3, true);
+    GH.meta.data.feats['reward_' + shellId] = true;
+    return '<b>' + def.name + ' BLUEPRINT DATA</b> — +80 alloy, +3 frame cores. Build it in the WORKSHOP.\n';
   }
 
   function sparkGain(v, silent) {
@@ -12473,7 +13329,22 @@ GH.game = (function () {
     var soft = T.active ? T.soft(player.x, player.z) : 0;
     var surf = T.active ? T.surface(player.x, player.z) : null;
     var authority = d.air ? 0.25 : 1;
-    if (hasInput) {
+    var mmo = input.mmoDrive;
+    if (mmo) {
+      // MMO wheel: A/D steer the skids, W opens the throttle, S brakes
+      var sfM = GH.clamp(Math.abs(d.spd) / Math.max(0.01, top), 0, 1);
+      var turnM = (d.drift ? 3.8 : 2.6 - sfM * 1.1) * dt * authority;
+      // a standing skimmer still pivots, just slower
+      if (mmo.steer) d.heading -= mmo.steer * turnM * (d.spd < -0.5 ? -1 : 1) * (Math.abs(d.spd) < 1 ? 0.6 : 1);
+      if (mmo.thr > 0.05 && !d.air) {
+        d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * V.accel * mmo.thr * dt);
+      } else if (mmo.thr < -0.05) {
+        if (d.spd > 1.5) d.spd = Math.max(0, d.spd - 34 * dt);
+        else d.spd = Math.max(-top * 0.22, d.spd - 14 * dt);
+      } else {
+        d.spd = d.spd > 0 ? Math.max(0, d.spd - (d.drift ? 6 : 12) * dt) : Math.min(0, d.spd + 12 * dt);
+      }
+    } else if (hasInput) {
       var want = Math.atan2(player.moveX, player.moveZ);
       var speedFrac = GH.clamp(Math.abs(d.spd) / Math.max(0.01, top), 0, 1);
       // grip narrows the wheel at speed; a drift throws it wide open
@@ -12638,19 +13509,33 @@ GH.game = (function () {
       }
     }
 
-    // aim priority: right stick / touch aim > mouse
-    if (camMode === 'chase' && !player.speederOn) {
-      // the frame faces where the camera looks; the mouse's offset from
-      // centre turns both (a stick or touch aim turns them too)
-      var turn = 0;
-      if (input.padAimActive) turn = input.padAimX;
-      else if (input.touchAimActive) turn = input.touchAimX;
-      else {
-        var mxn = input.mouseNDC.x, dz0 = 0.1;
-        if (Math.abs(mxn) > dz0) turn = (mxn > 0 ? 1 : -1) * Math.pow((Math.abs(mxn) - dz0) / (1 - dz0), 1.4);
+    // CHASE camera, MMO rules: A/D turn the frame and the camera together,
+    // a held right mouse button drags the view, the wheel zooms. The
+    // frame always faces where the camera looks.
+    var chaseNow = camMode === 'chase';
+    var turnAxis = 0;
+    var sens = GH.controls.settings.sens || 1;
+    if (chaseNow) {
+      turnAxis = (input.keys.d ? 1 : 0) - (input.keys.a ? 1 : 0);
+      if (input.padAimActive) turnAxis += input.padAimX;
+      else if (input.touchAimActive) turnAxis += input.touchAimX;
+      turnAxis = GH.clamp(turnAxis, -1, 1);
+      camYaw -= turnAxis * 2.8 * dt;
+      if (input.lookDX) { camYaw -= input.lookDX * 0.0045 * sens; }
+      if (input.lookDY) {
+        camPitch += input.lookDY * 0.003 * sens * (GH.controls.settings.invertY ? -1 : 1);
+        camPitch = GH.clamp(camPitch, -0.55, 0.75);
       }
-      camYaw -= turn * 3.2 * dt;
+      if (input.zoomDelta) camDist = GH.clamp(camDist + input.zoomDelta * 0.12, 0.55, 1.9);
+    }
+    input.lookDX = 0; input.lookDY = 0; input.zoomDelta = 0;
+    input.mmoDrive = null;
+    if (chaseNow && !player.speederOn) {
       player.facing = camYaw;
+    } else if (chaseNow) {
+      // skimmer form: W throttle, S brake/reverse, A/D steer the skids
+      var thr = (input.keys.w ? 1 : 0) - (input.keys.s ? 1 : 0) - (input.padMoveY + input.touchMoveY);
+      input.mmoDrive = { thr: GH.clamp(thr, -1, 1), steer: GH.clamp(turnAxis + input.padMoveX + input.touchMoveX, -1, 1) };
     } else if (input.padAimActive) {
       player.facing = Math.atan2(input.padAimX, input.padAimY);
     } else if (input.touchAimActive) {
@@ -12662,13 +13547,23 @@ GH.game = (function () {
       }
     }
 
-    var mx = (input.keys.d ? 1 : 0) - (input.keys.a ? 1 : 0) + input.padMoveX + input.touchMoveX;
-    var mz = (input.keys.s ? 1 : 0) - (input.keys.w ? 1 : 0) + input.padMoveY + input.touchMoveY;
-    if (camMode === 'chase') {
-      // WASD is relative to the view: W goes where the camera looks
+    var mx, mz;
+    if (chaseNow) {
+      // view-relative: W walks where the camera looks, Q/E sidestep
+      mx = (input.keys.e ? 1 : 0) - (input.keys.q ? 1 : 0) + input.padMoveX + input.touchMoveX;
+      mz = (input.keys.s ? 1 : 0) - (input.keys.w ? 1 : 0) + input.padMoveY + input.touchMoveY;
       var yr = camYaw - Math.PI, cyr = Math.cos(yr), syr = Math.sin(yr);
       var rmx = mx * cyr + mz * syr, rmz = -mx * syr + mz * cyr;
       mx = rmx; mz = rmz;
+      if (player.speederOn && input.mmoDrive) {
+        // the drivetrain reads throttle/steer directly; moveX/Z only
+        // tells the rest of the sim which way the nose is pointing
+        var hd = player.drive ? player.drive.heading : player.facing;
+        mx = Math.sin(hd) * input.mmoDrive.thr; mz = Math.cos(hd) * input.mmoDrive.thr;
+      }
+    } else {
+      mx = (input.keys.d ? 1 : 0) - (input.keys.a ? 1 : 0) + (input.keys.e ? 1 : 0) - (input.keys.q ? 1 : 0) + input.padMoveX + input.touchMoveX;
+      mz = (input.keys.s ? 1 : 0) - (input.keys.w ? 1 : 0) + input.padMoveY + input.touchMoveY;
     }
     if (input.itemPressed) { input.itemPressed = false; useItem(); }
     if (player.shieldT > 0) player.shieldT -= dt;
@@ -13146,6 +14041,7 @@ GH.game = (function () {
     return {
       zone: curZone,
       mech: GH.mechs.indexOf(player.def),
+      mechId: player.def.id,
       stats: JSON.parse(JSON.stringify(player.stats)),
       hp: player.hp, xp: player.xp, level: player.level, xpNeed: player.xpNeed,
       weapons: player.weapons.map(function (inst) {
@@ -13169,7 +14065,8 @@ GH.game = (function () {
     // stats are re-derived, never copied: base frame + devotions + the
     // CURRENT skill tree + mastery + per-level growth. That way training
     // or respeccing at camp reaches a live character immediately.
-    player = makePlayer(GH.mechs[saved.mech]);
+    var savedDef = saved.mechId ? GH.mechById(saved.mechId) : GH.mechs[saved.mech];
+    player = makePlayer(savedDef || GH.mechs[0]);
     var mbr = GH.progress.masteryBonus(player.def.id);
     player.stats.damageMult += mbr.damageMult;
     player.stats.maxHP += mbr.maxHP;
@@ -13499,6 +14396,7 @@ GH.game = (function () {
     awardCards(3);
     GH.factions.deed(curZone, 'dungeon', 6);
     coinsRun += 20 * ds.tier;
+    grantMats(12 * ds.tier + zoneNow.danger * 4, 1 + (ds.firstClear ? 1 : 0), false);
     spawnPickup('gem:' + GH.pick(GH.gems.typeIds), lay.chest.x + 1.5, lay.chest.z + 1.5);
     queueAnnounce('CACHE OPENED — +' + loot + ' SALVAGE BANKED', 26);
     GH.audio.win();
@@ -15706,8 +16604,11 @@ GH.game = (function () {
       }
       camPrevX = tx; camPrevZ = tz;
       var driving = veh || G.state === 'race';
-      var back = (driving ? 13 + speedFrac * 7 : 10) * (mate && !mate.down ? camZoom : 1);
-      var up = driving ? 6.2 + speedFrac * 1.5 : 5.4;
+      var back = (driving ? 13 + speedFrac * 7 : 10) * (mate && !mate.down ? camZoom : 1) * camDist;
+      var up = (driving ? 6.2 + speedFrac * 1.5 : 5.4) * camDist;
+      // pitch: drag up to look down on the fight, drag down to look ahead
+      up += Math.sin(camPitch) * back * 0.9;
+      back *= Math.cos(camPitch) * 0.85 + 0.15;
       var fx = Math.sin(camYaw), fz = Math.cos(camYaw);
       var cx = tx - fx * back, cz = tz - fz * back;
       var cy = camGround + up;
@@ -15769,7 +16670,7 @@ GH.game = (function () {
     } else {
       el['wave-timer'].textContent = GH.fmt1(Math.max(0, waveTimer));
     }
-    el['coin-count'].textContent = '×' + coinsRun;
+    el['coin-count'].textContent = '×' + coinsRun + '   ⬡ ' + GH.meta.data.mats.alloy + ' ALLOY · ◈ ' + GH.meta.data.mats.cores + ' CORES';
     el['boost-fill'].style.width = (player.boost * 100) + '%';
     // skimmer drive cluster: velocity readout, the bottle, the drift call
     if (el['drive-hud']) {
@@ -15802,7 +16703,7 @@ GH.game = (function () {
         hh += '<div class="hb-slot' + (known ? '' : ' locked') + (ready ? ' ready' : '') + '" title="' +
           ab.name + ' — ' + ab.desc + ' (' + ab.cost + ' energy)">' +
           '<div class="hb-glyph">' + (known ? ab.glyph : '✕') + '</div>' +
-          '<div class="hb-key">' + hn + '</div>' +
+          '<div class="hb-key">' + GH.controls.label('ability' + hn) + '</div>' +
           (known && cd > 0 ? '<div class="hb-cd">' + Math.ceil(cd) + '</div>' : '') +
           '</div>';
       }
@@ -15827,7 +16728,7 @@ GH.game = (function () {
     // ward row: three stances + energy
     var wardEl = document.getElementById('ward-row');
     var wh = '';
-    var wardKeys = ['Z', 'X', 'C'];
+    var wardKeys = [GH.controls.label('ward1'), GH.controls.label('ward2'), GH.controls.label('ward3')];
     WARD_ORDER.forEach(function (w, i) {
       var on = player.ward === w;
       wh += '<span class="ward-chip' + (on ? ' on' : '') + '" style="' +
@@ -15989,15 +16890,22 @@ GH.game = (function () {
     stageIndex = GH.clamp(stageIdx || 0, 0, GH.stages.length - 1);
     stage = GH.stages[stageIndex];
     applyStageLook(stage);
-    player = makePlayer(GH.mechs[mechIndex]);
-
-    // pilot mastery bonuses for this frame
-    var mb = GH.progress.masteryBonus(player.def.id);
-    player.stats.damageMult += mb.damageMult;
-    player.stats.maxHP += mb.maxHP;
-    player.hp = player.stats.maxHP;
-    player.stats.boostRegen += mb.boostRegen;
-    if (mb.energyBonus) player.stats.energyRegen *= 1.1;
+    var resume = opts.resume || null;
+    if (resume) {
+      // EXIT RUN left this character mid-climb: rebuild it from the save
+      restoreCharacter(resume.char);
+      player.x = 0; player.z = 0;
+    } else {
+      player = makePlayer(GH.mechs[mechIndex]);
+      // pilot mastery bonuses for this frame
+      var mb = GH.progress.masteryBonus(player.def.id);
+      player.stats.damageMult += mb.damageMult;
+      player.stats.maxHP += mb.maxHP;
+      player.hp = player.stats.maxHP;
+      player.stats.boostRegen += mb.boostRegen;
+      if (mb.energyBonus) player.stats.energyRegen *= 1.1;
+    }
+    GH.meta.data.suspended = null; // whatever was parked is now live (or replaced)
 
     // chase cosmetics: paint, trail, pico-drone
     var style = GH.meta.data.style;
@@ -16038,7 +16946,7 @@ GH.game = (function () {
     cipherRun = null;
     if (weekly && weekly.mods.php !== 1) {
       player.stats.maxHP = Math.round(player.stats.maxHP * weekly.mods.php);
-      player.hp = player.stats.maxHP;
+      player.hp = resume ? Math.min(player.hp, player.stats.maxHP) : player.stats.maxHP;
     }
     if (weekly && weekly.mods.crit) player.stats.crit += weekly.mods.crit;
     mate = null;
@@ -16046,14 +16954,19 @@ GH.game = (function () {
       var p2Idx = (opts.p2Mech !== undefined && opts.p2Mech >= 0) ? opts.p2Mech : mechIndex;
       spawnWingmate(p2Idx);
     }
-    if (opts.preset && !GH.meta.isIron()) applyPreset(opts.preset);
-    if (GH.devGrant) applyPreset({ weapons: GH.devGrant });
+    if (opts.preset && !GH.meta.isIron() && !resume) applyPreset(opts.preset);
+    if (GH.devGrant && !resume) applyPreset({ weapons: GH.devGrant });
     // stage-trial perks (permanent, stage-scoped)
     var trialTier = GH.progress.trialTier(stage.id);
     if (trialTier >= 2) player.stats.xpGain += 0.10;
     if (trialTier >= 3) player.stats.damageMult += 0.05;
     kills = 0; coinsRun = 0; runTime = 0; hitCount = 0; sparksRun = 0;
+    alloyRun = 0; coresRun = 0;
     elitesSpawned = 0;
+    if (resume) {
+      kills = resume.kills || 0; coinsRun = resume.coinsRun || 0; runTime = resume.runTime || 0;
+      sparksRun = resume.sparksRun || 0;
+    }
     announceQueue.length = 0;
     activeHint = null;
     hintTimer = 0;
@@ -16062,10 +16975,69 @@ GH.game = (function () {
     GH.music.play(stage.id);
     GH.music.setBoss(false);
     startAt = GH.clamp(startAt || 1, 1, 20);
-    if (startAt > 1) devCatchUp(startAt);
+    if (startAt > 1 && !resume) devCatchUp(startAt);
+    if (resume) wavePlan = GH.wavePlan(stage, 1, false);
     startWave(startAt);
     updateHUDStatic();
     document.getElementById('hud').classList.remove('hidden');
+    if (resume) queueAnnounce('RUN RESUMED — WAVE ' + startAt, 24);
+  };
+
+  // ---------------------------------------------------------------
+  // Leaving a run. EXIT keeps it (the Reach saves its character, an
+  // arena climb is parked at the start of its current wave); ABANDON
+  // deletes it for good.
+  // ---------------------------------------------------------------
+  G.suspendRun = function () {
+    if (!player) return false;
+    if (expActive) { saveExpedition(); return true; }
+    if (G.state !== 'play' && G.state !== 'pause') return false;
+    GH.meta.data.suspended = {
+      mode: G.mode, stage: stageIndex, wave: Math.max(1, waveNum),
+      char: serializeCharacter(),
+      kills: kills, coinsRun: coinsRun, runTime: runTime, sparksRun: sparksRun,
+      weekly: weekly, coop: !!mate, mateMech: mate ? mate.def.id : null,
+      when: new Date().toISOString().slice(0, 10)
+    };
+    GH.meta.save();
+    return true;
+  };
+  G.hasSuspended = function () { return !!GH.meta.data.suspended; };
+  G.suspendedLabel = function () {
+    var sv = GH.meta.data.suspended;
+    if (!sv) return '';
+    var def = sv.char && sv.char.mechId ? GH.mechById(sv.char.mechId) : GH.mechs[sv.char ? sv.char.mech : 0];
+    return (sv.mode === 'arena' ? 'ARENA' : sv.mode === 'weekly' ? 'WEEKLY' : 'CLASSIC') + ' · ' +
+      GH.stages[sv.stage].name + ' · WAVE ' + sv.wave + ' · ' + (def ? def.name : '?');
+  };
+  G.resumeRun = function () {
+    var sv = GH.meta.data.suspended;
+    if (!sv) return false;
+    G.mode = sv.mode || 'classic';
+    G.coop = !!sv.coop;
+    var idx = sv.char && sv.char.mechId ? GH.mechs.indexOf(GH.mechById(sv.char.mechId)) : (sv.char ? sv.char.mech : 0);
+    var p2 = sv.mateMech ? GH.mechs.indexOf(GH.mechById(sv.mateMech)) : -1;
+    G.startRun(Math.max(0, idx), sv.stage, sv.wave, { resume: sv, weekly: sv.weekly, p2Mech: p2 });
+    return true;
+  };
+  G.abandonRun = function () {
+    // the Reach: the character and its wreck are gone; the world's scars stay
+    if (expActive) {
+      expActive = false; // clearWorld() must not re-save the character we're deleting
+      GH.meta.data.world.exp = null;
+      GH.meta.data.world.wreck = null;
+    }
+    GH.meta.data.suspended = null;
+    GH.meta.save();
+  };
+  G.isExpedition = function () { return expActive; };
+  // tear the arena / world down and go home (EXIT and ABANDON both end here)
+  G.leaveRun = function () {
+    clearWorld();
+    G.state = 'title';
+    GH.music.play('title');
+    GH.music.setBoss(false);
+    document.getElementById('hud').classList.add('hidden');
   };
 
   // Arena loadout preset: grant starting weapons/traits/gems by card id
@@ -16166,8 +17138,13 @@ GH.game = (function () {
     }
 
     meta.data.salvage += banked;
+    meta.data.suspended = null; // a finished run can't be continued
     meta.data.collection.totalRuns++;
     if (won) meta.data.collection.totalWins++;
+    // workshop materials for the run: alloy by depth, cores for a clear
+    var endAlloy = Math.round(waveNum * 1.5 + kills / 10) + (won ? 30 : 0);
+    grantMats(endAlloy, won ? 2 : 0, true);
+    var matsMsg = 'Workshop: <b>+' + (alloyRun) + ' alloy</b>' + (coresRun ? ' · <b>+' + coresRun + ' frame cores</b>' : '') + '\n';
     if (won && G.mode === 'classic') awardTrial('clear');
 
     // pilot mastery XP: kills + depth, with a victory bonus
@@ -16203,10 +17180,7 @@ GH.game = (function () {
       if (waveNum > best) meta.data.bestWave[stage.id] = waveNum;
       if (won) {
         meta.data.victories[stage.id] = true;
-        var shellId = stage.unlocks;
-        if (meta.unlockShell(shellId)) {
-          unlockMsg = '<b>' + GH.mechById(shellId).name + ' FRAME RECOVERED</b> — new shell unlocked!\n';
-        }
+        unlockMsg = frameReward(stage.unlocks);
         meta.unlockStage(stageIndex + 2);
       }
     } else {
@@ -16215,7 +17189,7 @@ GH.game = (function () {
     meta.save();
 
     document.getElementById('end-title').innerHTML = won ? 'ARENA&nbsp;CLEARED' : 'FRAME&nbsp;DESTROYED';
-    document.getElementById('end-stats').innerHTML = unlockMsg + masteryMsg +
+    document.getElementById('end-stats').innerHTML = unlockMsg + masteryMsg + matsMsg +
       stage.name + (G.mode === 'arena' ? ' · ARENA' : (G.mode === 'weekly' ? ' · WEEKLY' : '')) +
       ' — reached <b>Wave ' + waveNum + '</b> as <b>' + player.def.name + '</b>' +
       (mate ? ' <i>(co-op)</i>' : '') + '\n' +
@@ -16277,34 +17251,47 @@ GH.game = (function () {
         '\n\n<b>Primary</b>\n' + def.weapon.name + ' (' + (def.weapon.cls || '') + ')' +
         '\n\n<b>Special</b>\n' + def.specialText;
     } else {
-      var stIdx = -1;
-      GH.stages.forEach(function (st, si) { if (st.unlocks === def.id) stIdx = si; });
-      document.getElementById('select-desc').textContent =
-        'A corrupted signal wears this frame. Bring it down to claim the shell.';
+      var rst = GH.roster.status(def.id);
+      document.getElementById('select-desc').textContent = def.desc;
       document.getElementById('select-stats').innerHTML =
-        '<b>To unlock</b>\nDefeat ' + def.name + '\'s corrupted double on wave 20 of ' +
-        (stIdx >= 0 ? GH.stages[stIdx].name : '???') + '.';
+        '<b>To unlock</b>\n' + rst.text + (rst.recipe
+          ? '\n\n<b>Workshop bill</b>\n' + rst.recipe.alloy + ' alloy · ' + rst.recipe.cores + ' frame cores · ' + rst.recipe.salvage + ' salvage' +
+            '\n\nOpen HANGAR → FRAME WORKSHOP to build it.'
+          : '');
     }
-    var icons = document.querySelectorAll('#select-icons .mech-icon');
-    for (var n = 0; n < icons.length; n++) {
-      icons[n].className = 'mech-icon' + (n === i ? ' sel' : '') +
-        (GH.meta.data.shells[GH.mechs[n].id] ? '' : ' locked');
-    }
+    buildSelectIcons();
     document.getElementById('btn-launch').textContent = unlocked ? 'SELECT STAGE' : 'LOCKED';
     if (G.onSelectChange) G.onSelectChange();
   };
 
+  // the hangar rack: every frame you own (135 exist — the locked ones live
+  // in the WORKSHOP, so the rack never becomes a wall of padlocks)
   function buildSelectIcons() {
     var wrap = document.getElementById('select-icons');
     wrap.innerHTML = '';
+    var shown = 0;
     GH.mechs.forEach(function (def, i) {
+      var owned = !!GH.meta.data.shells[def.id];
+      if (!owned && def.kind !== 'feat') return;
+      shown++;
       var d = document.createElement('div');
-      d.className = 'mech-icon' + (i === selMechIndex ? ' sel' : '') +
-        (GH.meta.data.shells[def.id] ? '' : ' locked');
+      d.className = 'mech-icon' + (i === selMechIndex ? ' sel' : '') + (owned ? '' : ' locked');
+      var pk = def.pack ? GH.roster.packById(def.pack) : null;
+      if (pk) d.style.borderColor = pk.css;
+      if (def.kind === 'relic') d.style.borderColor = '#ffd050';
       d.textContent = def.icon;
+      d.title = def.name + (owned ? '' : ' — ' + GH.roster.status(def.id).text);
       d.onclick = function () { GH.audio.card(); G.selectMech(i); };
       wrap.appendChild(d);
     });
+    var more = document.createElement('div');
+    more.className = 'mech-icon build-more';
+    more.textContent = '+';
+    more.title = 'Build more frames in the WORKSHOP (' + GH.roster.owned() + '/' + GH.roster.TOTAL + ' owned)';
+    more.onclick = function () { if (G.onOpenWorkshop) G.onOpenWorkshop(); };
+    wrap.appendChild(more);
+    var cnt = document.getElementById('select-count');
+    if (cnt) cnt.textContent = 'FRAMES OWNED ' + GH.roster.owned() + ' / ' + GH.roster.TOTAL + ' — build more in the WORKSHOP';
   }
 
   G.getSelectedMech = function () { return selMechIndex; };
@@ -16570,6 +17557,8 @@ GH.game = (function () {
     boostPressed: false,
     boostHeld: false,
     specialPressed: false,
+    // MMO camera: right-mouse drag deltas (pixels) and wheel zoom
+    lookDX: 0, lookDY: 0, zoomDelta: 0, looking: false,
     p2x: 0, p2y: 0, p2Boost: false,
     p2Special: false, p2SpecialPressed: false,
     wardPressed: 0, wardCycle: false,
@@ -16590,6 +17579,7 @@ GH.game = (function () {
     resize();
     window.addEventListener('resize', resize);
 
+    applySettings();
     bindInput();
     bindUI();
     bindTouch();
@@ -16609,17 +17599,22 @@ GH.game = (function () {
     cam.updateProjectionMatrix();
   }
 
+  // settings that live outside the pilot profile (CRT filter, camera)
+  function applySettings() {
+    var st = GH.controls.settings;
+    document.getElementById('crt-overlay').classList.toggle('off', !st.crt);
+  }
+
   // ----------------------------------------------------------------
-  var KEYMAP = {
-    KeyW: 'w', ArrowUp: 'w',
-    KeyA: 'a', ArrowLeft: 'a',
-    KeyS: 's', ArrowDown: 's',
-    KeyD: 'd', ArrowRight: 'd'
-  };
+  // Keyboard: every key resolves to actions through the binding table
+  // (CONTROLS screen). Movement actions map onto input.keys w/a/s/d/q/e
+  // which the sim and the racers read: w/s walk or throttle, a/d turn or
+  // steer, q/e sidestep.
+  var MOVE_KEYS = { forward: 'w', back: 's', turnLeft: 'a', turnRight: 'd', strafeLeft: 'q', strafeRight: 'e' };
   var P2KEYMAP = { KeyI: 'w', KeyJ: 'a', KeyK: 's', KeyL: 'd' };
 
   // Gamepad routing: with co-op ON the first pad is Player 2; solo, it
-  // drives Player 1 (left stick move, right stick aim, A boost, B special).
+  // drives Player 1 (left stick move, right stick turn, A boost, B special).
   function pollPads() {
     var x = (p2keys.d ? 1 : 0) - (p2keys.a ? 1 : 0);
     var y = (p2keys.s ? 1 : 0) - (p2keys.w ? 1 : 0);
@@ -16670,6 +17665,9 @@ GH.game = (function () {
               input._gpTHeld = true;
             }
           } else input._gpTHeld = false;
+          if (btn(9)) { // start: pause
+            if (!input._gpStart) { input._gpStart = true; onEscape(); }
+          } else input._gpStart = false;
         }
         break;
       }
@@ -16678,60 +17676,74 @@ GH.game = (function () {
     input.p2y = GH.clamp(y, -1, 1);
   }
 
+  var rebindWait = null;   // action id waiting for a key on the CONTROLS screen
+
+  function typingInField(e) {
+    var t = e.target;
+    return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
+  }
+
   function bindInput() {
     window.addEventListener('keydown', function (e) {
       GH.audio.unlock();
       if (!GH.music.mode()) GH.music.play('title');
-      var k = KEYMAP[e.code];
-      if (k) { input.keys[k] = true; e.preventDefault(); }
+      if (e.code === 'Escape') { onEscape(); e.preventDefault(); return; }
+      if (typingInField(e)) return;
+      // the CONTROLS screen is listening for a new key
+      if (rebindWait) {
+        if (GH.controls.rebind(rebindWait, e.code)) GH.audio.card();
+        rebindWait = null;
+        renderControls();
+        e.preventDefault();
+        return;
+      }
+      var acts = GH.controls.actionsFor(e.code);
+      var playing = GH.game.state === 'play';
+      for (var ai = 0; ai < acts.length; ai++) {
+        var a = acts[ai];
+        if (MOVE_KEYS[a]) { input.keys[MOVE_KEYS[a]] = true; e.preventDefault(); continue; }
+        if (a === 'boost') {
+          if (playing) input.boostPressed = true;
+          input.boostHeld = true; // skimmer drift hold
+          e.preventDefault();
+        } else if (a === 'special') {
+          input.special = true;
+          if (playing) input.specialPressed = true;
+        } else if (a.indexOf('ability') === 0 && playing) {
+          if (!input.abilityPressed) input.abilityPressed = {};
+          input.abilityPressed[parseInt(a.slice(7), 10)] = true;
+        } else if (a.indexOf('ward') === 0 && a !== 'wardCycle' && playing) {
+          input.wardPressed = parseInt(a.slice(4), 10);
+        } else if (a === 'wardCycle' && playing) input.wardCycle = true;
+        else if (a === 'interact' && playing) input.interactPressed = true;
+        else if (a === 'transform' && playing) input.transformPressed = true;
+        else if (a === 'item' && playing) input.itemPressed = true;
+        else if (a === 'target' && playing) { GH.game.tabTarget(); e.preventDefault(); }
+        else if (a === 'camera' && (playing || GH.game.state === 'race')) GH.game.toggleCamera();
+        else if (a === 'skills' && (playing || GH.game.state === 'title')) openSkills(playing);
+        else if (a === 'map' && (playing || GH.game.state === 'title')) openWorldMap(playing);
+        else if (a === 'pilot' && (playing || GH.game.state === 'title')) openPilot(playing, 'title');
+        else if (a === 'pause') onEscape();
+        else if (a === 'crt') {
+          GH.controls.settings.crt = !GH.controls.settings.crt;
+          GH.controls.save();
+          applySettings();
+        }
+      }
+      if (e.code === 'Tab') e.preventDefault();
+      // co-op P2 keys (arena modes)
       var pk = P2KEYMAP[e.code];
       if (pk) p2keys[pk] = true;
-      if (e.code === 'KeyO' && GH.game.state === 'play') input.p2Boost = true;
+      if (e.code === 'KeyO' && playing) input.p2Boost = true;
       if (e.code === 'KeyU') {
         p2keys.sp = true;
         input.p2Special = true;
-        if (GH.game.state === 'play') input.p2SpecialPressed = true;
+        if (playing) input.p2SpecialPressed = true;
       }
       // co-op reward votes: P2 picks with J/K/L
       if (GH.game.coop && GH.game.state === 'reward') {
         var vn = { KeyJ: 0, KeyK: 1, KeyL: 2 }[e.code];
         if (vn !== undefined) GH.game.pickRewardIndex(vn);
-      }
-      if (e.code === 'Space' && GH.game.state === 'play') {
-        input.boostPressed = true; e.preventDefault();
-      }
-      if (e.code === 'Space') input.boostHeld = true; // skimmer drift hold
-      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
-        input.special = true;
-        if (GH.game.state === 'play') input.specialPressed = true;
-      }
-      if (GH.game.state === 'play') {
-        // abilities on 1-4, wards (protection stances) on Z/X/C
-        var an = { Digit1: 1, Digit2: 2, Digit3: 3, Digit4: 4 }[e.code];
-        if (an) {
-          if (!input.abilityPressed) input.abilityPressed = {};
-          input.abilityPressed[an] = true;
-        }
-        var wn = { KeyZ: 1, KeyX: 2, KeyC: 3 }[e.code];
-        if (wn) input.wardPressed = wn;
-        if (e.code === 'KeyQ') input.wardCycle = true;
-        if (e.code === 'KeyE') input.interactPressed = true;
-        if (e.code === 'KeyT') input.transformPressed = true;
-        if (e.code === 'KeyG') input.itemPressed = true;
-        if (e.code === 'Tab') { GH.game.tabTarget(); e.preventDefault(); }
-      }
-      if (e.code === 'KeyV' && (GH.game.state === 'play' || GH.game.state === 'race')) GH.game.toggleCamera();
-      if (e.code === 'KeyK' &&
-        (GH.game.state === 'play' || GH.game.state === 'title')) {
-        openSkills(GH.game.state === 'play');
-      }
-      if (e.code === 'KeyM' &&
-        (GH.game.state === 'play' || GH.game.state === 'title')) {
-        openWorldMap(GH.game.state === 'play');
-      }
-      if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
-      if (e.code === 'KeyF') {
-        document.getElementById('crt-overlay').classList.toggle('off');
       }
       if (GH.game.state === 'reward') {
         var n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5 }[e.code];
@@ -16740,28 +17752,39 @@ GH.game = (function () {
       if (e.code === 'Enter') {
         if (GH.game.state === 'title') enterSelect('classic');
         else if (GH.game.state === 'select') openStageSelect();
-        else if (GH.game.state === 'stageselect') launch(chosenStage);
+        else if (GH.game.state === 'stageselect' && curScreen === 'stage-screen') launch(chosenStage);
       }
     });
     window.addEventListener('keyup', function (e) {
-      var k = KEYMAP[e.code];
-      if (k) input.keys[k] = false;
+      var acts = GH.controls.actionsFor(e.code);
+      for (var ai = 0; ai < acts.length; ai++) {
+        var a = acts[ai];
+        if (MOVE_KEYS[a]) input.keys[MOVE_KEYS[a]] = false;
+        else if (a === 'special') input.special = false;
+        else if (a === 'boost') input.boostHeld = false;
+      }
       var pk = P2KEYMAP[e.code];
       if (pk) p2keys[pk] = false;
       if (e.code === 'KeyU') { p2keys.sp = false; input.p2Special = false; }
-      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.special = false;
-      if (e.code === 'Space') input.boostHeld = false;
     });
+
+    // Mouse: LEFT attacks / picks a target, RIGHT (held) drags the camera,
+    // the WHEEL zooms — the MMO scheme
     window.addEventListener('mousemove', function (e) {
       input.mouseNDC.set(
         (e.clientX / window.innerWidth) * 2 - 1,
         -(e.clientY / window.innerHeight) * 2 + 1
       );
+      if (input.looking) {
+        input.lookDX += e.movementX || 0;
+        input.lookDY += e.movementY || 0;
+      }
     });
     window.addEventListener('mousedown', function (e) {
       GH.audio.unlock();
       if (!GH.music.mode()) GH.music.play('title');
-      if (e.button === 0 && GH.game.state === 'play') {
+      var st = GH.game.state;
+      if (e.button === 0 && st === 'play') {
         // left click attacks with the equipped weapon; clicking a
         // hostile also marks it as the target (pick your fight)
         input.mouseNDC.set(
@@ -16771,26 +17794,35 @@ GH.game = (function () {
         input.attackPressed = true;
         input.attackHeld = true;
       }
-      if (e.button === 2 && GH.game.state === 'play') {
-        input.special = true;
-        input.specialPressed = true;
+      if (e.button === 2 && (st === 'play' || st === 'race')) {
+        input.looking = true;
+        document.body.classList.add('looking');
+        e.preventDefault();
       }
     });
     window.addEventListener('mouseup', function (e) {
       if (e.button === 0) input.attackHeld = false;
-      if (e.button === 2) input.special = false;
+      if (e.button === 2) { input.looking = false; input.lookDX = 0; input.lookDY = 0; document.body.classList.remove('looking'); }
     });
+    window.addEventListener('wheel', function (e) {
+      if (GH.game.state === 'play' || GH.game.state === 'race') {
+        input.zoomDelta += e.deltaY > 0 ? 1 : -1;
+        e.preventDefault();
+      }
+    }, { passive: false });
     window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     window.addEventListener('blur', function () {
       input.keys = {};
       input.special = false;
       input.attackHeld = false;
+      input.looking = false;
+      document.body.classList.remove('looking');
       if (GH.game.state === 'play') togglePause();
     });
   }
 
   // ----------------------------------------------------------------
-  // Touch controls: left half = move stick, right half = aim stick,
+  // Touch controls: left half = move stick, right half = turn/aim stick,
   // plus BOOST / SPEC buttons. Shown only on coarse-pointer devices.
   var touchCapable = false;
   function bindTouch() {
@@ -16859,7 +17891,7 @@ GH.game = (function () {
     });
     specBtn.addEventListener('pointerup', function () { input.special = false; });
     specBtn.addEventListener('pointercancel', function () { input.special = false; });
-    // tapping the interact prompt works like pressing E
+    // tapping the interact prompt works like pressing the interact key
     document.getElementById('interact-line').addEventListener('pointerdown', function (e) {
       e.preventDefault();
       if (GH.game.state === 'play') input.interactPressed = true;
@@ -16867,41 +17899,89 @@ GH.game = (function () {
   }
 
   // ----------------------------------------------------------------
+  // Screens. show(id) swaps the visible overlay; every meta screen has a
+  // BACK handler, and ESC always calls the one for the screen on top.
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
     'trials-screen', 'season-screen', 'hub-screen', 'save-screen', 'factions-screen',
-    'reward-screen', 'pause-screen', 'end-screen', 'skills-screen', 'map-screen'];
+    'reward-screen', 'pause-screen', 'end-screen', 'skills-screen', 'map-screen',
+    'workshop-screen', 'pilot-screen', 'controls-screen', 'help-screen'];
+  var curScreen = null;
+  var backHandlers = {};
 
   function show(id) {
+    curScreen = id;
     SCREENS.forEach(function (s) {
       document.getElementById(s).classList.toggle('hidden', s !== id);
     });
+    // the HUD sits behind every menu — hide it so nothing overlaps
+    document.body.classList.toggle('menu-open', !!id && id !== 'reward-screen');
+    if (id !== 'controls-screen') rebindWait = null;
+  }
+
+  // ESC: close what's on top. Pause → resume; a menu → its BACK; play → pause.
+  function onEscape() {
+    var st = GH.game.state;
+    if (confirmOpen) { closeConfirm(); return; }
+    if (rebindWait) { rebindWait = null; renderControls(); return; }
+    if (st === 'reward') return; // a choice has to be made
+    if (curScreen && backHandlers[curScreen]) { GH.audio.card(); backHandlers[curScreen](); return; }
+    if (st === 'pause') { togglePause(); return; }
+    if (st === 'race') { GH.game.abortRace(); return; }
+    if (st === 'play') togglePause();
+  }
+
+  // a small in-page confirm box for destructive choices
+  var confirmOpen = false, confirmYes = null;
+  function confirmBox(title, text, yesLabel, onYes) {
+    confirmOpen = true;
+    confirmYes = onYes;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-text').textContent = text;
+    document.getElementById('btn-confirm-yes').textContent = yesLabel || 'CONFIRM';
+    document.getElementById('confirm-screen').classList.remove('hidden');
+  }
+  function closeConfirm() {
+    confirmOpen = false; confirmYes = null;
+    document.getElementById('confirm-screen').classList.add('hidden');
   }
 
   function refreshTitle() {
     var comp = GH.progress.completion();
     var s = GH.progress.seasonCheck();
+    var m = GH.meta.data.mats || { alloy: 0, cores: 0 };
     document.getElementById('title-salvage').textContent =
-      'SALVAGE: ' + GH.meta.data.salvage + '  ·  SHELLS: ' +
-      Object.keys(GH.meta.data.shells).length + '/' + GH.mechs.length +
-      '  ·  LOG: ' + comp.pct + '%' +
-      '  ·  MASTERY: ' + GH.progress.masteryTotal() +
-      '  ·  SEASON: ' + s.pts + ' PTS';
+      'SALVAGE ' + GH.meta.data.salvage + '  ·  ALLOY ' + m.alloy + '  ·  CORES ' + m.cores +
+      '  ·  FRAMES ' + GH.roster.owned() + '/' + GH.roster.TOTAL +
+      '  ·  LOG ' + comp.pct + '%' +
+      '  ·  PILOT LV ' + GH.skills.pilotProgress().lvl +
+      '  ·  SEASON ' + s.pts + ' PTS';
     var prof = GH.meta.PROFILES[GH.meta.profile];
-    document.getElementById('btn-profile').textContent = 'PILOT: ' + prof.name;
+    document.getElementById('btn-profile').textContent = 'PROFILE: ' + prof.name;
+    document.getElementById('btn-profile').title = prof.desc + ' — click to switch profile';
     // expedition button reflects the persistent world
     var w = GH.meta.data.world;
     var nestsDead = Object.keys(w.nests).length;
     var lairsDown = Object.keys(w.lairsDown).length;
     document.getElementById('btn-expedition').textContent =
-      w.exp ? 'THE SHATTERED REACH — RESUME' :
-      (nestsDead || lairsDown) ? 'THE SHATTERED REACH (' + nestsDead + ' nests · ' + lairsDown + ' lairs)' :
-      'THE SHATTERED REACH';
+      w.exp ? 'CONTINUE THE SHATTERED REACH' : 'THE SHATTERED REACH';
+    document.getElementById('exp-desc').textContent = w.exp
+      ? 'Open world · your pilot is saved at ' + (w.exp.zone ? GH.world.stageFor(w.exp.zone).name : 'camp') +
+        ' · Lv ' + w.exp.level + ' ' + (w.exp.mechId ? GH.mechById(w.exp.mechId).name : '')
+      : 'Open world campaign — explore, race, raid dungeons. Your pilot persists between sessions.' +
+        ((nestsDead || lairsDown) ? ' (' + nestsDead + ' nests broken · ' + lairsDown + ' lairs down)' : '');
+    document.getElementById('btn-new-exp').classList.toggle('hidden', !w.exp);
+    // a parked arena run
+    var cont = document.getElementById('btn-continue');
+    var has = GH.game.hasSuspended();
+    cont.classList.toggle('hidden', !has);
+    if (has) cont.textContent = 'CONTINUE RUN — ' + GH.game.suspendedLabel();
+    document.getElementById('title-foot').textContent = GH.controls.summary();
     var memEl = document.getElementById('title-memorial');
     var mem = GH.meta.memorial();
     if (GH.meta.isHardcore() && mem.length) {
-      memEl.textContent = 'MEMORIAL: ' + mem.slice(0, 3).map(function (m) {
-        return m.frame + ' — ' + m.stage + ' w' + m.wave;
+      memEl.textContent = 'MEMORIAL: ' + mem.slice(0, 3).map(function (mm) {
+        return mm.frame + ' — ' + mm.stage + ' w' + mm.wave;
       }).join('  ·  ');
     } else {
       memEl.textContent = '';
@@ -16925,7 +18005,12 @@ GH.game = (function () {
     document.getElementById('hud').classList.add('hidden');
     document.getElementById('btn-launch').textContent =
       mode === 'expedition' ? 'DEPLOY TO THE REACH' : 'SELECT STAGE';
+    document.getElementById('select-mode').textContent =
+      mode === 'expedition' ? 'THE SHATTERED REACH — pick the frame your pilot will fly' :
+      mode === 'arena' ? 'ARENA — ENDLESS — pick a frame, then a stage' :
+      'CLASSIC — 20 WAVES — pick a frame, then a stage';
     GH.game.onSelectChange = renderSelectExtras;
+    GH.game.onOpenWorkshop = function () { workshopReturn = 'select'; openWorkshop(); };
     GH.game.enterSelect();
     renderP2Row();
     renderSelectExtras();
@@ -17030,6 +18115,8 @@ GH.game = (function () {
       var reward = GH.mechById(st.unlocks);
       var tier = GH.progress.trialTier(st.id);
       var tierBadge = tier ? '<span class="sc-trial">TRIAL ' + ['I', 'II', 'III', 'IV'][tier - 1] + '</span>' : '';
+      var rewardLine = GH.meta.data.shells[st.unlocks] ? ''
+        : (reward.kind === 'feat' ? '<br>— defeat to unlock the frame' : '<br>— defeat for blueprint data + 3 cores');
       div.innerHTML =
         '<div class="sc-band" style="background:linear-gradient(' +
         st.sky[0] + ',' + st.sky[1] + ')"></div>' +
@@ -17037,8 +18124,7 @@ GH.game = (function () {
         '<div class="sc-name">' + st.name + '</div>' +
         '<div class="sc-info">' + (unlocked
           ? (arena ? 'Endless waves.<br>How deep can you go?'
-            : 'Wave 20 boss:<br>CORRUPTED ' + reward.name +
-            (GH.meta.data.shells[st.unlocks] ? '' : '<br>— defeat to unlock the frame'))
+            : 'Wave 20 boss:<br>CORRUPTED ' + reward.name + rewardLine)
           : 'Clear the previous stage<br>to unlock') + '</div>' +
         '<div class="sc-best">' + (won ? '★ CLEARED · ' : '') +
         (best ? 'best wave ' + best : '') + ' ' + tierBadge + '</div>';
@@ -17204,6 +18290,11 @@ GH.game = (function () {
     var comp = GH.progress.completion();
     var b = GH.meta.data.broker;
     var cards = [
+      { id: 'hub-workshop', glyph: '⚒', name: 'FRAME WORKSHOP',
+        sub: GH.roster.owned() + '/' + GH.roster.TOTAL + ' frames · build new frames from alloy + cores',
+        open: function () { workshopReturn = 'hub'; openWorkshop(); } },
+      { id: 'hub-pilot', glyph: '☺', name: 'PILOT SHEET',
+        sub: 'character, inventory, materials', open: function () { openPilot(false, 'hub'); } },
       { id: 'hub-map', glyph: '🗺', name: 'WORLD MAP',
         sub: Object.keys(GH.meta.data.world.dgTier || {}).length + '/24 dungeons ascended',
         open: function () { openWorldMap(false); } },
@@ -17229,7 +18320,11 @@ GH.game = (function () {
       { id: 'hub-save', glyph: '⛃', name: 'SAVE CODE',
         sub: 'back up or restore progress', open: openSave },
       { id: 'hub-factions', glyph: '⚑', name: 'THE HOUSES',
-        sub: factionsSub(), open: openFactions }
+        sub: factionsSub(), open: openFactions },
+      { id: 'hub-controls', glyph: '⌨', name: 'CONTROLS',
+        sub: 'rebind keys · camera · CRT filter', open: function () { pilotReturn = false; openControls(); } },
+      { id: 'hub-help', glyph: '?', name: 'HOW TO PLAY',
+        sub: 'controls, modes, how frames unlock', open: function () { pilotReturn = false; openHelp(); } }
     ];
     var wrap = document.getElementById('hub-cards');
     wrap.innerHTML = '';
@@ -17556,6 +18651,7 @@ GH.game = (function () {
       GH.progress.masteryTotal() + ')</div><div class="log-grid">';
     GH.mechs.forEach(function (m) {
       var lvl = GH.progress.masteryLevel(m.id);
+      if (!lvl && !GH.meta.data.shells[m.id]) return; // 135 exist; only list yours
       html += '<div class="log-cell' + (lvl ? ' seen' : '') + '">' +
         '<div class="lc-glyph">' + m.icon + '</div>' +
         '<div class="lc-name">' + m.name + '</div>' +
@@ -17781,12 +18877,19 @@ GH.game = (function () {
     });
   }
 
+
   // ----------------------------------------------------------------
+  // PAUSE — resume, controls, exit (keeps the run), abandon (deletes it)
   function togglePause() {
     if (GH.game.state === 'race') { GH.game.abortRace(); return; }
     if (GH.game.state === 'play') {
       GH.game.state = 'pause';
       document.getElementById('pause-stats').textContent = GH.game.pauseInfo();
+      var exp = GH.game.isExpedition();
+      document.getElementById('btn-exit-run').textContent = exp ? 'EXIT — SAVE & RETURN TO MENU' : 'EXIT RUN — SAVE & RETURN TO MENU';
+      document.getElementById('pause-exit-note').textContent = exp
+        ? 'Exit keeps your pilot exactly where they stand. Abandon deletes this pilot; the world\'s scars stay.'
+        : 'Exit parks this run at the start of wave ' + Math.max(1, GH.game.debugInfo().wave) + ' — CONTINUE RUN on the title brings you back. Abandon deletes it.';
       show('pause-screen');
     } else if (GH.game.state === 'pause') {
       GH.game.state = 'play';
@@ -17795,7 +18898,7 @@ GH.game = (function () {
   }
 
   function toTitle() {
-    GH.meta.save(); // abandoned runs still keep their tracking
+    GH.meta.save();
     expEntry = null;
     GH.game.state = 'title';
     document.getElementById('hud').classList.add('hidden');
@@ -17803,10 +18906,34 @@ GH.game = (function () {
     show('title-screen');
   }
 
+  // EXIT RUN: save whatever we're flying and go home
+  function exitRun() {
+    GH.game.suspendRun();
+    GH.game.leaveRun();
+    GH.audio.card();
+    toTitle();
+  }
+
+  // ABANDON RUN: delete it, after a confirm
+  function abandonRun(thenSelect) {
+    var exp = GH.game.isExpedition();
+    confirmBox(exp ? 'ABANDON THIS PILOT?' : 'ABANDON THIS RUN?',
+      exp ? 'The saved pilot, their level and their gear are deleted. Nests you broke and lairs you cleared stay cleared.'
+        : 'This run is deleted. Salvage, alloy and cores already banked are kept.',
+      'ABANDON', function () {
+        var mode = GH.game.mode;
+        GH.game.abandonRun();
+        GH.game.leaveRun();
+        GH.audio.hit();
+        if (thenSelect) enterSelect(mode === 'weekly' ? 'classic' : mode);
+        else toTitle();
+      });
+  }
+
   // ----------------------------------------------------------------
   // Expedition camp stations open the meta screens in place; backing
   // out drops you straight back into the world, not the title.
-  var expEntry = null; // which screen the camp station opened
+  var expEntry = null; // which screen the camp station / hotkey opened
 
   function resumeExpedition() {
     expEntry = null;
@@ -17834,26 +18961,345 @@ GH.game = (function () {
     }
   }
 
+  function newExpedition() {
+    if (!GH.meta.data.world.exp) { enterSelect('expedition'); return; }
+    confirmBox('START A NEW EXPEDITION?',
+      'Your saved pilot in the Reach is deleted (level, gear, position). The world\'s scars — broken nests, fallen lairs, ascended dungeons — stay.',
+      'NEW EXPEDITION', function () {
+        GH.meta.data.world.exp = null;
+        GH.meta.data.world.wreck = null;
+        GH.meta.save();
+        enterSelect('expedition');
+      });
+  }
+
+  // ----------------------------------------------------------------
+  // FRAME WORKSHOP — the 135. Browse by lineage, see exactly what a
+  // frame costs or which feat earns it, and build it.
+  var workshopReturn = 'hub';
+  var wsLineage = 'aegis';
+  var wsPick = null;
+
+  function openWorkshop() {
+    GH.audio.card();
+    if (GH.game.state === 'play') expEntry = 'workshop';
+    GH.game.state = 'hangar';
+    renderWorkshop();
+    show('workshop-screen');
+  }
+
+  function matsLine() {
+    var m = GH.meta.data.mats;
+    return '<span class="ws-mat">⬡ ALLOY <b>' + m.alloy + '</b></span> <span class="ws-mat">◈ CORES <b>' + m.cores +
+      '</b></span> <span class="ws-mat">$ SALVAGE <b>' + GH.meta.data.salvage + '</b></span>';
+  }
+
+  function renderWorkshop() {
+    document.getElementById('ws-head').innerHTML =
+      'FRAMES OWNED <b>' + GH.roster.owned() + ' / ' + GH.roster.TOTAL + '</b> · ' + matsLine();
+    // lineage tabs
+    var tabs = document.getElementById('ws-tabs');
+    tabs.innerHTML = '';
+    var lineages = GH.roster.BASE.map(function (b) { return { id: b.id, name: b.name, icon: b.icon }; });
+    lineages.push({ id: 'relic', name: 'RELICS', icon: '★' });
+    lineages.forEach(function (ln) {
+      var owned = 0, total = 0;
+      GH.mechs.forEach(function (m) {
+        if ((m.lineage || m.id) !== ln.id) return;
+        total++; if (GH.meta.data.shells[m.id]) owned++;
+      });
+      var t = document.createElement('div');
+      t.className = 'ws-tab' + (wsLineage === ln.id ? ' on' : '');
+      t.innerHTML = '<span class="ws-tab-icon">' + ln.icon + '</span>' + ln.name + '<span class="ws-tab-n">' + owned + '/' + total + '</span>';
+      t.onclick = function () { wsLineage = ln.id; wsPick = null; GH.audio.card(); renderWorkshop(); };
+      tabs.appendChild(t);
+    });
+    // grid
+    var grid = document.getElementById('ws-grid');
+    grid.innerHTML = '';
+    var first = null;
+    GH.mechs.forEach(function (m) {
+      if ((m.lineage || m.id) !== wsLineage) return;
+      var st = GH.roster.status(m.id);
+      var pk = m.pack ? GH.roster.packById(m.pack) : null;
+      var mk = m.mark ? GH.roster.markById(m.mark) : null;
+      var cell = document.createElement('div');
+      cell.className = 'ws-cell' + (st.owned ? ' owned' : (st.canBuild ? ' ready' : (st.feat ? ' feat' : ' locked'))) +
+        (wsPick === m.id ? ' pick' : '');
+      cell.innerHTML =
+        '<div class="ws-icon"' + (pk ? ' style="color:' + pk.css + '"' : '') + '>' + m.icon + '</div>' +
+        '<div class="ws-name">' + m.name + '</div>' +
+        '<div class="ws-sub">' + (pk ? pk.name + ' · ' + mk.name : (m.kind === 'relic' ? 'RELIC' : m.kind === 'starter' ? 'STARTER' : m.kind === 'feat' ? 'FEAT FRAME' : 'BASE FRAME')) + '</div>' +
+        '<div class="ws-state">' + (st.owned ? '✓ OWNED' : st.canBuild ? '⚒ READY TO BUILD' : st.feat ? '★ FEAT' : st.blockers && st.blockers.length ? '🔒 LOCKED' : '⬡ NEED MATERIALS') + '</div>';
+      cell.onclick = function () { wsPick = m.id; GH.audio.card(); renderWorkshop(); };
+      grid.appendChild(cell);
+      if (!first) first = m.id;
+    });
+    if (!wsPick) wsPick = first;
+    renderWorkshopDetail();
+  }
+
+  function renderWorkshopDetail() {
+    var box = document.getElementById('ws-detail');
+    var m = wsPick ? GH.mechById(wsPick) : null;
+    if (!m) { box.innerHTML = ''; return; }
+    var st = GH.roster.status(m.id);
+    var pk = m.pack ? GH.roster.packById(m.pack) : null;
+    var html = '<div class="ws-d-name">' + m.icon + ' ' + m.name + '</div>' +
+      '<div class="ws-d-role">' + m.role + '</div>' +
+      '<div class="ws-d-desc">' + m.desc + '</div>' +
+      '<div class="ws-d-stats">' + m.baseText.replace(/\n/g, ' · ') + '</div>' +
+      '<div class="ws-d-stats">Primary: <b>' + m.weapon.name + '</b> · ' + m.specialText + '</div>';
+    if (pk) html += '<div class="ws-d-pack" style="color:' + pk.css + '">' + pk.glyph + ' ' + pk.name + ' PACK — ' + pk.desc + '</div>';
+    if (st.owned) {
+      html += '<div class="ws-d-status owned">OWNED — pick it on the frame select screen.</div>';
+    } else if (st.feat) {
+      html += '<div class="ws-d-status feat">FEAT FRAME — ' + GH.roster.FEATS[m.id].desc + '</div>';
+    } else if (st.recipe) {
+      var rc = st.recipe, mats = GH.meta.data.mats;
+      var need = function (have, want, label) {
+        return '<span class="' + (have >= want ? 'ws-ok' : 'ws-short') + '">' + label + ' ' + have + '/' + want + '</span>';
+      };
+      html += '<div class="ws-d-bill">BILL: ' + need(mats.alloy, rc.alloy, '⬡ ALLOY') + ' · ' +
+        need(mats.cores, rc.cores, '◈ CORES') + ' · ' + need(GH.meta.data.salvage, rc.salvage, '$ SALVAGE') + '</div>';
+      if (rc.requires) html += '<div class="ws-d-req' + (GH.meta.data.shells[rc.requires] ? ' ws-ok' : ' ws-short') + '">REQUIRES: ' + GH.mechById(rc.requires).name + (GH.meta.data.shells[rc.requires] ? ' ✓' : ' (build it first)') + '</div>';
+      if (rc.feat) {
+        var fp = GH.roster.featProgress(rc.feat);
+        html += '<div class="ws-d-req' + (fp.done ? ' ws-ok' : ' ws-short') + '">FEAT: ' + rc.feat.desc + ' (' + fp.have + '/' + fp.need + ')' + (fp.done ? ' ✓' : '') + '</div>';
+      }
+      html += '<button class="menu-btn small" id="ws-build" ' + (st.canBuild ? '' : 'disabled') + '>' +
+        (st.canBuild ? '⚒ BUILD ' + m.name : st.blockers.length ? 'LOCKED' : 'NOT ENOUGH MATERIALS') + '</button>';
+    }
+    box.innerHTML = html;
+    var bb = document.getElementById('ws-build');
+    if (bb) bb.onclick = function () {
+      if (GH.roster.build(m.id)) {
+        GH.audio.win();
+        renderWorkshop();
+        if (GH.game.refreshPilot) GH.game.refreshPilot();
+      } else GH.audio.hit();
+    };
+  }
+
+  // ----------------------------------------------------------------
+  // PILOT SHEET — the character screen: who you are, what you carry,
+  // and doors to everything that changes it.
+  function openPilot(fromPlay, from) {
+    GH.audio.card();
+    if (from) pilotFrom = from;
+    if (fromPlay) expEntry = 'pilot';
+    if (GH.game.state !== 'play' || fromPlay) GH.game.state = 'hangar';
+    renderPilot();
+    show('pilot-screen');
+  }
+
+  function renderPilot() {
+    var d = GH.meta.data;
+    var pp = GH.skills.pilotProgress();
+    var prof = GH.meta.PROFILES[GH.meta.profile];
+    var f = GH.factions.state();
+    var art = d.world.equipped ? GH.progress.artifactById(d.world.equipped) : null;
+    var devName = { sol: 'Sol', pyre: 'Pyre', keen: 'Keen', verd: 'Verd', ruin: 'Ruin' }[d.activeDevotion] || '—';
+    var live = GH.game.state === 'hangar' && expEntry === 'pilot' && GH.game.debugInfo().hp > 0
+      ? GH.game.pauseInfo() : null;
+    var frames = [];
+    GH.mechs.forEach(function (m) { if (d.shells[m.id]) frames.push(m); });
+    var html =
+      '<div class="pl-col">' +
+      '<div class="pl-block"><div class="pl-h">PILOT</div>' +
+      '<div class="pl-row">Profile <b>' + prof.name + '</b> — ' + prof.desc + '</div>' +
+      '<div class="pl-row">Pilot level <b>' + pp.lvl + '</b> · ' + Math.floor(pp.into) + '/' + Math.ceil(pp.need) + ' XP to next</div>' +
+      '<div class="pl-row">Skill points ready <b class="' + (d.skillPoints ? 'pl-hot' : '') + '">' + d.skillPoints + '</b> · trained ranks <b>' + GH.skills.spentTotal() + '</b></div>' +
+      '<div class="pl-row">Mastery total <b>' + GH.progress.masteryTotal() + '</b> · runs <b>' + d.collection.totalRuns + '</b> · wins <b>' + d.collection.totalWins + '</b> · kills <b>' + d.collection.totalKills + '</b></div>' +
+      '</div>' +
+      '<div class="pl-block"><div class="pl-h">INVENTORY</div>' +
+      '<div class="pl-row">$ Salvage <b>' + d.salvage + '</b></div>' +
+      '<div class="pl-row">⬡ Alloy <b>' + d.mats.alloy + '</b> · ◈ Frame cores <b>' + d.mats.cores + '</b></div>' +
+      '<div class="pl-row">Artifact equipped <b>' + (art ? art.name : 'none') + '</b> (' + Object.keys(d.world.artifacts).length + '/' + GH.progress.artifacts.length + ' found — equip in COLLECTION LOG)</div>' +
+      '<div class="pl-row">Cosmetics owned <b>' + Object.keys(d.style.owned).length + '</b> — set on the frame select screen</div>' +
+      '<div class="pl-row">Active devotion <b>' + devName + '</b> · broker points <b>' + d.broker.points + '</b></div>' +
+      '<div class="pl-row">House: <b>' + factionsSub() + '</b></div>' +
+      '</div>' +
+      (live ? '<div class="pl-block"><div class="pl-h">CURRENT RUN</div><div class="pl-row pl-pre">' + live + '</div></div>' : '') +
+      '</div>' +
+      '<div class="pl-col">' +
+      '<div class="pl-block"><div class="pl-h">FRAMES OWNED — ' + frames.length + ' / ' + GH.roster.TOTAL + '</div><div class="pl-frames">' +
+      frames.map(function (m) {
+        var pk = m.pack ? GH.roster.packById(m.pack) : null;
+        return '<span class="pl-frame" title="' + m.role + '"' + (pk ? ' style="border-color:' + pk.css + '"' : '') + '>' + m.icon + ' ' + m.name + ' <i>Lv' + GH.progress.masteryLevel(m.id) + '</i></span>';
+      }).join('') + '</div></div>' +
+      '<div class="pl-block"><div class="pl-h">GO TO</div><div class="pl-links">' +
+      '<button class="menu-btn tiny" data-go="skills">PILOT TRAINING</button>' +
+      '<button class="menu-btn tiny" data-go="workshop">FRAME WORKSHOP</button>' +
+      '<button class="menu-btn tiny" data-go="collection">COLLECTION LOG</button>' +
+      '<button class="menu-btn tiny" data-go="hangar">DEVOTIONS</button>' +
+      '<button class="menu-btn tiny" data-go="controls">CONTROLS</button>' +
+      '<button class="menu-btn tiny" data-go="help">HOW TO PLAY</button>' +
+      '</div></div></div>';
+    var body = document.getElementById('pilot-body');
+    body.innerHTML = html;
+    body.querySelectorAll('[data-go]').forEach(function (b) {
+      b.onclick = function () {
+        var g = b.getAttribute('data-go');
+        pilotReturn = true;
+        if (g === 'skills') openSkills(false);
+        else if (g === 'workshop') { workshopReturn = 'pilot'; openWorkshop(); }
+        else if (g === 'collection') openCollection();
+        else if (g === 'hangar') openHangar();
+        else if (g === 'controls') openControls();
+        else if (g === 'help') openHelp();
+      };
+    });
+  }
+  var pilotReturn = false;
+
+  // ----------------------------------------------------------------
+  // CONTROLS — rebind any key, tune the camera
+  function openControls() {
+    GH.audio.card();
+    if (GH.game.state === 'play') expEntry = 'controls';
+    if (GH.game.state !== 'pause') GH.game.state = 'hangar';
+    controlsFromPause = GH.game.state === 'pause';
+    renderControls();
+    show('controls-screen');
+  }
+  var controlsFromPause = false;
+
+  function renderControls() {
+    var C = GH.controls;
+    var list = document.getElementById('controls-list');
+    var html = '';
+    var lastGroup = null;
+    C.ACTIONS.forEach(function (a) {
+      if (a.group !== lastGroup) {
+        lastGroup = a.group;
+        html += '<div class="ct-group">' + a.group + '</div>';
+      }
+      var waiting = rebindWait === a.id;
+      html += '<div class="ct-row"><span class="ct-name">' + a.name + '</span>' +
+        '<span class="ct-key' + (waiting ? ' waiting' : '') + (!C.binds[a.id] ? ' unbound' : '') + '" data-act="' + a.id + '">' +
+        (waiting ? 'PRESS A KEY…' : C.label(a.id)) + '</span></div>';
+    });
+    html += '<div class="ct-group">MOUSE (fixed)</div>' +
+      '<div class="ct-row"><span class="ct-name">Attack / pick target</span><span class="ct-key fixed">LEFT CLICK</span></div>' +
+      '<div class="ct-row"><span class="ct-name">Look around (hold and drag)</span><span class="ct-key fixed">RIGHT MOUSE</span></div>' +
+      '<div class="ct-row"><span class="ct-name">Zoom camera</span><span class="ct-key fixed">WHEEL</span></div>' +
+      '<div class="ct-row"><span class="ct-name">Pause / close menu</span><span class="ct-key fixed">ESC</span></div>';
+    list.innerHTML = html;
+    list.querySelectorAll('.ct-key[data-act]').forEach(function (k) {
+      k.onclick = function () {
+        rebindWait = k.getAttribute('data-act');
+        GH.audio.card();
+        renderControls();
+      };
+    });
+    // settings
+    var st = C.settings;
+    document.getElementById('set-sens').value = Math.round(st.sens * 100);
+    document.getElementById('set-sens-val').textContent = Math.round(st.sens * 100) + '%';
+    document.getElementById('set-invert').checked = !!st.invertY;
+    document.getElementById('set-crt').checked = !!st.crt;
+    document.getElementById('set-cam').value = GH.game.camMode();
+    document.getElementById('set-mute').checked = GH.audio.isMuted();
+  }
+
+  // ----------------------------------------------------------------
+  // HELP — how to play, where everything is, how frames are earned
+  function openHelp() {
+    GH.audio.card();
+    if (GH.game.state === 'play') expEntry = 'help';
+    if (GH.game.state !== 'pause') GH.game.state = 'hangar';
+    renderHelp();
+    show('help-screen');
+  }
+
+  function renderHelp() {
+    var L = GH.controls.label;
+    var feats = Object.keys(GH.roster.FEATS).map(function (id) {
+      var own = GH.meta.data.shells[id];
+      return '<li>' + (own ? '☑ ' : '☐ ') + '<b>' + GH.mechById(id).name + '</b> — ' + GH.roster.FEATS[id].desc + '</li>';
+    }).join('');
+    var relics = GH.roster.relics.map(function (m) {
+      var rc = GH.roster.recipes[m.id];
+      var fp = GH.roster.featProgress(rc.feat);
+      return '<li>' + (GH.meta.data.shells[m.id] ? '☑ ' : (fp.done ? '☑ ' : '☐ ')) + '<b>' + m.name + '</b> — ' + rc.feat.desc + ' (' + fp.have + '/' + fp.need + ')</li>';
+    }).join('');
+    document.getElementById('help-body').innerHTML =
+      '<div class="hp-col">' +
+      '<div class="hp-h">CONTROLS</div>' +
+      '<ul><li><b>' + L('forward') + ' / ' + L('back') + '</b> walk forward / back · <b>' + L('turnLeft') + ' / ' + L('turnRight') + '</b> turn · <b>' + L('strafeLeft') + ' / ' + L('strafeRight') + '</b> strafe</li>' +
+      '<li><b>Hold RIGHT MOUSE</b> and drag to look around; <b>WHEEL</b> zooms. <b>' + L('camera') + '</b> switches to the tactical top-down camera (mouse aims there).</li>' +
+      '<li><b>LEFT CLICK</b> attacks and marks the hostile under the cursor as your target. <b>' + L('target') + '</b> cycles targets.</li>' +
+      '<li><b>' + L('ability1') + '–' + L('ability4') + '</b> cast abilities (spend ENERGY). <b>' + L('ward1') + ' ' + L('ward2') + ' ' + L('ward3') + '</b> raise a ward matching the incoming damage.</li>' +
+      '<li><b>' + L('boost') + '</b> dashes (hold to drift in skimmer form). <b>' + L('special') + '</b> fires your frame\'s special, or nitro when driving.</li>' +
+      '<li><b>' + L('transform') + '</b> folds into the skimmer: ' + L('forward') + ' throttle, ' + L('back') + ' brake, ' + L('turnLeft') + '/' + L('turnRight') + ' steer.</li>' +
+      '<li><b>' + L('interact') + '</b> uses gates, chests, camp stations. <b>ESC</b> pauses or closes any menu. Rebind everything under CONTROLS.</li></ul>' +
+      '<div class="hp-h">GAME MODES</div>' +
+      '<ul><li><b>THE SHATTERED REACH</b> — the open world. Your pilot, level and gear are saved automatically; EXIT keeps them, ABANDON deletes them.</li>' +
+      '<li><b>CLASSIC</b> — 20 waves on one stage; the wave-20 boss unlocks the next stage and pays a frame or blueprint data.</li>' +
+      '<li><b>ARENA</b> — endless waves. <b>WEEKLY</b> — a fixed frame and modifiers shared by everyone that week.</li>' +
+      '<li>EXIT RUN from the pause menu parks a CLASSIC/ARENA run; CONTINUE RUN on the title resumes it at that wave.</li></ul>' +
+      '<div class="hp-h">WHERE THINGS ARE</div>' +
+      '<ul><li><b>HANGAR</b> — every progression screen: FRAME WORKSHOP (build frames), PILOT TRAINING (skill tree), DEVOTIONS, BROKER, COLLECTION LOG (artifacts), TRIALS, SEASON, HOUSES, SAVE CODE.</li>' +
+      '<li><b>PILOT</b> — your character sheet and inventory: materials, artifact, cosmetics, frames owned.</li>' +
+      '<li>In the Reach, the camp stations (console, shrine, memorial, broker) open the same screens without leaving the world.</li></ul>' +
+      '</div><div class="hp-col">' +
+      '<div class="hp-h">UNLOCKING FRAMES (' + GH.roster.owned() + ' / ' + GH.roster.TOTAL + ')</div>' +
+      '<ul><li><b>Starters</b>: AEGIS and VULCAN are yours from the first sortie.</li>' +
+      '<li><b>Feat frames</b> (earned, never bought):<ul>' + feats + '</ul></li>' +
+      '<li><b>Built frames</b>: the other ' + (GH.roster.TOTAL - 6) + ' are assembled in the FRAME WORKSHOP from ⬡ ALLOY, ◈ FRAME CORES and $ SALVAGE. Each lineage has five packs (AILE, SWORD, LAUNCHER, STORM, PHANTOM) in three marks — build MK.II before CUSTOM before PROTOTYPE.</li>' +
+      '<li><b>Relic frames</b> need a feat first:<ul>' + relics + '</ul></li></ul>' +
+      '<div class="hp-h">MATERIALS</div><ul>' +
+      GH.roster.SOURCES.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul>' +
+      '<div class="hp-h">TIPS</div>' +
+      '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run CLASSIC to wave 20 for cores.</li>' +
+      '<li>Sparks feed your persistent PILOT LEVEL — every level is a skill point for PILOT TRAINING.</li>' +
+      '<li>Wards cut matched damage by 75%. Watch the colour of what is hitting you.</li>' +
+      '<li>Your save lives in this browser. HANGAR → SAVE CODE exports it; paste it on another machine to restore.</li></ul>' +
+      '</div>';
+  }
+
   function bindUI() {
+    var byId = function (id) { return document.getElementById(id); };
+    // back buttons: the click AND the ESC key share one handler per screen
+    var back = function (screen, btnId, fn) {
+      backHandlers[screen] = fn;
+      if (btnId && byId(btnId)) byId(btnId).onclick = function () { GH.audio.card(); fn(); };
+    };
+
     GH.game.onInteract = function (kind) {
       if (kind === 'broker') { expEntry = 'broker'; openBroker(); }
       else if (kind === 'shrine') { expEntry = 'hangar'; openHangar(); }
       else if (kind === 'memorial') { expEntry = 'collection'; openCollection(); }
       else { expEntry = 'hub'; openHub(); }
     };
-    document.getElementById('btn-expedition').onclick = startOrResumeExpedition;
-    document.getElementById('btn-start').onclick = function () { enterSelect('classic'); };
-    document.getElementById('btn-arena').onclick = function () { enterSelect('arena'); };
-    document.getElementById('btn-weekly').onclick = openWeekly;
-    document.getElementById('btn-hub').onclick = openHub;
-    document.getElementById('btn-hub-back').onclick = metaBack('hub', toTitle);
-    document.getElementById('btn-profile').onclick = cycleProfile;
-    // meta screens live under the hub now (or under a camp station)
-    document.getElementById('btn-season-back').onclick = openHub;
-    document.getElementById('btn-map-back').onclick = metaBack('map', openHub);
-    document.getElementById('btn-fac-back').onclick = metaBack('factions', openHub);
-    document.getElementById('btn-skills-back').onclick = metaBack('skills', openHub);
-    document.getElementById('btn-respec').onclick = function () {
+    byId('btn-expedition').onclick = startOrResumeExpedition;
+    byId('btn-new-exp').onclick = newExpedition;
+    byId('btn-continue').onclick = function () {
+      GH.audio.wave();
+      show(null);
+      lastLaunch = null;
+      if (!GH.game.resumeRun()) toTitle();
+    };
+    byId('btn-start').onclick = function () { enterSelect('classic'); };
+    byId('btn-arena').onclick = function () { enterSelect('arena'); };
+    byId('btn-weekly').onclick = openWeekly;
+    byId('btn-hub').onclick = openHub;
+    byId('btn-title-pilot').onclick = function () { openPilot(false, 'title'); };
+    byId('btn-title-controls').onclick = openControls;
+    byId('btn-title-help').onclick = openHelp;
+    byId('btn-profile').onclick = cycleProfile;
+
+    back('hub-screen', 'btn-hub-back', metaBack('hub', toTitle));
+    back('season-screen', 'btn-season-back', openHub);
+    back('map-screen', 'btn-map-back', metaBack('map', openHub));
+    back('factions-screen', 'btn-fac-back', metaBack('factions', openHub));
+    back('skills-screen', 'btn-skills-back', function () {
+      if (expEntry === 'skills') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else openHub();
+    });
+    byId('btn-respec').onclick = function () {
       if (GH.skills.respec()) {
         GH.audio.win();
         renderSkills();
@@ -17861,13 +19307,65 @@ GH.game = (function () {
         GH.audio.hit();
       }
     };
-    document.getElementById('btn-broker-back').onclick = metaBack('broker', openHub);
-    document.getElementById('btn-collection-back').onclick = metaBack('collection', openHub);
-    document.getElementById('btn-trials-back').onclick = openHub;
-    document.getElementById('btn-hangar-back').onclick = metaBack('hangar', openHub);
-    document.getElementById('btn-save-back').onclick = openHub;
-    document.getElementById('btn-save-copy').onclick = function () {
-      var ta = document.getElementById('save-export');
+    back('broker-screen', 'btn-broker-back', metaBack('broker', openHub));
+    back('collection-screen', 'btn-collection-back', function () {
+      if (expEntry === 'collection') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else openHub();
+    });
+    back('trials-screen', 'btn-trials-back', openHub);
+    back('hangar-screen', 'btn-hangar-back', function () {
+      if (expEntry === 'hangar') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else openHub();
+    });
+    back('save-screen', 'btn-save-back', openHub);
+    back('workshop-screen', 'btn-ws-back', function () {
+      if (expEntry === 'workshop') resumeExpedition();
+      else if (workshopReturn === 'select') { workshopReturn = 'hub'; enterSelect(GH.game.mode); }
+      else if (workshopReturn === 'pilot') { workshopReturn = 'hub'; openPilot(false); }
+      else openHub();
+    });
+    back('pilot-screen', 'btn-pilot-back', function () {
+      if (expEntry === 'pilot') resumeExpedition();
+      else if (pilotFrom === 'hub') openHub();
+      else toTitle();
+    });
+    back('controls-screen', 'btn-controls-back', function () {
+      rebindWait = null;
+      if (controlsFromPause) { controlsFromPause = false; show('pause-screen'); return; }
+      if (expEntry === 'controls') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else toTitle();
+    });
+    back('help-screen', 'btn-help-back', function () {
+      if (GH.game.state === 'pause') { show('pause-screen'); return; }
+      if (expEntry === 'help') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else toTitle();
+    });
+    byId('btn-controls-reset').onclick = function () {
+      GH.controls.reset();
+      applySettings();
+      GH.audio.card();
+      renderControls();
+    };
+    byId('set-sens').oninput = function () {
+      GH.controls.settings.sens = parseInt(this.value, 10) / 100;
+      byId('set-sens-val').textContent = this.value + '%';
+      GH.controls.save();
+    };
+    byId('set-invert').onchange = function () { GH.controls.settings.invertY = this.checked; GH.controls.save(); };
+    byId('set-crt').onchange = function () { GH.controls.settings.crt = this.checked; GH.controls.save(); applySettings(); };
+    byId('set-cam').onchange = function () { GH.game.setCamMode(this.value); };
+    byId('set-mute').onchange = function () {
+      GH.audio.unlock();
+      GH.audio.setMuted(this.checked);
+      byId('mute-btn').classList.toggle('off', this.checked);
+    };
+
+    byId('btn-save-copy').onclick = function () {
+      var ta = byId('save-export');
       ta.select();
       var ok = false;
       try {
@@ -17878,53 +19376,67 @@ GH.game = (function () {
           ok = document.execCommand('copy');
         }
       } catch (e) { /* fall through */ }
-      document.getElementById('save-feedback').textContent =
+      byId('save-feedback').textContent =
         ok ? 'Copied — keep it somewhere safe.' : 'Select the code and copy it manually.';
       GH.audio.card();
     };
-    document.getElementById('btn-save-import').onclick = function () {
-      var res = GH.meta.importCode(document.getElementById('save-import').value);
-      var fb = document.getElementById('save-feedback');
+    byId('btn-save-import').onclick = function () {
+      var res = GH.meta.importCode(byId('save-import').value);
+      var fb = byId('save-feedback');
       if (res.ok) {
         fb.textContent = 'Restored ' + res.profiles + ' profile(s) from ' + (res.saved || 'save') + '.';
         GH.audio.win();
         refreshTitle();
-        document.getElementById('save-export').value = GH.meta.exportCode();
+        byId('save-export').value = GH.meta.exportCode();
       } else {
         fb.textContent = res.error;
         GH.audio.hit();
       }
     };
-    document.getElementById('btn-weekly-back').onclick = toTitle;
-    document.getElementById('btn-preset-back').onclick = function () {
+    back('weekly-screen', 'btn-weekly-back', toTitle);
+    back('preset-screen', 'btn-preset-back', function () {
       GH.game.state = 'stageselect';
       renderStageList();
       show('stage-screen');
-    };
-    document.getElementById('btn-coop').onclick = function () {
+    });
+    byId('btn-coop').onclick = function () {
       GH.game.coop = !GH.game.coop;
       GH.audio.card();
-      document.getElementById('btn-coop').textContent =
+      byId('btn-coop').textContent =
         'CO-OP P2: ' + (GH.game.coop ? 'ON (IJKL + O boost + U special)' : 'OFF');
       renderP2Row();
     };
-    document.getElementById('btn-launch').onclick = openStageSelect;
-    document.getElementById('btn-select-back').onclick = toTitle;
-    document.getElementById('btn-stage-back').onclick = function () { enterSelect(GH.game.mode); };
-    document.getElementById('btn-resume').onclick = togglePause;
-    document.getElementById('btn-quit').onclick = toTitle;
-    document.getElementById('btn-retry').onclick = function () {
+    byId('btn-launch').onclick = openStageSelect;
+    byId('btn-select-workshop').onclick = function () { workshopReturn = 'select'; openWorkshop(); };
+    back('select-screen', 'btn-select-back', toTitle);
+    back('stage-screen', 'btn-stage-back', function () { enterSelect(GH.game.mode); });
+
+    // pause menu
+    byId('btn-resume').onclick = togglePause;
+    byId('btn-pause-controls').onclick = openControls;
+    byId('btn-pause-help').onclick = openHelp;
+    byId('btn-exit-run').onclick = exitRun;
+    byId('btn-new-run').onclick = function () { abandonRun(true); };
+    byId('btn-quit').onclick = function () { abandonRun(false); };
+    backHandlers['pause-screen'] = togglePause;
+
+    // confirm box
+    byId('btn-confirm-yes').onclick = function () { var fn = confirmYes; closeConfirm(); if (fn) fn(); };
+    byId('btn-confirm-no').onclick = closeConfirm;
+
+    byId('btn-retry').onclick = function () {
       if (lastLaunch) lastLaunch();
       else { show(null); launch(chosenStage); }
     };
-    document.getElementById('btn-menu').onclick = toTitle;
-    var muteBtn = document.getElementById('mute-btn');
+    byId('btn-menu').onclick = toTitle;
+    var muteBtn = byId('mute-btn');
     muteBtn.onclick = function () {
       GH.audio.unlock();
       GH.audio.setMuted(!GH.audio.isMuted());
       muteBtn.classList.toggle('off', GH.audio.isMuted());
     };
   }
+  var pilotFrom = 'title';
 
   // ----------------------------------------------------------------
   var last = 0;

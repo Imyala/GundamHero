@@ -999,3 +999,177 @@ html, body {
 #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(240, 240, 255, .7); }
 #crosshair::before { left: 50%; top: -6px; width: 1px; height: 6px; }
 #crosshair::after { left: -6px; top: 50%; width: 6px; height: 1px; }
+
+/* ---------------- screen headers (BACK never overlaps content) ---------------- */
+
+.screen { padding-top: 68px; }
+#title-screen { padding-top: 0; }
+.screen-head {
+  position: absolute; top: 0; left: 0; right: 0; height: 58px;
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 16px;
+  background: linear-gradient(rgba(6, 10, 30, 0.97), rgba(4, 6, 20, 0.97));
+  border-bottom: 2px solid #c8b060;
+  box-shadow: 0 2px 0 #000, 0 4px 14px rgba(0,0,0,0.6);
+  z-index: 12;
+}
+.screen-head .select-title {
+  font-size: clamp(18px, 2.6vw, 28px); letter-spacing: 6px; margin: 0;
+  flex: 1; text-align: center;
+}
+.screen-head .back-btn { position: static; }
+.esc-hint { font-size: 11px; color: #8090c0; letter-spacing: 1px; min-width: 70px; text-align: right; }
+.screen-sub { font-size: 12px; color: #9ab0e0; letter-spacing: 1px; text-align: center; z-index: 1; }
+/* the HUD sits behind menus; hide it so nothing overlaps */
+body.menu-open #hud, body.menu-open #crosshair, body.menu-open #minimap, body.menu-open #hotbar { visibility: hidden !important; }
+body.looking { cursor: none; }
+body.looking #crosshair { opacity: 0.4; }
+
+/* ---------------- title menu ---------------- */
+
+.title-menu { display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 1; }
+.menu-desc { font-size: 11px; color: #8898c8; text-align: center; max-width: 560px; line-height: 1.4; z-index: 1; }
+.title-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.title-choice .menu-desc { max-width: 170px; }
+.continue-btn { border-color: #60e890; color: #c8ffe0; }
+.danger-btn { border-color: #c04040; color: #ffc0c0; }
+.danger-btn:hover { background: linear-gradient(#7a2a2a, #481010); }
+
+/* ---------------- frame select rack ---------------- */
+
+#select-rack {
+  position: absolute; bottom: 7vh; left: 4%; width: min(60%, 760px);
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+}
+.rack-label { font-size: 11px; color: #9ab0e0; letter-spacing: 1px; }
+#select-icons { position: static; display: flex; flex-wrap: wrap; gap: 6px; max-height: 22vh; overflow-y: auto; padding: 2px; }
+.mech-icon.build-more { border-style: dashed; color: #ffd050; font-size: 30px; filter: none; }
+.mech-icon.build-more:hover { background: #2a2410; }
+
+/* ---------------- pause ---------------- */
+
+#pause-screen .menu-desc { max-width: 520px; }
+
+/* ---------------- frame workshop ---------------- */
+
+#workshop-screen { justify-content: flex-start; gap: 10px; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
+#ws-head { font-family: "Times New Roman", serif; font-size: 14px; color: #c8c8d8; letter-spacing: 1px; }
+#ws-head b { color: #f0d888; }
+.ws-mat { margin-left: 10px; }
+#ws-tabs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 1100px; }
+.ws-tab {
+  padding: 5px 10px; border: 1px solid #3a4456; background: rgba(10, 14, 30, 0.9);
+  font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px; letter-spacing: 1px;
+  color: #c0c8e0; cursor: pointer; display: flex; align-items: center; gap: 6px;
+}
+.ws-tab.on { border-color: #f0d060; color: #fff; background: #1a2450; }
+.ws-tab-n { font-size: 10px; color: #8898c8; font-weight: normal; }
+#ws-body { display: flex; gap: 14px; width: min(96vw, 1180px); flex: 1; min-height: 0; }
+#ws-grid {
+  flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px; overflow-y: auto; padding: 4px; align-content: start; max-height: calc(100vh - 230px);
+}
+.ws-cell {
+  background: rgba(10, 14, 30, 0.9); border: 1px solid #3a4456; padding: 8px; cursor: pointer;
+  text-align: center;
+}
+.ws-cell.owned { border-color: #60c890; }
+.ws-cell.ready { border-color: #ffd050; box-shadow: 0 0 8px rgba(255, 208, 80, 0.35); }
+.ws-cell.feat { border-color: #c090ff; }
+.ws-cell.locked { opacity: 0.6; }
+.ws-cell.pick { background: #1a2450; border-width: 2px; }
+.ws-icon { font-size: 26px; }
+.ws-name { font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px; color: #f0f0f6; letter-spacing: 1px; }
+.ws-sub { font-size: 10px; color: #8898c8; margin-top: 2px; }
+.ws-state { font-size: 10px; color: #c0c8e0; margin-top: 4px; letter-spacing: 1px; }
+.ws-cell.owned .ws-state { color: #60c890; }
+.ws-cell.ready .ws-state { color: #ffd050; }
+#ws-detail {
+  width: 320px; background: rgba(2, 4, 12, 0.9); border: 2px solid #d8d8d8; box-shadow: 0 0 0 2px #000;
+  padding: 12px 14px; font-size: 12px; line-height: 1.45; overflow-y: auto; max-height: calc(100vh - 230px);
+}
+.ws-d-name { font-family: "Times New Roman", serif; font-weight: bold; font-size: 18px; color: #fff; letter-spacing: 2px; }
+.ws-d-role { font-size: 11px; color: #90a8d0; letter-spacing: 2px; margin-bottom: 8px; }
+.ws-d-desc { color: #c8c8c8; margin-bottom: 8px; }
+.ws-d-stats { color: #b8c8b8; margin-bottom: 6px; }
+.ws-d-stats b { color: #f0e0a0; }
+.ws-d-pack { margin-bottom: 8px; }
+.ws-d-bill, .ws-d-req { margin: 6px 0; font-weight: bold; }
+.ws-ok { color: #60c890; }
+.ws-short { color: #ff8080; }
+.ws-d-status { margin-top: 8px; font-weight: bold; }
+.ws-d-status.owned { color: #60c890; }
+.ws-d-status.feat { color: #c090ff; }
+#ws-build { margin-top: 10px; width: 100%; }
+#ws-build:disabled { opacity: 0.45; cursor: default; }
+@media (max-width: 800px) { #ws-body { flex-direction: column; } #ws-detail { width: 100%; max-height: 40vh; } }
+
+/* ---------------- pilot sheet ---------------- */
+
+#pilot-screen { justify-content: flex-start; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
+#pilot-body { display: flex; gap: 16px; width: min(96vw, 1100px); flex-wrap: wrap; overflow-y: auto; max-height: calc(100vh - 90px); }
+.pl-col { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 12px; }
+.pl-block { background: rgba(2, 4, 12, 0.9); border: 2px solid #8090b8; box-shadow: 0 0 0 2px #000; padding: 10px 14px; font-size: 12px; line-height: 1.6; }
+.pl-h { font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px; letter-spacing: 2px; color: #f0d888; margin-bottom: 4px; }
+.pl-row b { color: #fff; }
+.pl-hot { color: #ffd050 !important; }
+.pl-pre { white-space: pre-line; }
+.pl-frames { display: flex; flex-wrap: wrap; gap: 4px; max-height: 32vh; overflow-y: auto; }
+.pl-frame { border: 1px solid #3a4456; padding: 2px 6px; font-size: 11px; color: #d0d8f0; }
+.pl-frame i { color: #8898c8; font-style: normal; }
+.pl-links { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------------- controls ---------------- */
+
+#controls-screen { justify-content: flex-start; gap: 10px; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
+#controls-body { display: flex; gap: 18px; width: min(96vw, 1000px); flex: 1; min-height: 0; }
+#controls-list { flex: 1; overflow-y: auto; max-height: calc(100vh - 150px); padding-right: 6px; }
+#controls-settings { width: 300px; font-size: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ct-group { font-family: "Times New Roman", serif; font-weight: bold; letter-spacing: 2px; color: #f0d888; margin: 10px 0 4px; font-size: 14px; }
+.ct-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid #1c2236; font-size: 12px; }
+.ct-name { color: #d0d8f0; }
+.ct-key {
+  min-width: 96px; text-align: center; padding: 3px 8px; border: 1px solid #8090b8; background: #0a0e20;
+  font-family: "Times New Roman", serif; font-weight: bold; color: #f0e0b0; cursor: pointer; letter-spacing: 1px;
+}
+.ct-key:hover { border-color: #f0d060; color: #fff; }
+.ct-key.waiting { border-color: #ffd050; color: #ffd050; animation: ct-blink 0.8s infinite; }
+.ct-key.unbound { color: #ff8080; }
+.ct-key.fixed { cursor: default; opacity: 0.7; }
+@keyframes ct-blink { 50% { opacity: 0.4; } }
+.ct-set { display: flex; align-items: center; gap: 8px; color: #d0d8f0; cursor: pointer; }
+.ct-set input[type=range] { flex: 1; }
+.ct-set select { background: #0a0e20; color: #f0e0b0; border: 1px solid #8090b8; font-family: inherit; }
+.ct-note { font-size: 11px; color: #8898c8; line-height: 1.5; }
+@media (max-width: 760px) { #controls-body { flex-direction: column; } #controls-settings { width: 100%; } }
+
+/* ---------------- help ---------------- */
+
+#help-screen { justify-content: flex-start; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
+#help-body { display: flex; gap: 20px; width: min(96vw, 1100px); overflow-y: auto; max-height: calc(100vh - 90px); font-size: 12px; line-height: 1.55; color: #c8d0e8; flex-wrap: wrap; }
+.hp-col { flex: 1; min-width: 300px; }
+.hp-h { font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px; letter-spacing: 2px; color: #f0d888; margin: 10px 0 4px; }
+#help-body ul { padding-left: 18px; margin: 0 0 6px; }
+#help-body ul ul { margin-top: 2px; }
+#help-body b { color: #fff; }
+
+/* ---------------- confirm ---------------- */
+
+#confirm-screen { background: rgba(2, 3, 10, 0.7); z-index: 40; padding-top: 0; }
+#confirm-box {
+  background: rgba(6, 10, 30, 0.98); border: 2px solid #c8b060; box-shadow: 0 0 0 2px #000, 0 0 30px #000;
+  padding: 22px 28px; max-width: 520px; text-align: center; display: flex; flex-direction: column; gap: 14px; align-items: center;
+}
+#confirm-title { font-size: clamp(22px, 3vw, 32px); letter-spacing: 4px; }
+#confirm-text { font-size: 13px; color: #c0c8e0; line-height: 1.5; }
+#select-screen { padding-top: 70px; }
+#select-mode { margin-top: 2px; }
+
+/* legibility: every meta screen sits on a dark backdrop, even over a live world */
+#skills-screen, #map-screen, #hub-screen, #hangar-screen, #broker-screen, #collection-screen,
+#trials-screen, #season-screen, #factions-screen, #save-screen, #weekly-screen, #stage-screen, #preset-screen {
+  background: radial-gradient(ellipse at center, rgba(6, 10, 40, 0.94), rgba(0, 0, 4, 0.97));
+}
+#select-panel { top: 11%; max-height: 50vh; overflow-y: auto; }
+#select-rack { bottom: 3vh; }
+.coop-btn { top: 68px !important; }

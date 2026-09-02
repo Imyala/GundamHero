@@ -15,6 +15,12 @@ GH.meta = (function () {
     return {
       salvage: 0,
       shells: { aegis: true, vulcan: true },
+      // frame workshop materials: ALLOY (common) and FRAME CORES (bosses)
+      mats: { alloy: 0, cores: 0 },
+      // one-off feats (relic prerequisites): harrow, ...
+      feats: {},
+      // a CLASSIC / ARENA / WEEKLY run left mid-way with EXIT RUN
+      suspended: null,
       stages: 1,
       devotion: { sol: 0, pyre: 0, keen: 0, verd: 0, ruin: 0 },
       activeDevotion: 'sol',
@@ -232,6 +238,10 @@ GH.meta = (function () {
       if (p.get('unlock') === 'all') {
         GH.mechs.forEach(function (m) { M.data.shells[m.id] = true; });
         M.data.stages = 6;
+      }
+      if (p.get('mats')) {
+        var mv = parseInt(p.get('mats'), 10) || 0;
+        M.data.mats.alloy += mv; M.data.mats.cores += Math.round(mv / 20);
       }
       if (p.get('salvage')) M.data.salvage += parseInt(p.get('salvage'), 10) || 0;
       if (p.get('weakboss') === '1') GH.devWeakBoss = true;

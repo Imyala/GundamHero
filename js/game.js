@@ -54,22 +54,23 @@ GH.game = (function () {
       }
     }
     var seen = GH.meta.data.seenHints;
+    var L = GH.controls.label;
     if (expActive && runTime > 12) {
-      showHint('transform', 'Press T to TRANSFORM — the skimmer is fast and mounts strafe cannons, but its hull is thin');
+      showHint('transform', 'Press ' + L('transform') + ' to TRANSFORM — the skimmer is fast and mounts strafe cannons, but its hull is thin');
     }
     if (seen.__done) return;
     if (waveNum === 1) {
-      if (runTime > 0.5) showHint('move', 'WASD to move · LEFT CLICK to attack (hold to keep attacking) — clicking a hostile marks it as your target');
-      if (runTime > 8) showHint('ability', 'Press 1 to cast RUPTURE on your target — abilities spend the blue ENERGY bar');
-      if (sparksRun > 0) showHint('sparks', 'SPARKS feed your level AND your persistent PILOT LEVEL — skill points are spent in the tree [K]');
+      if (runTime > 0.5) showHint('move', L('forward') + '/' + L('back') + ' walk · ' + L('turnLeft') + '/' + L('turnRight') + ' turn · hold RIGHT MOUSE to look around · LEFT CLICK attacks and marks a target');
+      if (runTime > 8) showHint('ability', 'Press ' + L('ability1') + ' to cast RUPTURE on your target — abilities spend the blue ENERGY bar');
+      if (sparksRun > 0) showHint('sparks', 'SPARKS feed your level AND your persistent PILOT LEVEL — skill points are spent in PILOT TRAINING [' + L('skills') + ']');
     }
     if (waveNum === 2) {
       if (waveTimer < wavePlan.duration - 2) {
-        showHint('wards', 'Press Z / X / C to raise a WARD — match it to the incoming damage to cut it 75%');
+        showHint('wards', 'Press ' + L('ward1') + ' / ' + L('ward2') + ' / ' + L('ward3') + ' to raise a WARD — match it to the incoming damage to cut it 75%');
       }
     }
     if (waveNum === 3) {
-      showHint('special', 'SHIFT or right-click fires your frame’s SPECIAL');
+      showHint('special', L('special') + ' fires your frame’s SPECIAL · ALLOY and FRAME CORES you pick up build new frames in the HANGAR WORKSHOP');
       if (seen.special) { seen.__done = true; GH.meta.save(); }
     }
   }
@@ -111,13 +112,21 @@ GH.game = (function () {
   var camMode = 'chase';
   try { camMode = localStorage.getItem('hf_cam') || 'chase'; } catch (e) { /* no storage */ }
   var camYaw = Math.PI;
+  var camPitch = 0;      // right-mouse drag tilts the chase camera
+  var camDist = 1;       // wheel zoom (0.55 .. 1.9)
   var camPrevX = 0, camPrevZ = 0;
   G.camMode = function () { return camMode; };
-  G.toggleCamera = function () {
-    camMode = camMode === 'chase' ? 'top' : 'chase';
+  G.setCamMode = function (m) {
+    camMode = m === 'top' ? 'top' : 'chase';
     try { localStorage.setItem('hf_cam', camMode); } catch (e) { /* no storage */ }
     if (player) camYaw = player.speederOn && player.drive ? player.drive.heading : (player.facing || Math.PI);
-    announce(camMode === 'chase' ? 'CHASE CAMERA — MOUSE TURNS, WASD FOLLOWS THE VIEW' : 'TACTICAL CAMERA', 20);
+  };
+  G.toggleCamera = function () {
+    G.setCamMode(camMode === 'chase' ? 'top' : 'chase');
+    var L = GH.controls.label;
+    announce(camMode === 'chase'
+      ? 'CHASE CAMERA — ' + L('turnLeft') + '/' + L('turnRight') + ' TURN · RIGHT-MOUSE LOOKS'
+      : 'TACTICAL CAMERA — MOUSE AIMS, ' + L('forward') + L('turnLeft') + L('back') + L('turnRight') + ' MOVES', 20);
   };
   var tmpV3 = new THREE.Vector3();
 
@@ -312,7 +321,7 @@ GH.game = (function () {
         regen: dev.regen, magnet: 3.2 * (1 + dev.magnet), xpGain: 1 + dev.xpGain,
         bonusProj: skl.cleave ? 1 : 0,
         boostRegen: 0.35 + dev.boostRegen + skl.boostRegen, boostCost: 0.34,
-        elemMult: mechDef.id === 'hexen' ? 1.15 : 1,
+        elemMult: mechDef.elemMult || (mechDef.id === 'hexen' ? 1.15 : 1),
         energyMax: skl.energyMax, energyRegen: skl.energyRegen
       },
       skillBon: skl,
@@ -682,11 +691,14 @@ GH.game = (function () {
         queueAnnounce('NEST BROKEN — ' + cc.dead + '/' + cc.total + ' CLEANSED', 24);
         GH.audio.win();
         coinsRun += 25;
+        grantMats(8 + (zoneNow ? zoneNow.danger * 3 : 0), Math.random() < 0.3 ? 1 : 0, false);
         saveExpedition();
       }
       // THE HARROW falls — locked out until it re-roosts tomorrow
       if (e.id === 'harrow') {
         GH.meta.data.world.harrowDay = GH.world.dayStamp();
+        GH.meta.data.feats.harrow = true;
+        grantMats(40, 3, false);
         harrowSpot = null;
         harrowUp = false;
         coinsRun += 150;
@@ -708,9 +720,9 @@ GH.game = (function () {
       if (e.def.corrupt && e.lairZone) {
         GH.meta.data.world.lairsDown[e.lairZone] = true;
         var shellId = GH.world.stageFor(e.lairZone).unlocks;
-        if (GH.meta.unlockShell(shellId)) {
-          queueAnnounce(GH.mechById(shellId).name + ' FRAME RECOVERED', 30);
-        }
+        var lairMsg = frameReward(shellId);
+        if (lairMsg) queueAnnounce(lairMsg.replace(/<[^>]+>/g, '').replace(/\n/g, ''), 30);
+        if (GH.mechById(shellId).kind === 'feat') GH.meta.data.victories[e.lairZone] = true;
         GH.factions.deed(curZone, 'lair', 8);
         var lairArtifacts = {
           wreck: 'bulwark_fragment', glacier: 'glacier_core', cloister: 'harvest_coil',
@@ -782,6 +794,15 @@ GH.game = (function () {
     if (e.elite) {
       spawnPickup('coin', e.x, e.z);
       spawnPickup('spark1', e.x + 0.5, e.z);
+      spawnPickup('alloy', e.x - 0.5, e.z + 0.4);
+    } else if (!e.def.boss && !e.nestId && Math.random() < 0.12) {
+      spawnPickup('alloy', e.x + GH.rand(-0.5, 0.5), e.z + GH.rand(-0.5, 0.5));
+    }
+    if (e.def.boss) {
+      // wardens and other mid-bosses drop a core; true bosses drop two
+      var coreN = e.def.mid ? 1 : 2;
+      for (var cn = 0; cn < coreN; cn++) spawnPickup('core', e.x + cn * 1.2 - 0.6, e.z - 1.2);
+      for (var an = 0; an < (e.def.corrupt ? 8 : 4); an++) spawnPickup('alloy', e.x + GH.rand(-2, 2), e.z + GH.rand(-2, 2));
     }
     if (e.def.boss && expActive) awardCards(3);
     else if (e.elite && expActive && Math.random() < 0.25) awardCards(2);
@@ -2360,6 +2381,8 @@ GH.game = (function () {
     else if (type.indexOf('gem:') === 0) mesh = GH.models.buildGemDrop(type.slice(4));
     else if (type === 'cipher') mesh = GH.models.buildCipher();
     else if (type === 'cache') mesh = GH.models.buildCache();
+    else if (type === 'alloy') mesh = GH.models.buildAlloy();
+    else if (type === 'core') mesh = GH.models.buildCore();
     else mesh = GH.models.buildCoin();
     mesh.position.set(x, 0.5 + gy(x, z), z);
     scene.add(mesh);
@@ -2392,7 +2415,36 @@ GH.game = (function () {
       }
       if (!silent) GH.audio.win();
     }
+    else if (pk.type === 'alloy') { grantMats(GH.rand(1, 3) | 0 || 1, 0, silent); }
+    else if (pk.type === 'core') { grantMats(0, 1, silent); }
     else { coinsRun++; if (!silent) GH.audio.coin(); }
+  }
+
+  // workshop materials bank the moment they're picked up (a death never
+  // takes them back); cores are rare enough to announce
+  var alloyRun = 0, coresRun = 0;
+  function grantMats(alloy, cores, silent) {
+    var m = GH.meta.data.mats;
+    if (alloy > 0) { m.alloy += alloy; alloyRun += alloy; if (!silent) GH.audio.coin(); }
+    if (cores > 0) {
+      m.cores += cores; coresRun += cores;
+      if (!silent) { queueAnnounce('FRAME CORE RECOVERED — ' + m.cores + ' BANKED', 22); GH.audio.levelup(); }
+    }
+    GH.meta.save();
+  }
+  G.matsRun = function () { return { alloy: alloyRun, cores: coresRun }; };
+
+  // a stage or lair reward: feat frames unlock outright, everything
+  // else pays workshop materials toward building it
+  function frameReward(shellId) {
+    var def = GH.mechById(shellId);
+    if (def.kind === 'feat' || GH.roster.STARTERS.indexOf(shellId) !== -1) {
+      if (GH.meta.unlockShell(shellId)) return '<b>' + def.name + ' FRAME RECOVERED</b> — new frame unlocked!\n';
+      return '';
+    }
+    grantMats(80, 3, true);
+    GH.meta.data.feats['reward_' + shellId] = true;
+    return '<b>' + def.name + ' BLUEPRINT DATA</b> — +80 alloy, +3 frame cores. Build it in the WORKSHOP.\n';
   }
 
   function sparkGain(v, silent) {
@@ -3041,7 +3093,22 @@ GH.game = (function () {
     var soft = T.active ? T.soft(player.x, player.z) : 0;
     var surf = T.active ? T.surface(player.x, player.z) : null;
     var authority = d.air ? 0.25 : 1;
-    if (hasInput) {
+    var mmo = input.mmoDrive;
+    if (mmo) {
+      // MMO wheel: A/D steer the skids, W opens the throttle, S brakes
+      var sfM = GH.clamp(Math.abs(d.spd) / Math.max(0.01, top), 0, 1);
+      var turnM = (d.drift ? 3.8 : 2.6 - sfM * 1.1) * dt * authority;
+      // a standing skimmer still pivots, just slower
+      if (mmo.steer) d.heading -= mmo.steer * turnM * (d.spd < -0.5 ? -1 : 1) * (Math.abs(d.spd) < 1 ? 0.6 : 1);
+      if (mmo.thr > 0.05 && !d.air) {
+        d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * V.accel * mmo.thr * dt);
+      } else if (mmo.thr < -0.05) {
+        if (d.spd > 1.5) d.spd = Math.max(0, d.spd - 34 * dt);
+        else d.spd = Math.max(-top * 0.22, d.spd - 14 * dt);
+      } else {
+        d.spd = d.spd > 0 ? Math.max(0, d.spd - (d.drift ? 6 : 12) * dt) : Math.min(0, d.spd + 12 * dt);
+      }
+    } else if (hasInput) {
       var want = Math.atan2(player.moveX, player.moveZ);
       var speedFrac = GH.clamp(Math.abs(d.spd) / Math.max(0.01, top), 0, 1);
       // grip narrows the wheel at speed; a drift throws it wide open
@@ -3206,19 +3273,33 @@ GH.game = (function () {
       }
     }
 
-    // aim priority: right stick / touch aim > mouse
-    if (camMode === 'chase' && !player.speederOn) {
-      // the frame faces where the camera looks; the mouse's offset from
-      // centre turns both (a stick or touch aim turns them too)
-      var turn = 0;
-      if (input.padAimActive) turn = input.padAimX;
-      else if (input.touchAimActive) turn = input.touchAimX;
-      else {
-        var mxn = input.mouseNDC.x, dz0 = 0.1;
-        if (Math.abs(mxn) > dz0) turn = (mxn > 0 ? 1 : -1) * Math.pow((Math.abs(mxn) - dz0) / (1 - dz0), 1.4);
+    // CHASE camera, MMO rules: A/D turn the frame and the camera together,
+    // a held right mouse button drags the view, the wheel zooms. The
+    // frame always faces where the camera looks.
+    var chaseNow = camMode === 'chase';
+    var turnAxis = 0;
+    var sens = GH.controls.settings.sens || 1;
+    if (chaseNow) {
+      turnAxis = (input.keys.d ? 1 : 0) - (input.keys.a ? 1 : 0);
+      if (input.padAimActive) turnAxis += input.padAimX;
+      else if (input.touchAimActive) turnAxis += input.touchAimX;
+      turnAxis = GH.clamp(turnAxis, -1, 1);
+      camYaw -= turnAxis * 2.8 * dt;
+      if (input.lookDX) { camYaw -= input.lookDX * 0.0045 * sens; }
+      if (input.lookDY) {
+        camPitch += input.lookDY * 0.003 * sens * (GH.controls.settings.invertY ? -1 : 1);
+        camPitch = GH.clamp(camPitch, -0.55, 0.75);
       }
-      camYaw -= turn * 3.2 * dt;
+      if (input.zoomDelta) camDist = GH.clamp(camDist + input.zoomDelta * 0.12, 0.55, 1.9);
+    }
+    input.lookDX = 0; input.lookDY = 0; input.zoomDelta = 0;
+    input.mmoDrive = null;
+    if (chaseNow && !player.speederOn) {
       player.facing = camYaw;
+    } else if (chaseNow) {
+      // skimmer form: W throttle, S brake/reverse, A/D steer the skids
+      var thr = (input.keys.w ? 1 : 0) - (input.keys.s ? 1 : 0) - (input.padMoveY + input.touchMoveY);
+      input.mmoDrive = { thr: GH.clamp(thr, -1, 1), steer: GH.clamp(turnAxis + input.padMoveX + input.touchMoveX, -1, 1) };
     } else if (input.padAimActive) {
       player.facing = Math.atan2(input.padAimX, input.padAimY);
     } else if (input.touchAimActive) {
@@ -3230,13 +3311,23 @@ GH.game = (function () {
       }
     }
 
-    var mx = (input.keys.d ? 1 : 0) - (input.keys.a ? 1 : 0) + input.padMoveX + input.touchMoveX;
-    var mz = (input.keys.s ? 1 : 0) - (input.keys.w ? 1 : 0) + input.padMoveY + input.touchMoveY;
-    if (camMode === 'chase') {
-      // WASD is relative to the view: W goes where the camera looks
+    var mx, mz;
+    if (chaseNow) {
+      // view-relative: W walks where the camera looks, Q/E sidestep
+      mx = (input.keys.e ? 1 : 0) - (input.keys.q ? 1 : 0) + input.padMoveX + input.touchMoveX;
+      mz = (input.keys.s ? 1 : 0) - (input.keys.w ? 1 : 0) + input.padMoveY + input.touchMoveY;
       var yr = camYaw - Math.PI, cyr = Math.cos(yr), syr = Math.sin(yr);
       var rmx = mx * cyr + mz * syr, rmz = -mx * syr + mz * cyr;
       mx = rmx; mz = rmz;
+      if (player.speederOn && input.mmoDrive) {
+        // the drivetrain reads throttle/steer directly; moveX/Z only
+        // tells the rest of the sim which way the nose is pointing
+        var hd = player.drive ? player.drive.heading : player.facing;
+        mx = Math.sin(hd) * input.mmoDrive.thr; mz = Math.cos(hd) * input.mmoDrive.thr;
+      }
+    } else {
+      mx = (input.keys.d ? 1 : 0) - (input.keys.a ? 1 : 0) + (input.keys.e ? 1 : 0) - (input.keys.q ? 1 : 0) + input.padMoveX + input.touchMoveX;
+      mz = (input.keys.s ? 1 : 0) - (input.keys.w ? 1 : 0) + input.padMoveY + input.touchMoveY;
     }
     if (input.itemPressed) { input.itemPressed = false; useItem(); }
     if (player.shieldT > 0) player.shieldT -= dt;
@@ -3714,6 +3805,7 @@ GH.game = (function () {
     return {
       zone: curZone,
       mech: GH.mechs.indexOf(player.def),
+      mechId: player.def.id,
       stats: JSON.parse(JSON.stringify(player.stats)),
       hp: player.hp, xp: player.xp, level: player.level, xpNeed: player.xpNeed,
       weapons: player.weapons.map(function (inst) {
@@ -3737,7 +3829,8 @@ GH.game = (function () {
     // stats are re-derived, never copied: base frame + devotions + the
     // CURRENT skill tree + mastery + per-level growth. That way training
     // or respeccing at camp reaches a live character immediately.
-    player = makePlayer(GH.mechs[saved.mech]);
+    var savedDef = saved.mechId ? GH.mechById(saved.mechId) : GH.mechs[saved.mech];
+    player = makePlayer(savedDef || GH.mechs[0]);
     var mbr = GH.progress.masteryBonus(player.def.id);
     player.stats.damageMult += mbr.damageMult;
     player.stats.maxHP += mbr.maxHP;
@@ -4067,6 +4160,7 @@ GH.game = (function () {
     awardCards(3);
     GH.factions.deed(curZone, 'dungeon', 6);
     coinsRun += 20 * ds.tier;
+    grantMats(12 * ds.tier + zoneNow.danger * 4, 1 + (ds.firstClear ? 1 : 0), false);
     spawnPickup('gem:' + GH.pick(GH.gems.typeIds), lay.chest.x + 1.5, lay.chest.z + 1.5);
     queueAnnounce('CACHE OPENED — +' + loot + ' SALVAGE BANKED', 26);
     GH.audio.win();
@@ -6274,8 +6368,11 @@ GH.game = (function () {
       }
       camPrevX = tx; camPrevZ = tz;
       var driving = veh || G.state === 'race';
-      var back = (driving ? 13 + speedFrac * 7 : 10) * (mate && !mate.down ? camZoom : 1);
-      var up = driving ? 6.2 + speedFrac * 1.5 : 5.4;
+      var back = (driving ? 13 + speedFrac * 7 : 10) * (mate && !mate.down ? camZoom : 1) * camDist;
+      var up = (driving ? 6.2 + speedFrac * 1.5 : 5.4) * camDist;
+      // pitch: drag up to look down on the fight, drag down to look ahead
+      up += Math.sin(camPitch) * back * 0.9;
+      back *= Math.cos(camPitch) * 0.85 + 0.15;
       var fx = Math.sin(camYaw), fz = Math.cos(camYaw);
       var cx = tx - fx * back, cz = tz - fz * back;
       var cy = camGround + up;
@@ -6337,7 +6434,7 @@ GH.game = (function () {
     } else {
       el['wave-timer'].textContent = GH.fmt1(Math.max(0, waveTimer));
     }
-    el['coin-count'].textContent = '×' + coinsRun;
+    el['coin-count'].textContent = '×' + coinsRun + '   ⬡ ' + GH.meta.data.mats.alloy + ' ALLOY · ◈ ' + GH.meta.data.mats.cores + ' CORES';
     el['boost-fill'].style.width = (player.boost * 100) + '%';
     // skimmer drive cluster: velocity readout, the bottle, the drift call
     if (el['drive-hud']) {
@@ -6370,7 +6467,7 @@ GH.game = (function () {
         hh += '<div class="hb-slot' + (known ? '' : ' locked') + (ready ? ' ready' : '') + '" title="' +
           ab.name + ' — ' + ab.desc + ' (' + ab.cost + ' energy)">' +
           '<div class="hb-glyph">' + (known ? ab.glyph : '✕') + '</div>' +
-          '<div class="hb-key">' + hn + '</div>' +
+          '<div class="hb-key">' + GH.controls.label('ability' + hn) + '</div>' +
           (known && cd > 0 ? '<div class="hb-cd">' + Math.ceil(cd) + '</div>' : '') +
           '</div>';
       }
@@ -6395,7 +6492,7 @@ GH.game = (function () {
     // ward row: three stances + energy
     var wardEl = document.getElementById('ward-row');
     var wh = '';
-    var wardKeys = ['Z', 'X', 'C'];
+    var wardKeys = [GH.controls.label('ward1'), GH.controls.label('ward2'), GH.controls.label('ward3')];
     WARD_ORDER.forEach(function (w, i) {
       var on = player.ward === w;
       wh += '<span class="ward-chip' + (on ? ' on' : '') + '" style="' +
@@ -6557,15 +6654,22 @@ GH.game = (function () {
     stageIndex = GH.clamp(stageIdx || 0, 0, GH.stages.length - 1);
     stage = GH.stages[stageIndex];
     applyStageLook(stage);
-    player = makePlayer(GH.mechs[mechIndex]);
-
-    // pilot mastery bonuses for this frame
-    var mb = GH.progress.masteryBonus(player.def.id);
-    player.stats.damageMult += mb.damageMult;
-    player.stats.maxHP += mb.maxHP;
-    player.hp = player.stats.maxHP;
-    player.stats.boostRegen += mb.boostRegen;
-    if (mb.energyBonus) player.stats.energyRegen *= 1.1;
+    var resume = opts.resume || null;
+    if (resume) {
+      // EXIT RUN left this character mid-climb: rebuild it from the save
+      restoreCharacter(resume.char);
+      player.x = 0; player.z = 0;
+    } else {
+      player = makePlayer(GH.mechs[mechIndex]);
+      // pilot mastery bonuses for this frame
+      var mb = GH.progress.masteryBonus(player.def.id);
+      player.stats.damageMult += mb.damageMult;
+      player.stats.maxHP += mb.maxHP;
+      player.hp = player.stats.maxHP;
+      player.stats.boostRegen += mb.boostRegen;
+      if (mb.energyBonus) player.stats.energyRegen *= 1.1;
+    }
+    GH.meta.data.suspended = null; // whatever was parked is now live (or replaced)
 
     // chase cosmetics: paint, trail, pico-drone
     var style = GH.meta.data.style;
@@ -6606,7 +6710,7 @@ GH.game = (function () {
     cipherRun = null;
     if (weekly && weekly.mods.php !== 1) {
       player.stats.maxHP = Math.round(player.stats.maxHP * weekly.mods.php);
-      player.hp = player.stats.maxHP;
+      player.hp = resume ? Math.min(player.hp, player.stats.maxHP) : player.stats.maxHP;
     }
     if (weekly && weekly.mods.crit) player.stats.crit += weekly.mods.crit;
     mate = null;
@@ -6614,14 +6718,19 @@ GH.game = (function () {
       var p2Idx = (opts.p2Mech !== undefined && opts.p2Mech >= 0) ? opts.p2Mech : mechIndex;
       spawnWingmate(p2Idx);
     }
-    if (opts.preset && !GH.meta.isIron()) applyPreset(opts.preset);
-    if (GH.devGrant) applyPreset({ weapons: GH.devGrant });
+    if (opts.preset && !GH.meta.isIron() && !resume) applyPreset(opts.preset);
+    if (GH.devGrant && !resume) applyPreset({ weapons: GH.devGrant });
     // stage-trial perks (permanent, stage-scoped)
     var trialTier = GH.progress.trialTier(stage.id);
     if (trialTier >= 2) player.stats.xpGain += 0.10;
     if (trialTier >= 3) player.stats.damageMult += 0.05;
     kills = 0; coinsRun = 0; runTime = 0; hitCount = 0; sparksRun = 0;
+    alloyRun = 0; coresRun = 0;
     elitesSpawned = 0;
+    if (resume) {
+      kills = resume.kills || 0; coinsRun = resume.coinsRun || 0; runTime = resume.runTime || 0;
+      sparksRun = resume.sparksRun || 0;
+    }
     announceQueue.length = 0;
     activeHint = null;
     hintTimer = 0;
@@ -6630,10 +6739,69 @@ GH.game = (function () {
     GH.music.play(stage.id);
     GH.music.setBoss(false);
     startAt = GH.clamp(startAt || 1, 1, 20);
-    if (startAt > 1) devCatchUp(startAt);
+    if (startAt > 1 && !resume) devCatchUp(startAt);
+    if (resume) wavePlan = GH.wavePlan(stage, 1, false);
     startWave(startAt);
     updateHUDStatic();
     document.getElementById('hud').classList.remove('hidden');
+    if (resume) queueAnnounce('RUN RESUMED — WAVE ' + startAt, 24);
+  };
+
+  // ---------------------------------------------------------------
+  // Leaving a run. EXIT keeps it (the Reach saves its character, an
+  // arena climb is parked at the start of its current wave); ABANDON
+  // deletes it for good.
+  // ---------------------------------------------------------------
+  G.suspendRun = function () {
+    if (!player) return false;
+    if (expActive) { saveExpedition(); return true; }
+    if (G.state !== 'play' && G.state !== 'pause') return false;
+    GH.meta.data.suspended = {
+      mode: G.mode, stage: stageIndex, wave: Math.max(1, waveNum),
+      char: serializeCharacter(),
+      kills: kills, coinsRun: coinsRun, runTime: runTime, sparksRun: sparksRun,
+      weekly: weekly, coop: !!mate, mateMech: mate ? mate.def.id : null,
+      when: new Date().toISOString().slice(0, 10)
+    };
+    GH.meta.save();
+    return true;
+  };
+  G.hasSuspended = function () { return !!GH.meta.data.suspended; };
+  G.suspendedLabel = function () {
+    var sv = GH.meta.data.suspended;
+    if (!sv) return '';
+    var def = sv.char && sv.char.mechId ? GH.mechById(sv.char.mechId) : GH.mechs[sv.char ? sv.char.mech : 0];
+    return (sv.mode === 'arena' ? 'ARENA' : sv.mode === 'weekly' ? 'WEEKLY' : 'CLASSIC') + ' · ' +
+      GH.stages[sv.stage].name + ' · WAVE ' + sv.wave + ' · ' + (def ? def.name : '?');
+  };
+  G.resumeRun = function () {
+    var sv = GH.meta.data.suspended;
+    if (!sv) return false;
+    G.mode = sv.mode || 'classic';
+    G.coop = !!sv.coop;
+    var idx = sv.char && sv.char.mechId ? GH.mechs.indexOf(GH.mechById(sv.char.mechId)) : (sv.char ? sv.char.mech : 0);
+    var p2 = sv.mateMech ? GH.mechs.indexOf(GH.mechById(sv.mateMech)) : -1;
+    G.startRun(Math.max(0, idx), sv.stage, sv.wave, { resume: sv, weekly: sv.weekly, p2Mech: p2 });
+    return true;
+  };
+  G.abandonRun = function () {
+    // the Reach: the character and its wreck are gone; the world's scars stay
+    if (expActive) {
+      expActive = false; // clearWorld() must not re-save the character we're deleting
+      GH.meta.data.world.exp = null;
+      GH.meta.data.world.wreck = null;
+    }
+    GH.meta.data.suspended = null;
+    GH.meta.save();
+  };
+  G.isExpedition = function () { return expActive; };
+  // tear the arena / world down and go home (EXIT and ABANDON both end here)
+  G.leaveRun = function () {
+    clearWorld();
+    G.state = 'title';
+    GH.music.play('title');
+    GH.music.setBoss(false);
+    document.getElementById('hud').classList.add('hidden');
   };
 
   // Arena loadout preset: grant starting weapons/traits/gems by card id
@@ -6734,8 +6902,13 @@ GH.game = (function () {
     }
 
     meta.data.salvage += banked;
+    meta.data.suspended = null; // a finished run can't be continued
     meta.data.collection.totalRuns++;
     if (won) meta.data.collection.totalWins++;
+    // workshop materials for the run: alloy by depth, cores for a clear
+    var endAlloy = Math.round(waveNum * 1.5 + kills / 10) + (won ? 30 : 0);
+    grantMats(endAlloy, won ? 2 : 0, true);
+    var matsMsg = 'Workshop: <b>+' + (alloyRun) + ' alloy</b>' + (coresRun ? ' · <b>+' + coresRun + ' frame cores</b>' : '') + '\n';
     if (won && G.mode === 'classic') awardTrial('clear');
 
     // pilot mastery XP: kills + depth, with a victory bonus
@@ -6771,10 +6944,7 @@ GH.game = (function () {
       if (waveNum > best) meta.data.bestWave[stage.id] = waveNum;
       if (won) {
         meta.data.victories[stage.id] = true;
-        var shellId = stage.unlocks;
-        if (meta.unlockShell(shellId)) {
-          unlockMsg = '<b>' + GH.mechById(shellId).name + ' FRAME RECOVERED</b> — new shell unlocked!\n';
-        }
+        unlockMsg = frameReward(stage.unlocks);
         meta.unlockStage(stageIndex + 2);
       }
     } else {
@@ -6783,7 +6953,7 @@ GH.game = (function () {
     meta.save();
 
     document.getElementById('end-title').innerHTML = won ? 'ARENA&nbsp;CLEARED' : 'FRAME&nbsp;DESTROYED';
-    document.getElementById('end-stats').innerHTML = unlockMsg + masteryMsg +
+    document.getElementById('end-stats').innerHTML = unlockMsg + masteryMsg + matsMsg +
       stage.name + (G.mode === 'arena' ? ' · ARENA' : (G.mode === 'weekly' ? ' · WEEKLY' : '')) +
       ' — reached <b>Wave ' + waveNum + '</b> as <b>' + player.def.name + '</b>' +
       (mate ? ' <i>(co-op)</i>' : '') + '\n' +
@@ -6845,34 +7015,47 @@ GH.game = (function () {
         '\n\n<b>Primary</b>\n' + def.weapon.name + ' (' + (def.weapon.cls || '') + ')' +
         '\n\n<b>Special</b>\n' + def.specialText;
     } else {
-      var stIdx = -1;
-      GH.stages.forEach(function (st, si) { if (st.unlocks === def.id) stIdx = si; });
-      document.getElementById('select-desc').textContent =
-        'A corrupted signal wears this frame. Bring it down to claim the shell.';
+      var rst = GH.roster.status(def.id);
+      document.getElementById('select-desc').textContent = def.desc;
       document.getElementById('select-stats').innerHTML =
-        '<b>To unlock</b>\nDefeat ' + def.name + '\'s corrupted double on wave 20 of ' +
-        (stIdx >= 0 ? GH.stages[stIdx].name : '???') + '.';
+        '<b>To unlock</b>\n' + rst.text + (rst.recipe
+          ? '\n\n<b>Workshop bill</b>\n' + rst.recipe.alloy + ' alloy · ' + rst.recipe.cores + ' frame cores · ' + rst.recipe.salvage + ' salvage' +
+            '\n\nOpen HANGAR → FRAME WORKSHOP to build it.'
+          : '');
     }
-    var icons = document.querySelectorAll('#select-icons .mech-icon');
-    for (var n = 0; n < icons.length; n++) {
-      icons[n].className = 'mech-icon' + (n === i ? ' sel' : '') +
-        (GH.meta.data.shells[GH.mechs[n].id] ? '' : ' locked');
-    }
+    buildSelectIcons();
     document.getElementById('btn-launch').textContent = unlocked ? 'SELECT STAGE' : 'LOCKED';
     if (G.onSelectChange) G.onSelectChange();
   };
 
+  // the hangar rack: every frame you own (135 exist — the locked ones live
+  // in the WORKSHOP, so the rack never becomes a wall of padlocks)
   function buildSelectIcons() {
     var wrap = document.getElementById('select-icons');
     wrap.innerHTML = '';
+    var shown = 0;
     GH.mechs.forEach(function (def, i) {
+      var owned = !!GH.meta.data.shells[def.id];
+      if (!owned && def.kind !== 'feat') return;
+      shown++;
       var d = document.createElement('div');
-      d.className = 'mech-icon' + (i === selMechIndex ? ' sel' : '') +
-        (GH.meta.data.shells[def.id] ? '' : ' locked');
+      d.className = 'mech-icon' + (i === selMechIndex ? ' sel' : '') + (owned ? '' : ' locked');
+      var pk = def.pack ? GH.roster.packById(def.pack) : null;
+      if (pk) d.style.borderColor = pk.css;
+      if (def.kind === 'relic') d.style.borderColor = '#ffd050';
       d.textContent = def.icon;
+      d.title = def.name + (owned ? '' : ' — ' + GH.roster.status(def.id).text);
       d.onclick = function () { GH.audio.card(); G.selectMech(i); };
       wrap.appendChild(d);
     });
+    var more = document.createElement('div');
+    more.className = 'mech-icon build-more';
+    more.textContent = '+';
+    more.title = 'Build more frames in the WORKSHOP (' + GH.roster.owned() + '/' + GH.roster.TOTAL + ' owned)';
+    more.onclick = function () { if (G.onOpenWorkshop) G.onOpenWorkshop(); };
+    wrap.appendChild(more);
+    var cnt = document.getElementById('select-count');
+    if (cnt) cnt.textContent = 'FRAMES OWNED ' + GH.roster.owned() + ' / ' + GH.roster.TOTAL + ' — build more in the WORKSHOP';
   }
 
   G.getSelectedMech = function () { return selMechIndex; };

@@ -33,6 +33,27 @@ In Gundam Circuit, you pilot an evolving machine through a world of missions and
 - Quest, race, and challenge pillars for varied progression
 - Fast restart loops designed for repeated improvement
 
+## Controls (rebindable under CONTROLS)
+
+MMO-style: **W/S** walk, **A/D** turn, **Q/E** strafe, **hold RIGHT MOUSE** to look around, **WHEEL** zooms.
+**LEFT CLICK** attacks and marks a target, **TAB** cycles targets, **1–4** abilities, **Z/X/C** wards,
+**SPACE** boost / drift, **SHIFT** special / nitro, **T** transform (W throttle, S brake, A/D steer),
+**F** interact, **V** tactical camera, **K** training, **M** map, **P** pilot sheet, **ESC** pause / close any menu.
+
+## The 135 frames
+
+- **2 starters** (AEGIS, VULCAN) are yours from the first sortie.
+- **4 feat frames** (FANG, HEXEN, VIPER, MORROW) are earned by clearing a CLASSIC stage (or its lair in the Reach).
+- **129 built frames** are assembled in the HANGAR → FRAME WORKSHOP from ⬡ ALLOY (drops from hostiles and
+  elites), ◈ FRAME CORES (bosses, wardens, stage clears, dungeon caches) and $ SALVAGE. Each of the 8 lineages
+  has 5 packs (AILE, SWORD, LAUNCHER, STORM, PHANTOM) in 3 marks (MK.II → CUSTOM → PROTOTYPE), plus 7 RELIC
+  frames gated behind feats.
+
+## Runs
+
+From the pause menu: **EXIT RUN** saves (the Reach keeps your pilot; an arena climb is parked at its current
+wave and offered as CONTINUE RUN on the title), **NEW RUN** or **ABANDON RUN** delete it after a confirm.
+
 ## Play Locally
 
 No complex setup required.
@@ -44,7 +65,8 @@ No complex setup required.
 python3 -m http.server
 ```
 
-Then visit `http://localhost:8000`.
+Then visit `http://localhost:8000`. `node tools/build-single.js` rebuilds `dist/heroframe.html`, a single-file build.
+Dev URL flags: `?unlock=all`, `?salvage=N`, `?mats=N`, `?wave=N`.
 
 ## Design Bible
 
@@ -56,7 +78,7 @@ Note: the code currently calls the game **HERO FRAME**; the design docs explain 
 
 ## Project Structure
 
-- `/js` — game logic and systems
+- `/js` — game logic and systems (`controls.js` key bindings, `roster.js` the 135-frame roster and workshop)
 - `/css` — UI and presentation styles
 - `/lib` — third-party runtime libraries
 - `/dist` — bundled output
