@@ -17,6 +17,33 @@ GH.models = (function () {
   // Humanoid mech. cfg: { body, accent, dark, trim, prop, corrupt }
   // Chunky fifth-gen proportions: broad chest, pauldrons, thrusters.
   // ---------------------------------------------------------------
+  // Lineage silhouettes. Rule from the design bible: head = tier, colour =
+  // allegiance, asymmetry = specialisation. Each base prop (the frame's
+  // weapon) carries a whole body language, so the eight lineages read as
+  // different machines at 64 px, not eight palettes of one.
+  //   sword   HERO      twin eyes, V-fin, chest intakes, skirt, blade hilts
+  //   guns    GRUNT     single visor, boxy shoulders, ammo drums on the hips
+  //   claws   MONO-EYE  one glowing eye, commander horn, one spiked pauldron
+  //   staff   NEWTYPE   hidden eyes, sweeping horns, flared back binders
+  //   daggers STEALTH   hooded narrow head, thin limbs, cloak plates
+  //   scythe  RELIC     jaw face, exposed inner frame, slab armour, reactors
+  //   lance   VARIABLE  narrow visor, fin crest, swept wings, pointed feet
+  //   mortar  HEAVY     mono-slit, huge skirt, bell legs, hover jets, hunched
+  //   eva     BIO       muzzle jaw, one optic, pylons, restraint plates, core
+  //   drill   SPIRAL    a face on the chest, drill forearms, sunglasses crest
+  var STYLES = {
+    sword:   { head: 'hero', chest: 1.0, pad: 1.0, legs: 'std', skirt: 1, pack: 'hilts' },
+    guns:    { head: 'visor', chest: 1.12, pad: 1.2, legs: 'std', skirt: 0, pack: 'drums' },
+    claws:   { head: 'mono', chest: 0.92, pad: 'spike', legs: 'digit', skirt: 0, pack: 'tail' },
+    staff:   { head: 'newtype', chest: 0.86, pad: 0.8, legs: 'slim', skirt: 1, pack: 'binders' },
+    daggers: { head: 'hood', chest: 0.8, pad: 0.7, legs: 'slim', skirt: 0, pack: 'cloak' },
+    scythe:  { head: 'jaw', chest: 1.06, pad: 1.1, legs: 'exposed', skirt: 1, pack: 'reactors' },
+    lance:   { head: 'narrow', chest: 0.9, pad: 0.9, legs: 'point', skirt: 0, pack: 'wings' },
+    mortar:  { head: 'slit', chest: 1.28, pad: 1.35, legs: 'bell', skirt: 2, pack: 'jets', hunch: 0.16 },
+    eva:     { head: 'muzzle', chest: 0.78, pad: 0.6, legs: 'slim', skirt: 0, pack: 'pylons', hunch: 0.1 },
+    drill:   { head: 'shades', chest: 1.1, pad: 1.0, legs: 'std', skirt: 1, pack: 'drillpack' }
+  };
+
   M.buildMech = function (cfg) {
     var g = new THREE.Group();
     var body = cfg.body, accent = cfg.accent;
@@ -25,32 +52,78 @@ GH.models = (function () {
     if (cfg.corrupt) {
       body = 0x2c2430; dark = 0x141018; trim = 0x584050; accent = 0xff2838;
     }
+    var S = STYLES[cfg.style] || STYLES[cfg.prop] || STYLES.sword;
     var parts = {};
+    var glowMat = function (c) { return mat(c, { emissive: c, emissiveIntensity: 0.7 }); };
 
     // ---- legs ----
     var legL = new THREE.Group(), legR = new THREE.Group();
     [legL, legR].forEach(function (leg, i) {
+      var side = i === 0 ? -1 : 1;
+      var L = S.legs;
+      var tw = L === 'slim' ? 0.28 : L === 'bell' ? 0.4 : L === 'exposed' ? 0.18 : 0.36;
+      var sw = L === 'slim' ? 0.24 : L === 'bell' ? 0.5 : 0.3;
       var hip = box(0.3, 0.22, 0.34, dark); hip.position.y = 0.02;
-      var thigh = box(0.36, 0.52, 0.4, body); thigh.position.y = -0.3;
+      var thigh = box(tw, 0.52, L === 'exposed' ? 0.2 : 0.4, L === 'exposed' ? dark : body); thigh.position.y = -0.3;
       var knee = box(0.3, 0.16, 0.32, trim); knee.position.y = -0.6;
-      var shin = box(0.3, 0.48, 0.34, dark); shin.position.y = -0.85;
-      var foot = box(0.4, 0.18, 0.62, body); foot.position.set(0, -1.12, 0.1);
-      var toe = box(0.32, 0.12, 0.16, dark); toe.position.set(0, -1.14, 0.44);
+      var shin = box(sw, 0.48, L === 'bell' ? 0.5 : 0.34, dark); shin.position.y = -0.85;
+      var foot = box(L === 'bell' ? 0.56 : 0.4, 0.18, L === 'point' ? 0.7 : 0.62, body); foot.position.set(0, -1.12, 0.1);
+      var toe = L === 'point' ? box(0.12, 0.12, 0.3, accent) : box(0.32, 0.12, 0.16, dark);
+      toe.position.set(0, -1.14, L === 'point' ? 0.55 : 0.44);
       leg.add(hip, thigh, knee, shin, foot, toe);
-      leg.position.set(i === 0 ? -0.28 : 0.28, 1.22, 0);
+      if (L === 'exposed') {
+        // slab plates hung on a bare inner frame
+        var slab = box(0.14, 0.5, 0.42, body); slab.position.set(side * 0.2, -0.3, 0);
+        var shinSlab = box(0.34, 0.3, 0.1, body); shinSlab.position.set(0, -0.85, 0.2);
+        leg.add(slab, shinSlab);
+      }
+      if (L === 'digit') {
+        // beast stance: thigh forward, shin back, claw toes
+        thigh.rotation.x = -0.35; thigh.position.z = 0.1;
+        shin.rotation.x = 0.45; shin.position.z = -0.1;
+        [-0.12, 0, 0.12].forEach(function (x) { var cl = box(0.06, 0.08, 0.2, accent); cl.position.set(x, -1.16, 0.5); leg.add(cl); });
+      }
+      if (L === 'bell') {
+        var bell = box(0.6, 0.22, 0.6, body); bell.position.y = -1.0; leg.add(bell);
+        var jet = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.12, 6), mat(0x1a1a20)); jet.position.set(0, -1.2, -0.2); leg.add(jet);
+      }
+      leg.position.set(side * (L === 'bell' ? 0.36 : 0.28), 1.22, 0);
       g.add(leg);
     });
     parts.legL = legL; parts.legR = legR;
 
     // ---- waist/torso group (rotates toward aim) ----
     var torso = new THREE.Group();
-    var waist = box(0.6, 0.24, 0.44, dark); waist.position.y = -0.14;
-    var chest = box(1.0, 0.62, 0.66, body); chest.position.y = 0.32;
-    var chestTop = box(0.8, 0.2, 0.7, trim); chestTop.position.y = 0.64;
+    var cw = S.chest;
+    var waist = box(0.6 * cw, 0.24, 0.44, dark); waist.position.y = -0.14;
+    var chest = box(1.0 * cw, 0.62, 0.66, body); chest.position.y = 0.32;
+    var chestTop = box(0.8 * cw, 0.2, 0.7, trim); chestTop.position.y = 0.64;
     var vent = box(0.5, 0.16, 0.1, accent); vent.position.set(0, 0.34, 0.36);
     var cockpit = box(0.24, 0.14, 0.08, cfg.corrupt ? 0xff2838 : 0x202830);
     cockpit.position.set(0, 0.55, 0.38);
     torso.add(waist, chest, chestTop, vent, cockpit);
+    if (S.head === 'hero') {
+      [-0.3, 0.3].forEach(function (x) { var intake = box(0.18, 0.28, 0.08, dark); intake.position.set(x, 0.3, 0.36); torso.add(intake); });
+    }
+    if (S.head === 'shades') {
+      // the face on the chest
+      [-0.22, 0.22].forEach(function (x) { var eye = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.06), glowMat(accent)); eye.position.set(x, 0.42, 0.36); torso.add(eye); });
+      var grin = box(0.5, 0.06, 0.06, 0x101418); grin.position.set(0, 0.18, 0.36); torso.add(grin);
+      var teeth = box(0.46, 0.04, 0.05, 0xf0f0f0); teeth.position.set(0, 0.2, 0.37); torso.add(teeth);
+    }
+    if (S.head === 'muzzle') {
+      var core = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), glowMat(0xff3040)); core.position.set(0, 0.3, 0.36); torso.add(core);
+      [-0.3, 0.3].forEach(function (x) { var clamp = box(0.12, 0.5, 0.1, trim); clamp.position.set(x, 0.32, 0.34); torso.add(clamp); });
+    }
+    // skirt armour
+    if (S.skirt) {
+      var sk = S.skirt === 2 ? 1.4 : 1;
+      [-1, 1].forEach(function (side) {
+        var plate = box(0.34 * sk, 0.4 * sk, 0.5, body); plate.position.set(side * 0.34 * sk, -0.42, 0);
+        torso.add(plate);
+      });
+      var front = box(0.36 * sk, 0.34 * sk, 0.1, trim); front.position.set(0, -0.4, 0.24); torso.add(front);
+    }
 
     // backpack + thrusters
     var pack = box(0.7, 0.5, 0.24, dark); pack.position.set(0, 0.4, -0.42);
@@ -69,33 +142,124 @@ GH.models = (function () {
       flames.push(flame);
     });
     parts.flames = flames;
+    // lineage backpack
+    var P = S.pack;
+    if (P === 'hilts') {
+      [-0.3, 0.3].forEach(function (x) { var h = box(0.08, 0.5, 0.08, trim); h.position.set(x, 0.85, -0.5); h.rotation.z = x > 0 ? -0.25 : 0.25; torso.add(h); var pommel = box(0.12, 0.08, 0.12, accent); pommel.position.set(x - x * 0.4, 1.1, -0.5); torso.add(pommel); });
+    } else if (P === 'drums') {
+      [-1, 1].forEach(function (side) { var drum = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.36, 8), mat(dark)); drum.rotation.z = Math.PI / 2; drum.position.set(side * 0.55, -0.32, -0.1); torso.add(drum); });
+      var rack = box(0.9, 0.3, 0.2, trim); rack.position.set(0, 0.7, -0.5); torso.add(rack);
+    } else if (P === 'tail') {
+      var tail = box(0.16, 0.16, 0.9, dark); tail.position.set(0, -0.1, -0.8); tail.rotation.x = -0.5; torso.add(tail);
+      var tailTip = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.4, 4), mat(accent)); tailTip.rotation.x = -Math.PI / 2 - 0.5; tailTip.position.set(0, -0.4, -1.3); torso.add(tailTip);
+    } else if (P === 'binders') {
+      [-1, 1].forEach(function (side) { var b = box(0.12, 1.2, 0.7, body); b.position.set(side * 0.62, 0.55, -0.55); b.rotation.z = side * 0.35; b.rotation.x = -0.2; torso.add(b); var edge = box(0.14, 1.0, 0.08, accent); edge.position.set(side * 0.62, 0.55, -0.9); edge.rotation.z = side * 0.35; edge.rotation.x = -0.2; torso.add(edge); });
+    } else if (P === 'cloak') {
+      [-1, 1].forEach(function (side) { var c = box(0.36, 1.3, 0.08, dark); c.position.set(side * 0.3, -0.2, -0.56); c.rotation.z = side * 0.12; torso.add(c); });
+    } else if (P === 'reactors') {
+      [-0.28, 0.28].forEach(function (x) { var r = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.7, 7), mat(dark)); r.position.set(x, 0.5, -0.6); torso.add(r); var cap = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.1, 7), glowMat(accent)); cap.position.set(x, 0.9, -0.6); torso.add(cap); });
+    } else if (P === 'wings') {
+      [-1, 1].forEach(function (side) { var w = box(0.08, 0.36, 1.1, trim); w.position.set(side * 0.5, 0.7, -0.75); w.rotation.y = side * 0.5; w.rotation.z = side * 0.6; torso.add(w); var tipW = box(0.06, 0.12, 0.4, accent); tipW.position.set(side * 0.9, 1.0, -1.1); tipW.rotation.y = side * 0.5; tipW.rotation.z = side * 0.6; torso.add(tipW); });
+    } else if (P === 'jets') {
+      [-0.36, 0.36].forEach(function (x) { var j = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.5, 7), mat(0x1a1a20)); j.position.set(x, -0.5, -0.5); torso.add(j); });
+      var plate = box(1.1, 0.7, 0.14, trim); plate.position.set(0, 0.45, -0.55); torso.add(plate);
+    } else if (P === 'pylons') {
+      [-1, 1].forEach(function (side) { var py = box(0.14, 0.9, 0.24, trim); py.position.set(side * 0.55, 1.0, -0.15); torso.add(py); var pyt = box(0.1, 0.14, 0.14, accent); pyt.position.set(side * 0.55, 1.5, -0.15); torso.add(pyt); });
+    } else if (P === 'drillpack') {
+      [-0.3, 0.3].forEach(function (x) { var dr = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.6, 6), mat(trim)); dr.position.set(x, 0.95, -0.5); torso.add(dr); });
+    }
 
     // ---- head ----
-    var head = box(0.44, 0.38, 0.46, body); head.position.y = 0.98;
-    var visor = box(0.36, 0.1, 0.06, accent); visor.position.set(0, 0.98, 0.25);
-    var chin = box(0.2, 0.1, 0.1, dark); chin.position.set(0, 0.86, 0.24);
-    var crest = box(0.08, 0.32, 0.34, trim); crest.position.set(0, 1.22, -0.02);
-    var antenna = box(0.03, 0.34, 0.03, dark); antenna.position.set(0.2, 1.3, -0.1);
-    torso.add(head, visor, chin, crest, antenna);
+    var H = S.head;
+    var hw = H === 'slit' ? 0.62 : H === 'hood' || H === 'narrow' ? 0.36 : H === 'mono' ? 0.5 : 0.44;
+    var hy = H === 'slit' ? 0.86 : 0.98;
+    var head = box(hw, H === 'slit' ? 0.26 : 0.38, H === 'muzzle' ? 0.6 : 0.46, H === 'jaw' ? dark : body); head.position.y = hy;
+    torso.add(head);
+    var visor;
+    if (H === 'hero' || H === 'jaw' || H === 'shades') {
+      // twin eyes
+      [-0.1, 0.1].forEach(function (x) { var eye = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.06), H === 'jaw' ? mat(accent) : glowMat(accent)); eye.position.set(x, hy + 0.02, 0.24); torso.add(eye); });
+      visor = box(0.3, 0.04, 0.06, accent); visor.position.set(0, hy + 0.1, 0.24); visor.visible = H === 'hero'; torso.add(visor);
+      var chin = box(0.2, 0.1, 0.1, dark); chin.position.set(0, hy - 0.12, 0.24); torso.add(chin);
+      if (H === 'hero') {
+        // V-fin
+        [-1, 1].forEach(function (side) { var fin = box(0.03, 0.34, 0.06, accent); fin.position.set(side * 0.14, hy + 0.32, 0.18); fin.rotation.z = side * -0.6; torso.add(fin); });
+        var jewel = box(0.08, 0.08, 0.04, 0xff3040); jewel.position.set(0, hy + 0.14, 0.24); torso.add(jewel);
+      }
+      if (H === 'jaw') {
+        var jaw = box(0.36, 0.14, 0.2, body); jaw.position.set(0, hy - 0.16, 0.2); torso.add(jaw);
+        var neck = box(0.16, 0.2, 0.16, dark); neck.position.set(0, hy - 0.26, 0); torso.add(neck);
+      }
+      if (H === 'shades') {
+        var shades = box(0.5, 0.1, 0.08, 0xff2020); shades.position.set(0, hy + 0.04, 0.26); torso.add(shades);
+        var spike = box(0.06, 0.32, 0.06, accent); spike.position.set(0, hy + 0.32, -0.05); torso.add(spike);
+      }
+    } else if (H === 'visor' || H === 'narrow') {
+      visor = new THREE.Mesh(new THREE.BoxGeometry(H === 'narrow' ? 0.22 : 0.38, H === 'narrow' ? 0.05 : 0.1, 0.06), glowMat(accent)); visor.position.set(0, hy, 0.25); torso.add(visor);
+      var chin2 = box(0.2, 0.1, 0.1, dark); chin2.position.set(0, hy - 0.12, 0.24); torso.add(chin2);
+      if (H === 'narrow') { var finN = box(0.06, 0.4, 0.3, trim); finN.position.set(0, hy + 0.28, -0.02); torso.add(finN); }
+      else { var brow = box(0.48, 0.06, 0.5, trim); brow.position.set(0, hy + 0.18, 0); torso.add(brow); }
+    } else if (H === 'mono') {
+      var rail = box(0.42, 0.1, 0.06, 0x101418); rail.position.set(0, hy, 0.25); torso.add(rail);
+      visor = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), glowMat(accent)); visor.position.set(0.06, hy, 0.27); torso.add(visor);
+      var horn = box(0.05, 0.42, 0.08, trim); horn.position.set(0.02, hy + 0.36, 0.06); horn.rotation.z = -0.15; horn.rotation.x = -0.3; torso.add(horn);
+      var cable = box(0.05, 0.05, 0.36, 0x1a1a20); cable.position.set(0.2, hy - 0.16, -0.1); torso.add(cable);
+    } else if (H === 'newtype') {
+      visor = box(0.36, 0.1, 0.06, 0x101418); visor.position.set(0, hy, 0.25); torso.add(visor);
+      var brow2 = box(0.5, 0.08, 0.5, trim); brow2.position.set(0, hy + 0.2, 0.02); torso.add(brow2);
+      [-1, 1].forEach(function (side) { var hornN = box(0.05, 0.5, 0.08, accent); hornN.position.set(side * 0.22, hy + 0.34, -0.1); hornN.rotation.z = side * 0.5; hornN.rotation.x = 0.5; torso.add(hornN); });
+    } else if (H === 'hood') {
+      var hood = box(0.5, 0.2, 0.52, dark); hood.position.set(0, hy + 0.2, -0.02); torso.add(hood);
+      var hoodBack = box(0.5, 0.36, 0.1, dark); hoodBack.position.set(0, hy, -0.24); torso.add(hoodBack);
+      visor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.06), glowMat(accent)); visor.position.set(0, hy, 0.22); torso.add(visor);
+    } else if (H === 'slit') {
+      // sunk into the shoulders, one wide slit
+      visor = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.05, 0.06), glowMat(accent)); visor.position.set(0, hy, 0.33); torso.add(visor);
+      var dome = box(0.7, 0.14, 0.5, trim); dome.position.set(0, hy + 0.18, -0.02); torso.add(dome);
+    } else if (H === 'muzzle') {
+      visor = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), glowMat(accent)); visor.position.set(0, hy + 0.06, 0.28); torso.add(visor);
+      var muzzle = box(0.24, 0.16, 0.24, dark); muzzle.position.set(0, hy - 0.1, 0.36); torso.add(muzzle);
+      var teeth2 = box(0.22, 0.04, 0.04, 0xf0f0f0); teeth2.position.set(0, hy - 0.12, 0.49); torso.add(teeth2);
+      var hornM = box(0.05, 0.4, 0.06, trim); hornM.position.set(0, hy + 0.34, 0.08); hornM.rotation.x = -0.4; torso.add(hornM);
+    }
+    if (!visor) { visor = box(0.36, 0.1, 0.06, accent); visor.position.set(0, hy, 0.25); torso.add(visor); }
+    var antenna = box(0.03, 0.34, 0.03, dark); antenna.position.set(0.2, hy + 0.32, -0.1); antenna.visible = H === 'visor' || H === 'narrow';
+    torso.add(antenna);
     parts.visor = visor;
 
     // ---- arms ----
     var armL = new THREE.Group(), armR = new THREE.Group();
     [armL, armR].forEach(function (arm, i) {
       var side = i === 0 ? -1 : 1;
-      var pad = box(0.5, 0.36, 0.54, trim); pad.position.set(side * 0.06, 0.16, 0);
-      var padTop = box(0.42, 0.1, 0.46, accent); padTop.position.set(side * 0.06, 0.38, 0);
-      var upper = box(0.28, 0.5, 0.3, body); upper.position.y = -0.2;
+      var ps = typeof S.pad === 'number' ? S.pad : 1.0;
+      var slim = S.legs === 'slim';
+      var pad = box(0.5 * ps, 0.36 * ps, 0.54 * ps, trim); pad.position.set(side * 0.06, 0.16, 0);
+      var padTop = box(0.42 * ps, 0.1, 0.46 * ps, accent); padTop.position.set(side * 0.06, 0.38 * ps, 0);
+      var upper = box(slim ? 0.22 : 0.28, 0.5, slim ? 0.24 : 0.3, body); upper.position.y = -0.2;
       var elbow = box(0.22, 0.12, 0.24, dark); elbow.position.y = -0.46;
-      var fore = box(0.3, 0.34, 0.32, dark); fore.position.y = -0.66;
+      var fore = box(slim ? 0.24 : 0.3, 0.34, slim ? 0.26 : 0.32, dark); fore.position.y = -0.66;
       var fist = box(0.26, 0.22, 0.26, body); fist.position.y = -0.88;
       arm.add(pad, padTop, upper, elbow, fore, fist);
-      arm.position.set(side * 0.76, 0.48, 0);
+      if (S.pad === 'spike') {
+        if (i === 0) {
+          // the spiked pauldron
+          var bigPad = box(0.6, 0.44, 0.6, trim); bigPad.position.set(-0.1, 0.2, 0); arm.add(bigPad);
+          for (var sp = 0; sp < 3; sp++) { var spk = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 4), mat(accent)); spk.position.set(-0.2 - sp * 0.08, 0.5 + sp * 0.02, -0.2 + sp * 0.2); arm.add(spk); }
+        } else {
+          var shield = box(0.08, 0.7, 0.5, body); shield.position.set(0.32, 0.0, 0); arm.add(shield);
+        }
+      }
+      if (S.legs === 'exposed') { var slabA = box(0.12, 0.4, 0.34, body); slabA.position.set(side * 0.18, -0.2, 0); arm.add(slabA); }
+      if (cfg.style === 'drill' || cfg.prop === 'drill') {
+        var dfore = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.6, 6), mat(trim)); dfore.rotation.x = Math.PI; dfore.position.y = -1.05; arm.add(dfore);
+      }
+      arm.position.set(side * (0.62 + 0.14 * cw), 0.48, 0);
       torso.add(arm);
     });
     parts.armL = armL; parts.armR = armR;
 
     torso.position.y = 1.72;
+    if (S.hunch) { torso.rotation.x = S.hunch; torso.position.y -= S.hunch * 0.5; }
     g.add(torso);
     parts.torso = torso;
 
@@ -519,6 +683,26 @@ GH.models = (function () {
       mat(0xe83838, { emissive: 0x601010 }));
     m.rotation.x = Math.PI / 2;
     return m;
+  };
+
+  // an alloy vein: a cluster of grey-blue crystals, richer ones taller and lit
+  M.buildOreNode = function (rich) {
+    var g = new THREE.Group();
+    var n = rich ? 6 : 4;
+    for (var i = 0; i < n; i++) {
+      var a = (i / n) * Math.PI * 2 + 0.3;
+      var h = (rich ? 1.1 : 0.7) + (i % 2) * 0.35;
+      var c = new THREE.Mesh(new THREE.ConeGeometry(0.22, h, 5),
+        mat(rich ? 0xc8d8f0 : 0x9aa4b0, rich ? { emissive: 0x304060, emissiveIntensity: 0.5 } : {}));
+      c.position.set(Math.cos(a) * 0.45, h / 2, Math.sin(a) * 0.45);
+      c.rotation.z = Math.cos(a) * 0.3; c.rotation.x = Math.sin(a) * 0.3;
+      g.add(c);
+    }
+    var base = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 0.25, 7), mat(0x50565e));
+    base.position.y = 0.12;
+    g.add(base);
+    blobShadow(g, 2.0);
+    return g;
   };
 
   // workshop materials: a grey alloy ingot, and a frame core that glows
@@ -1044,47 +1228,239 @@ GH.models = (function () {
   };
 
   // transformed frame: a folded speeder / skimmer form
-  M.buildSpeeder = function (cfg, kind) {
-    var g = new THREE.Group();
-    var body = cfg.body, accent = cfg.accent, dark = cfg.dark || 0x30343a;
-    if (kind === 'tank') {
-      // hover-tank: wide hull, a turret, skirts
-      var hullT = box(1.7, 0.5, 2.6, body); hullT.position.y = 0.7; g.add(hullT);
-      var skirtL = box(0.3, 0.3, 2.4, dark); skirtL.position.set(-0.95, 0.5, 0); g.add(skirtL);
-      var skirtR = box(0.3, 0.3, 2.4, dark); skirtR.position.set(0.95, 0.5, 0); g.add(skirtR);
-      var turret = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.4, 8), mat(accent)); turret.position.set(0, 1.15, -0.2); g.add(turret);
-      var barrel = box(0.16, 0.16, 1.6, dark); barrel.position.set(0, 1.2, 0.9); g.add(barrel);
-      var canopyT = box(0.5, 0.22, 0.5, 0x202830); canopyT.position.set(0, 1.45, -0.2); g.add(canopyT);
-    } else if (kind === 'disc') {
-      // disc: a flat saucer with an underslung cannon
-      var disc = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.1, 0.35, 10), mat(body)); disc.position.y = 0.8; g.add(disc);
-      var dome = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 5), mat(0x202830)); dome.position.y = 1.05; g.add(dome);
-      var ring = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.08, 4, 12), mat(accent)); ring.rotation.x = Math.PI / 2; ring.position.y = 0.8; g.add(ring);
-      var gunD = box(0.14, 0.14, 1.2, dark); gunD.position.set(0, 0.5, 0.9); g.add(gunD);
-    } else if (kind === 'bike') {
-      // hover-bike: narrow, long, a fork and a spine
-      var spine = box(0.5, 0.36, 2.6, body); spine.position.y = 0.8; g.add(spine);
-      var fork = box(0.3, 0.3, 0.9, dark); fork.position.set(0, 0.7, 1.5); fork.rotation.x = 0.4; g.add(fork);
-      var noseB = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.9, 4), mat(accent)); noseB.rotation.x = Math.PI / 2; noseB.position.set(0, 0.8, 1.9); g.add(noseB);
-      var seat = box(0.42, 0.18, 0.9, 0x202830); seat.position.set(0, 1.05, -0.2); g.add(seat);
-      var barL = box(0.6, 0.06, 0.06, dark); barL.position.set(0, 1.15, 0.7); g.add(barL);
-      var finB = box(0.08, 0.5, 0.7, dark); finB.position.set(0, 1.1, -1.1); g.add(finB);
-    } else {
-      var hull = box(0.9, 0.4, 2.4, body); hull.position.y = 0.75;
-      var nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.1, 4), mat(accent));
-      nose.rotation.x = Math.PI / 2;
-      nose.position.set(0, 0.75, 1.6);
-      var canopy = box(0.5, 0.28, 0.8, 0x202830); canopy.position.set(0, 1.05, 0.2);
-      var finL = box(0.1, 0.5, 0.9, dark); finL.position.set(-0.55, 0.95, -0.8); finL.rotation.z = 0.5;
-      var finR = box(0.1, 0.5, 0.9, dark); finR.position.set(0.55, 0.95, -0.8); finR.rotation.z = -0.5;
-      g.add(hull, nose, canopy, finL, finR);
+  // ---------------------------------------------------------------
+  // Vehicles (VECTOR forms). One builder per silhouette; the frame's
+  // palette carries over so a folded frame still reads as that frame.
+  // buildSpeeder(cfg, kind, shape): kind = drivetrain, shape = look.
+  // ---------------------------------------------------------------
+  var SHAPES = {};
+  function vcyl(rt, rb, h, seg, c, o) { return new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat(c, o)); }
+  function vcone(r, h, seg, c) { return new THREE.Mesh(new THREE.ConeGeometry(r, h, seg), mat(c)); }
+  function at(m, x, y, z) { m.position.set(x, y, z); return m; }
+  function glow(c) { return mat(c, { emissive: c, emissiveIntensity: 0.6 }); }
+
+  // --- hover-tank family ---
+  SHAPES.tank = function (g, P) {
+    g.add(at(box(1.7, 0.5, 2.6, P.body), 0, 0.7, 0));
+    g.add(at(box(0.3, 0.3, 2.4, P.dark), -0.95, 0.5, 0), at(box(0.3, 0.3, 2.4, P.dark), 0.95, 0.5, 0));
+    g.add(at(vcyl(0.5, 0.6, 0.4, 8, P.accent), 0, 1.15, -0.2));
+    g.add(at(box(0.16, 0.16, 1.6, P.dark), 0, 1.2, 0.9));
+    g.add(at(box(0.5, 0.22, 0.5, 0x202830), 0, 1.45, -0.2));
+  };
+  SHAPES.shieldtank = function (g, P) {
+    SHAPES.tank(g, P);
+    var sh = at(box(1.9, 1.0, 0.16, P.trim), 0, 0.9, 1.5); sh.rotation.x = -0.25; g.add(sh);
+    g.add(at(box(0.5, 0.5, 0.06, P.accent), 0, 0.95, 1.6));
+    g.add(at(box(0.12, 0.7, 0.4, P.accent), 0, 1.7, -0.6));
+  };
+  SHAPES.guntank = function (g, P) {
+    g.add(at(box(1.6, 0.6, 2.4, P.body), 0, 0.7, 0));
+    [-0.85, 0.85].forEach(function (x) { g.add(at(box(0.36, 0.5, 2.6, P.dark), x, 0.5, 0)); });
+    var ring = at(vcyl(0.7, 0.7, 0.24, 10, P.trim), 0, 1.12, -0.2); g.add(ring);
+    [-0.3, 0.3].forEach(function (x) {
+      g.add(at(box(0.14, 0.14, 1.9, P.dark), x, 1.3, 0.8));
+      g.add(at(box(0.2, 0.2, 0.3, P.accent), x, 1.3, 1.8));
+    });
+    g.add(at(box(0.6, 0.26, 0.6, 0x202830), 0, 1.4, -0.5));
+    g.add(at(vcyl(0.22, 0.22, 0.5, 6, P.accent), -0.6, 1.2, -0.9));
+  };
+  SHAPES.halftrack = function (g, P) {
+    g.add(at(box(1.3, 0.6, 1.2, P.body), 0, 0.85, 0.8));
+    g.add(at(box(1.0, 0.5, 0.8, 0x202830), 0, 1.3, 0.9));
+    g.add(at(box(1.6, 0.5, 1.6, P.dark), 0, 0.6, -0.7));
+    [-0.7, 0.7].forEach(function (x) { g.add(at(box(0.4, 0.55, 1.6, P.trim), x, 0.45, -0.7)); });
+    [-0.55, 0.55].forEach(function (x) { g.add(at(vcyl(0.3, 0.3, 0.2, 8, P.dark), x, 0.35, 1.3)); });
+    var rot = at(vcyl(0.2, 0.2, 1.4, 6, P.accent), 0, 1.35, -0.4); rot.rotation.x = Math.PI / 2; g.add(rot);
+    [0, 1, 2].forEach(function (i) { var b = at(vcyl(0.05, 0.05, 1.4, 4, P.dark), Math.cos(i * 2.1) * 0.2, 1.35 + Math.sin(i * 2.1) * 0.2, -0.4); b.rotation.x = Math.PI / 2; g.add(b); });
+  };
+  SHAPES.crawler = function (g, P) {
+    g.add(at(box(2.0, 0.6, 2.8, P.body), 0, 0.75, 0));
+    [-1.1, 1.1].forEach(function (x) { g.add(at(box(0.5, 0.7, 3.0, P.dark), x, 0.5, 0)); for (var i = -1; i <= 1; i++) g.add(at(vcyl(0.22, 0.22, 0.55, 8, P.trim), x, 0.35, i * 1.0)); });
+    var m = at(vcyl(0.3, 0.36, 1.6, 7, P.dark), 0, 1.3, 0.2); m.rotation.x = Math.PI / 2 - 0.55; g.add(m);
+    g.add(at(box(0.9, 0.5, 0.9, P.accent), 0, 1.25, -0.5));
+    g.add(at(box(0.4, 0.2, 0.4, 0x202830), 0, 1.6, -0.5));
+  };
+  SHAPES.sled = function (g, P) {
+    g.add(at(box(2.2, 0.36, 2.6, P.body), 0, 0.55, 0));
+    var prow = at(box(2.2, 0.8, 0.3, P.trim), 0, 0.8, 1.35); prow.rotation.x = -0.35; g.add(prow);
+    [-0.6, 0.6].forEach(function (x) { var l = at(vcone(0.12, 1.2, 4, P.accent), x, 0.85, 2.2); l.rotation.x = Math.PI / 2; g.add(l); });
+    [-1.0, 1.0].forEach(function (x) { g.add(at(box(0.3, 0.2, 2.8, P.dark), x, 0.35, 0)); });
+    g.add(at(box(0.6, 0.4, 0.8, 0x202830), 0, 0.95, -0.4));
+    g.add(at(box(1.2, 0.5, 0.2, P.accent), 0, 1.0, -1.3));
+  };
+  SHAPES.hearse = function (g, P) {
+    g.add(at(box(1.4, 0.7, 3.0, P.body), 0, 0.8, 0));
+    g.add(at(box(1.5, 0.12, 3.1, P.trim), 0, 1.2, 0));
+    [-0.85, 0.85].forEach(function (x) { g.add(at(box(0.3, 0.5, 3.0, P.dark), x, 0.45, 0)); });
+    [-0.8, 0.8].forEach(function (x) { var fin = at(box(0.06, 0.8, 1.2, P.accent), x, 1.5, -0.6); fin.rotation.z = x > 0 ? -0.3 : 0.3; g.add(fin); });
+    var scythe = at(box(0.08, 0.1, 1.6, P.accent), 0, 1.35, 1.2); scythe.rotation.y = 0.5; g.add(scythe);
+    g.add(at(box(0.5, 0.3, 0.6, 0x202830), 0, 1.35, 0.6));
+  };
+  SHAPES.barge = function (g, P) {
+    g.add(at(box(2.4, 0.8, 3.2, P.body), 0, 0.9, 0));
+    g.add(at(box(2.6, 0.2, 3.4, P.trim), 0, 1.35, 0));
+    [-1.3, 1.3].forEach(function (x) { g.add(at(box(0.5, 0.9, 3.2, P.dark), x, 0.5, 0)); });
+    [-0.7, 0.7].forEach(function (x) { g.add(at(vcyl(0.4, 0.45, 0.4, 8, P.dark), x, 1.65, -0.4)); g.add(at(box(0.14, 0.14, 1.3, P.accent), x, 1.7, 0.4)); });
+    g.add(at(box(0.8, 0.5, 0.8, 0x202830), 0, 1.7, -1.0));
+    var core = at(new THREE.Mesh(new THREE.OctahedronGeometry(0.3), glow(P.accent)), 0, 1.6, 1.2); g.add(core);
+  };
+
+  // --- hover-bike family ---
+  SHAPES.bike = function (g, P) {
+    g.add(at(box(0.5, 0.36, 2.6, P.body), 0, 0.8, 0));
+    var fork = at(box(0.3, 0.3, 0.9, P.dark), 0, 0.7, 1.5); fork.rotation.x = 0.4; g.add(fork);
+    var nose = at(vcone(0.3, 0.9, 4, P.accent), 0, 0.8, 1.9); nose.rotation.x = Math.PI / 2; g.add(nose);
+    g.add(at(box(0.42, 0.18, 0.9, 0x202830), 0, 1.05, -0.2));
+    g.add(at(box(0.6, 0.06, 0.06, P.dark), 0, 1.15, 0.7));
+    g.add(at(box(0.08, 0.5, 0.7, P.dark), 0, 1.1, -1.1));
+    [-0.35, 0.35].forEach(function (x) { var claw = at(box(0.1, 0.16, 0.5, P.trim), x, 0.5, 0.6); claw.rotation.z = x > 0 ? 0.4 : -0.4; g.add(claw); });
+  };
+  SHAPES.stealthbike = function (g, P) {
+    var hull = at(box(0.6, 0.26, 2.8, P.dark), 0, 0.72, 0); g.add(hull);
+    var top = at(box(0.5, 0.2, 1.4, P.body), 0, 0.92, 0.3); top.rotation.x = -0.1; g.add(top);
+    var nose = at(vcone(0.28, 1.1, 3, P.dark), 0, 0.75, 1.9); nose.rotation.x = Math.PI / 2; g.add(nose);
+    g.add(at(box(0.34, 0.12, 0.7, 0x101418), 0, 1.05, -0.3));
+    [-0.4, 0.4].forEach(function (x) { var fin = at(box(0.05, 0.4, 0.9, P.accent), x, 0.9, -1.0); fin.rotation.z = x > 0 ? -0.9 : 0.9; g.add(fin); });
+    g.add(at(box(0.5, 0.05, 0.05, glow(P.accent) && P.accent), 0, 0.72, 1.2));
+  };
+  SHAPES.lancebike = function (g, P) {
+    SHAPES.bike(g, P);
+    var lance = at(vcyl(0.05, 0.1, 2.2, 6, P.trim), 0, 0.85, 2.0); lance.rotation.x = Math.PI / 2; g.add(lance);
+    (function () { var _m = at(vcone(0.12, 0.5, 4, P.accent), 0, 0.85, 3.2); _m.rotation.x = Math.PI / 2; g.add(_m); })();
+  };
+  SHAPES.drillbike = function (g, P) {
+    g.add(at(box(0.8, 0.5, 2.0, P.body), 0, 0.9, -0.2));
+    var drill = at(vcone(0.45, 1.5, 8, P.accent), 0, 0.9, 1.5); drill.rotation.x = Math.PI / 2; g.add(drill);
+    [[-0.5, 0.6], [0.5, 0.6], [-0.5, -0.9], [0.5, -0.9]].forEach(function (l) {
+      g.add(at(box(0.2, 0.7, 0.2, P.dark), l[0], 0.4, l[1]));
+      g.add(at(box(0.3, 0.14, 0.4, P.trim), l[0], 0.08, l[1] + 0.1));
+    });
+    g.add(at(box(0.5, 0.3, 0.6, 0x202830), 0, 1.25, -0.4));
+    g.add(at(box(0.7, 0.08, 0.3, P.accent), 0, 1.15, 0.5)); // the shades
+  };
+
+  // --- beast family (four legs) ---
+  SHAPES.beast = function (g, P) {
+    g.add(at(box(0.9, 0.6, 2.2, P.body), 0, 0.95, 0));
+    var head = at(box(0.6, 0.45, 0.7, P.body), 0, 1.15, 1.35); g.add(head);
+    g.add(at(box(0.36, 0.08, 0.1, P.accent), 0, 1.2, 1.72));
+    [[-0.5, 0.7], [0.5, 0.7], [-0.5, -0.8], [0.5, -0.8]].forEach(function (l) {
+      var thigh = at(box(0.24, 0.6, 0.3, P.dark), l[0], 0.65, l[1]); thigh.rotation.x = l[1] > 0 ? -0.5 : 0.5; g.add(thigh);
+      g.add(at(box(0.2, 0.5, 0.2, P.trim), l[0], 0.28, l[1] + (l[1] > 0 ? 0.25 : -0.25)));
+    });
+    var tail = at(box(0.14, 0.14, 1.0, P.dark), 0, 1.1, -1.5); tail.rotation.x = -0.4; g.add(tail);
+    [-0.25, 0.25].forEach(function (x) { g.add(at(box(0.06, 0.3, 0.1, P.accent), x, 1.5, 1.3)); });
+  };
+  SHAPES.drillpod = function (g, P) {
+    g.add(at(box(1.0, 0.9, 1.0, P.body), 0, 0.95, 0));
+    g.add(at(box(0.7, 0.14, 0.1, P.accent), 0, 1.1, 0.52));   // the grin
+    g.add(at(box(0.5, 0.1, 0.1, 0x101418), 0, 0.8, 0.52));
+    var drill = at(vcone(0.35, 1.0, 8, P.trim), 0, 0.95, 1.0); drill.rotation.x = Math.PI / 2; g.add(drill);
+    [[-0.45, 0.35], [0.45, 0.35], [-0.45, -0.35], [0.45, -0.35]].forEach(function (l) { g.add(at(box(0.2, 0.5, 0.2, P.dark), l[0], 0.28, l[1])); });
+    var key = at(box(0.1, 0.5, 0.1, P.accent), 0, 1.55, -0.2); g.add(key);
+    g.add(at(box(0.3, 0.1, 0.1, P.accent), 0, 1.8, -0.2));
+  };
+  SHAPES.feral = function (g, P) {
+    g.add(at(box(0.7, 0.5, 2.4, P.body), 0, 0.9, 0));
+    var skull = at(box(0.5, 0.4, 0.8, P.dark), 0, 1.0, 1.5); g.add(skull);
+    g.add(at(box(0.4, 0.06, 0.06, P.accent), 0, 1.1, 1.9));
+    [[-0.45, 0.6], [0.45, 0.6], [-0.45, -0.7], [0.45, -0.7]].forEach(function (l) {
+      var arm = at(box(0.18, 0.9, 0.18, P.dark), l[0], 0.5, l[1]); arm.rotation.x = l[1] > 0 ? -0.4 : 0.4; g.add(arm);
+      g.add(at(box(0.3, 0.1, 0.34, P.trim), l[0], 0.06, l[1] + (l[1] > 0 ? 0.35 : -0.35)));
+    });
+    [-0.3, 0.3].forEach(function (x) { g.add(at(box(0.08, 0.7, 0.16, P.trim), x, 1.4, -0.4)); }); // shoulder pylons
+    g.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5), glow(0xff3040)), 0, 1.0, 0.4)); // the core
+  };
+
+  // --- disc family ---
+  SHAPES.disc = function (g, P) {
+    g.add(at(vcyl(1.3, 1.1, 0.35, 10, P.body), 0, 0.8, 0));
+    g.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 5), mat(0x202830)), 0, 1.05, 0));
+    var ring = at(new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.08, 4, 12), mat(P.accent)), 0, 0.8, 0); ring.rotation.x = Math.PI / 2; g.add(ring);
+    g.add(at(box(0.14, 0.14, 1.2, P.dark), 0, 0.5, 0.9));
+    for (var i = 0; i < 6; i++) { var a = i / 6 * Math.PI * 2; g.add(at(box(0.16, 0.06, 0.3, glow(P.accent) && P.accent), Math.cos(a) * 1.0, 1.0, Math.sin(a) * 1.0)); }
+  };
+  SHAPES.reaperdisc = function (g, P) {
+    g.add(at(vcyl(1.2, 1.0, 0.4, 8, P.dark), 0, 0.8, 0));
+    g.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 5), mat(P.body)), 0, 1.05, 0));
+    for (var i = 0; i < 4; i++) {
+      var a = i / 4 * Math.PI * 2;
+      var blade = at(box(0.9, 0.06, 0.28, P.accent), Math.cos(a) * 1.5, 0.8, Math.sin(a) * 1.5);
+      blade.rotation.y = -a + 0.6; g.add(blade);
     }
+    g.add(at(box(0.5, 0.3, 0.5, 0x101418), 0, 1.3, -0.2));
+  };
+  SHAPES.fortressdisc = function (g, P) {
+    g.add(at(vcyl(1.6, 1.4, 0.6, 10, P.body), 0, 0.85, 0));
+    g.add(at(vcyl(1.7, 1.7, 0.12, 10, P.trim), 0, 1.2, 0));
+    var m = at(vcyl(0.28, 0.34, 1.5, 7, P.dark), 0, 1.6, 0.2); m.rotation.x = Math.PI / 2 - 0.6; g.add(m);
+    g.add(at(box(0.7, 0.5, 0.7, P.accent), 0, 1.5, -0.4));
+    for (var i = 0; i < 4; i++) { var a = i / 4 * Math.PI * 2 + 0.4; g.add(at(box(0.5, 0.36, 0.5, P.dark), Math.cos(a) * 1.3, 1.35, Math.sin(a) * 1.3)); }
+    g.add(at(box(0.5, 0.24, 0.5, 0x202830), 0, 1.9, -0.4));
+  };
+  SHAPES.binderdisc = function (g, P) {
+    SHAPES.disc(g, P);
+    [-1, 1].forEach(function (side) {
+      var b = at(box(0.14, 1.2, 0.9, P.trim), side * 1.4, 1.3, -0.4); b.rotation.z = side * 0.35; g.add(b);
+      for (var i = 0; i < 3; i++) g.add(at(box(0.06, 0.2, 0.3, glow(P.accent) && P.accent), side * 1.45, 0.9 + i * 0.35, -0.4 - i * 0.2));
+    });
+  };
+
+  // --- waverider / jet family ---
+  SHAPES.wing = function (g, P) {
+    var hull = at(box(0.9, 0.3, 2.6, P.body), 0, 0.8, 0); g.add(hull);
+    [-1, 1].forEach(function (side) {
+      var w = at(box(1.6, 0.08, 1.2, P.dark), side * 1.0, 0.8, -0.5); w.rotation.y = side * -0.5; g.add(w);
+      var blade = at(box(0.9, 0.05, 0.16, P.accent), side * 1.6, 0.82, 0.2); blade.rotation.y = side * -0.5; g.add(blade);
+    });
+    g.add(at(box(0.5, 0.22, 0.9, 0x202830), 0, 1.0, 0.3));
+    var nose = at(vcone(0.3, 1.2, 4, P.trim), 0, 0.8, 1.9); nose.rotation.x = Math.PI / 2; g.add(nose);
+  };
+  SHAPES.jet = function (g, P) {
+    var hull = at(box(0.7, 0.5, 3.0, P.body), 0, 0.85, 0); g.add(hull);
+    var lance = at(vcone(0.25, 1.6, 4, P.accent), 0, 0.85, 2.3); lance.rotation.x = Math.PI / 2; g.add(lance);
+    [-1, 1].forEach(function (side) {
+      var w = at(box(1.4, 0.08, 0.9, P.trim), side * 1.0, 0.85, -0.6); w.rotation.y = side * -0.35; g.add(w);
+      var tail = at(box(0.06, 0.7, 0.6, P.dark), side * 0.35, 1.25, -1.3); tail.rotation.z = side * -0.5; g.add(tail);
+    });
+    g.add(at(box(0.44, 0.24, 1.0, 0x202830), 0, 1.15, 0.4));
+    [-0.25, 0.25].forEach(function (x) { (function () { var _m = at(vcyl(0.16, 0.2, 0.5, 6, P.dark), x, 0.85, -1.4); _m.rotation.x = Math.PI / 2; g.add(_m); })(); });
+  };
+  SHAPES.broom = function (g, P) {
+    var staff = at(vcyl(0.12, 0.16, 3.4, 6, P.dark), 0, 0.85, 0); staff.rotation.x = Math.PI / 2; g.add(staff);
+    g.add(at(new THREE.Mesh(new THREE.OctahedronGeometry(0.4), glow(P.accent)), 0, 0.85, 1.9));
+    [-1, 1].forEach(function (side) { var w = at(box(1.1, 0.06, 0.7, P.body), side * 0.7, 0.85, -0.3); w.rotation.y = side * -0.6; g.add(w); });
+    g.add(at(box(0.4, 0.2, 0.9, 0x202830), 0, 1.02, -0.2));
+    for (var i = 0; i < 5; i++) (function () { var _m = at(box(0.06, 0.4, 0.06, P.trim), 0, 0.85, -1.5 - i * 0.12); _m.rotation.z = (i - 2) * 0.35; g.add(_m); })();
+  };
+  SHAPES.skiff = function (g, P) {
+    var hull = at(box(0.8, 0.36, 2.8, P.body), 0, 0.85, 0); g.add(hull);
+    var wing = at(box(0.1, 1.8, 1.4, P.trim), 0.6, 1.4, -0.6); wing.rotation.z = -0.9; wing.rotation.x = 0.3; g.add(wing);
+    g.add(at(box(0.44, 0.22, 0.9, 0x202830), 0, 1.05, 0.2));
+    var nose = at(vcone(0.28, 1.0, 5, P.accent), 0, 0.85, 1.9); nose.rotation.x = Math.PI / 2; g.add(nose);
+    (function () { var _m = at(new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.05, 4, 10), glow(P.accent)), 0, 0.85, -1.5); _m.rotation.y = 0; g.add(_m); })();
+  };
+  SHAPES.comet = function (g, P) {
+    var hull = at(box(0.8, 0.4, 3.2, P.body), 0, 0.85, 0); g.add(hull);
+    [-1, 1].forEach(function (side) { var w = at(box(1.2, 0.08, 1.0, P.body), side * 0.9, 0.85, -0.8); w.rotation.y = side * -0.7; g.add(w); });
+    [-0.3, 0, 0.3].forEach(function (x) { (function () { var _m = at(vcyl(0.16, 0.22, 0.6, 6, P.dark), x, 0.85, -1.7); _m.rotation.x = Math.PI / 2; g.add(_m); })(); });
+    g.add(at(box(0.4, 0.2, 0.9, 0x202830), 0, 1.08, 0.5));
+    var nose = at(vcone(0.3, 1.2, 4, P.accent), 0, 0.85, 2.2); nose.rotation.x = Math.PI / 2; g.add(nose);
+    g.add(at(box(0.6, 0.5, 0.1, P.accent), 0, 1.2, -1.2)); // the emblem plate
+  };
+
+  M.buildSpeeder = function (cfg, kind, shape) {
+    var g = new THREE.Group();
+    var P = { body: cfg.body, accent: cfg.accent, dark: cfg.dark || 0x30343a, trim: cfg.trim || cfg.accent };
+    var fn = SHAPES[shape] || SHAPES[kind] || SHAPES.bike;
+    fn(g, P);
     var flames = [];
+    var isBeast = kind === 'beast';
     [-0.28, 0.28].forEach(function (x) {
       var flame = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.9, 4),
         new THREE.MeshBasicMaterial({ color: 0x70c0ff, transparent: true, opacity: 0.85 }));
       flame.rotation.x = -Math.PI / 2;
-      flame.position.set(x, 0.75, -1.5);
+      flame.position.set(x, isBeast ? 1.0 : 0.75, isBeast ? -1.3 : -1.5);
       g.add(flame);
       flames.push(flame);
     });

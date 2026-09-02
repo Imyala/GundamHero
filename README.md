@@ -49,6 +49,15 @@ MMO-style: **W/S** walk, **A/D** turn, **Q/E** strafe, **hold RIGHT MOUSE** to l
   has 5 packs (AILE, SWORD, LAUNCHER, STORM, PHANTOM) in 3 marks (MK.II → CUSTOM → PROTOTYPE), plus 7 RELIC
   frames gated behind feats.
 
+## Vehicles, drifting, and living in the Reach
+
+Every lineage folds into two vehicles (23 designs: tanks, crawlers, bikes, beasts, discs, waveriders);
+pick one on the frame select screen and build the second in the WORKSHOP → VECTORS tab. Drifting charges a
+turbo through three tiers and pays it on release; a slide cooks the skids after 3.4 s. Nitro launches you
+higher off crests and keeps burning in the air. The Reach has zone diaries (WORLD MAP), a daily task board
+(BROKER), alloy veins to mine, and cache signals to chase. Details: `docs/design/13-world-life-vehicles-balance.md`.
+`node tools/balance.js` audits frame power; `tools/gallery.html` renders every frame and vehicle.
+
 ## Runs
 
 From the pause menu: **EXIT RUN** saves (the Reach keeps your pilot; an arena climb is parked at its current

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HERO FRAME — model gallery (dev)</title>
+<style>
+  body { margin: 0; background: #0a0e20; color: #ddd; font: 12px "Courier New", monospace; }
+  #wrap { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
+  .cell { width: 150px; text-align: center; }
+  canvas { background: #182040; border: 1px solid #3a4456; image-rendering: pixelated; }
+  h2 { margin: 8px; font-size: 14px; letter-spacing: 2px; color: #f0d888; }
+</style>
+</head>
+<body>
+<h2 id="title">LOADING</h2>
+<div id="wrap"></div>
+<script src="../lib/three.min.js"></script>
+<script src="../js/util.js"></script>
+<script src="../js/assets.js"></script>
+<script src="../js/gems.js"></script>
+<script src="../js/stages.js"></script>
+<script src="../js/models.js"></script>
+<script src="../js/mechs.js"></script>
+<script src="../js/controls.js"></script>
+<script src="../js/meta.js"></script>
+<script src="../js/upgrades.js"></script>
+<script src="../js/enemies.js"></script>
+<script src="../js/progress.js"></script>
+<script src="../js/skills.js"></script>
+<script src="../js/roster.js"></script>
+<script src="../js/vehicles.js"></script>
+<script src="../js/worldlife.js"></script>
+<script>
+// Renders every frame and vehicle to its own thumbnail so silhouettes can
+// be checked side by side. ?what=frames|vehicles|base  ?size=150
+(function () {
+  var q = new URLSearchParams(location.search);
+  var what = q.get('what') || 'base';
+  var size = parseInt(q.get('size') || '150', 10);
+  GH.assets.init();
+  GH.meta.load();
+  var renderer = new THREE.WebGLRenderer({ antialias: false });
+  renderer.setSize(size, size);
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x182040);
+  var hemi = new THREE.HemisphereLight(0xdfe8ff, 0x303848, 1.0); scene.add(hemi);
+  var sun = new THREE.DirectionalLight(0xfff0d0, 0.9); sun.position.set(3, 6, 4); scene.add(sun);
+  var cam = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
+  var list = [];
+  if (what === 'vehicles') {
+    GH.vehicles.DESIGNS.forEach(function (d) {
+      var def = GH.mechById(d.lineage);
+      list.push({ name: d.name + ' (' + d.kind + ')', build: function () { return GH.models.buildSpeeder(def.model, d.kind, d.shape); }, veh: true });
+    });
+  } else {
+    GH.mechs.forEach(function (m) {
+      if (what === 'base' && m.kind !== 'starter' && m.kind !== 'feat' && m.kind !== 'craft' && m.kind !== 'relic') return;
+      if (what === 'base' && m.pack && m.kind !== 'relic') return;
+      list.push({ name: m.name, build: function () { var cfg = {}; for (var k in m.model) cfg[k] = m.model[k]; return GH.models.buildMech(cfg); } });
+    });
+  }
+  document.getElementById('title').textContent = what.toUpperCase() + ' — ' + list.length + ' models';
+  var wrap = document.getElementById('wrap');
+  list.forEach(function (it) {
+    var g = it.build();
+    g.rotation.y = it.veh ? -0.7 : 0.5;
+    scene.add(g);
+    if (it.veh) { cam.position.set(3.2, 2.6, 4.2); cam.lookAt(0, 0.8, 0); }
+    else { cam.position.set(0, 2.0, 5.6); cam.lookAt(0, 1.5, 0); }
+    renderer.render(scene, cam);
+    var c = document.createElement('canvas'); c.width = size; c.height = size;
+    c.getContext('2d').drawImage(renderer.domElement, 0, 0);
+    scene.remove(g);
+    var cell = document.createElement('div'); cell.className = 'cell';
+    cell.appendChild(c);
+    var lab = document.createElement('div'); lab.textContent = it.name; cell.appendChild(lab);
+    wrap.appendChild(cell);
+  });
+})();
+</script>
+</body>
+</html>

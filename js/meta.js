@@ -21,6 +21,13 @@ GH.meta = (function () {
       feats: {},
       // a CLASSIC / ARENA / WEEKLY run left mid-way with EXIT RUN
       suspended: null,
+      // vehicle designs: chosen per lineage, and the second designs bought
+      vectorPick: {},
+      vectorsOwned: {},
+      // world life: zone diaries, the daily board, today's mined veins
+      diary: {},
+      daily: null,
+      nodesMined: {},
       stages: 1,
       devotion: { sol: 0, pyre: 0, keen: 0, verd: 0, ruin: 0 },
       activeDevotion: 'sol',

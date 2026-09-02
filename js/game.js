@@ -308,6 +308,7 @@ GH.game = (function () {
     var skl = GH.skills.bonuses(); // the pilot's trained tree
     var p = {
       def: mechDef,
+      vec: GH.vehicles.activeFor(mechDef),
       mesh: GH.models.buildMech(mechDef.model),
       x: 0, z: 0, facing: 0, moveX: 0, moveZ: 0,
       stats: {
@@ -692,6 +693,7 @@ GH.game = (function () {
         GH.audio.win();
         coinsRun += 25;
         grantMats(8 + (zoneNow ? zoneNow.danger * 3 : 0), Math.random() < 0.3 ? 1 : 0, false);
+        lifeEvent('nests', 1);
         saveExpedition();
       }
       // THE HARROW falls — locked out until it re-roosts tomorrow
@@ -742,11 +744,17 @@ GH.game = (function () {
       }
     }
 
+    // world life: diaries and the daily board
+    if (!e.nestId) {
+      lifeEvent('kills', 1);
+      if (e.elite) lifeEvent('elites', 1);
+    }
     // progression hooks: collection log, contracts, trials, season, ciphers
     GH.progress.logKill(e.id);
     var cdone = GH.progress.contractKill(e.id, stage.id);
     if (cdone && expActive) GH.factions.deed(curZone, 'contract', 8);
     if (cdone) {
+      lifeEvent('contract', 1);
       queueAnnounce('CONTRACT COMPLETE — +' + cdone.salvage + ' SALVAGE, +' + cdone.pts + ' PTS', 22);
       GH.audio.win();
       seasonAwardNotify(GH.progress.seasonCounter('contracts', 1));
@@ -2407,6 +2415,13 @@ GH.game = (function () {
     else if (pk.type === 'cache') {
       var loot = GH.progress.openCache();
       coinsRun += loot.salvage;
+      if (pk.signal) {
+        signalSpot = null;
+        var sgPerk = expActive ? GH.worldlife.zonePerk(curZone).alloy : 1;
+        grantMats(Math.round((18 + (zoneNow ? zoneNow.danger * 8 : 0)) * sgPerk), zoneNow && zoneNow.danger >= 3 && Math.random() < 0.4 ? 1 : 0, true);
+        queueAnnounce('SIGNAL CACHE RECOVERED', 22);
+        lifeEvent('signals', 1);
+      }
       if (loot.unique) {
         queueAnnounce('CACHE — ' + loot.unique.name.toUpperCase() + ' UNLOCKED', 24);
       } else if (loot.gem) {
@@ -2415,7 +2430,12 @@ GH.game = (function () {
       }
       if (!silent) GH.audio.win();
     }
-    else if (pk.type === 'alloy') { grantMats(GH.rand(1, 3) | 0 || 1, 0, silent); }
+    else if (pk.type === 'alloy') {
+      var alN = (GH.rand(1, 3) | 0) || 1;
+      if (expActive) alN = Math.round(alN * GH.worldlife.zonePerk(curZone).alloy * (1 + (zoneNow ? (zoneNow.danger - 1) * 0.25 : 0)));
+      grantMats(alN, 0, silent);
+      lifeEvent('alloy', alN);
+    }
     else if (pk.type === 'core') { grantMats(0, 1, silent); }
     else { coinsRun++; if (!silent) GH.audio.coin(); }
   }
@@ -2681,6 +2701,7 @@ GH.game = (function () {
   // =================================================================
   function startWave(n) {
     waveNum = n;
+    if (n === 10) lifeEvent('wave10', 1);
     wavePlan = GH.wavePlan(stage, n, G.mode !== 'classic');
     if (weekly) {
       wavePlan.rate *= weekly.mods.rate;
@@ -3064,7 +3085,10 @@ GH.game = (function () {
       heading: player.facing || 0, spd: 0, nitro: 0, nitroT: 0,
       slip: 0, fwd: 0, top: 1, drift: false, crashCd: 0,
       skidT: 0, streakT: 0, score: 0,
-      air: false, hgt: 0, vy: 0, bog: 0, bogMsg: false, offTrack: false, jumpMsgT: 0
+      // drift state: time in the slide, charge tier, cooldown after a release,
+      // how long the wheel has been straight, turbo left from the last release
+      driftT: 0, driftTier: 0, driftCd: 0, straightT: 0, turboT: 0, driftHeat: 0,
+      air: false, hgt: 0, vy: 0, airT: 0, nitroJump: 0, bog: 0, bogMsg: false, offTrack: false, jumpMsgT: 0
     };
   }
 
@@ -3072,7 +3096,7 @@ GH.game = (function () {
     var d = player.drive;
     if (!d || d.bog === undefined) d = player.drive = freshDrive();
     player.dashTime = 0; // no frame-dash on the throttle
-    var V = GH.VECTORS[player.def.vector] || GH.VECTORS.bike;
+    var V = GH.VECTORS[player.vec.kind] || GH.VECTORS.bike;
     var top = spd * 3.3 * V.top;
     // the bottle: SHIFT burns while there's charge
     var wantNitro = !!input.special && d.nitro > 0.03 && !d.air;
@@ -3085,7 +3109,7 @@ GH.game = (function () {
     var nitroOn = d.nitroT > 0;
     if (nitroOn) top *= 1.5;
     var hasInput = player.moveX !== 0 || player.moveZ !== 0;
-    d.drift = !!input.boostHeld && d.spd > top * 0.2 && !d.air;
+    var steerIn = 0; // -1..1, filled by whichever steering model runs below
     var T = GH.terrain;
     var fx0 = Math.sin(d.heading), fz0 = Math.cos(d.heading);
     // the ground ahead: how steep, how soft, what it is
@@ -3099,6 +3123,7 @@ GH.game = (function () {
       var sfM = GH.clamp(Math.abs(d.spd) / Math.max(0.01, top), 0, 1);
       var turnM = (d.drift ? 3.8 : 2.6 - sfM * 1.1) * dt * authority;
       // a standing skimmer still pivots, just slower
+      steerIn = mmo.steer;
       if (mmo.steer) d.heading -= mmo.steer * turnM * (d.spd < -0.5 ? -1 : 1) * (Math.abs(d.spd) < 1 ? 0.6 : 1);
       if (mmo.thr > 0.05 && !d.air) {
         d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * V.accel * mmo.thr * dt);
@@ -3113,6 +3138,8 @@ GH.game = (function () {
       var speedFrac = GH.clamp(Math.abs(d.spd) / Math.max(0.01, top), 0, 1);
       // grip narrows the wheel at speed; a drift throws it wide open
       var turn = (d.drift ? 3.8 : 2.6 - speedFrac * 1.1) * dt * authority;
+      var wdiff = Math.atan2(Math.sin(want - d.heading), Math.cos(want - d.heading));
+      steerIn = GH.clamp(-wdiff / 0.8, -1, 1);
       d.heading = approachAngle(d.heading, want, turn);
       var dot = Math.sin(d.heading) * player.moveX + Math.cos(d.heading) * player.moveZ;
       if (dot < -0.55 && d.spd > 1.5) {
@@ -3125,7 +3152,58 @@ GH.game = (function () {
     } else {
       d.spd = d.spd > 0 ? Math.max(0, d.spd - (d.drift ? 6 : 12) * dt) : Math.min(0, d.spd + 12 * dt);
     }
-    if (d.drift) d.spd = Math.max(0, d.spd - 3.5 * dt); // the slide scrubs speed
+    // ---- the drift, arcade rules (Underground entry, Ridge Racer exit, Kart turbo) ----
+    // Entry: hold the drift button while steering at speed. The tail steps
+    // out with a lateral kick. Sustain: the slide charges a turbo through
+    // three tiers (0.8 / 1.8 / 2.8 s) and scrubs speed the whole time.
+    // Exit: let go, straighten the wheel for a quarter second, hit a wall,
+    // run out of speed, or cook the skids past 3.4 s (forced release).
+    // Every exit pays the charged turbo and starts a short cooldown, so a
+    // held button can never slide forever.
+    d.driftCd = Math.max(0, d.driftCd - dt);
+    d.turboT = Math.max(0, d.turboT - dt);
+    // seat time counts for the diaries and the daily board
+    d.lifeT = (d.lifeT || 0) + dt;
+    if (d.lifeT >= 5) { lifeEvent('driveT', d.lifeT); d.lifeT = 0; }
+    d.driftHeat = Math.max(0, d.driftHeat - dt * 0.5);
+    var wantDrift = !!input.boostHeld && !d.air && d.driftCd <= 0 && d.driftHeat < 0.5;
+    if (!d.drift) {
+      if (wantDrift && d.spd > top * 0.35 && Math.abs(steerIn) > 0.25) {
+        d.drift = true; d.driftT = 0; d.driftTier = 0; d.straightT = 0;
+        d.spd *= 0.95;
+        // lateral kick toward the outside of the turn
+        var kick = 0.32 * d.spd * steerIn;
+        player.velX += Math.cos(d.heading) * kick;
+        player.velZ += -Math.sin(d.heading) * kick;
+        GH.audio.dash();
+      }
+    } else {
+      d.driftT += dt;
+      d.driftTier = d.driftT > 2.8 ? 3 : d.driftT > 1.8 ? 2 : d.driftT > 0.8 ? 1 : 0;
+      d.spd = Math.max(0, d.spd - (3.5 + d.slip * 0.25) * dt); // the slide scrubs speed
+      // a straight wheel with a settled tail snaps back into grip
+      if (Math.abs(steerIn) < 0.15 && d.slip < 1.0) d.straightT += dt; else d.straightT = 0;
+      var cooked = d.driftT > 3.4;
+      var release = !input.boostHeld || d.air || d.straightT > 0.25 || d.spd < top * 0.18 || d.crashCd > 0.9 || cooked;
+      if (release) {
+        d.drift = false;
+        d.driftCd = cooked ? 0.9 : 0.35;
+        if (cooked) d.driftHeat = 1;
+        if (d.driftTier > 0 && d.crashCd <= 0.9) {
+          // mini-turbo: the charged slide pays out on release
+          var tb = [0, 0.5, 1.0, 1.6][d.driftTier];
+          d.turboT = tb;
+          d.boostT = Math.max(d.boostT || 0, tb);
+          d.spd = Math.min(top * 1.35, d.spd + top * [0, 0.15, 0.25, 0.35][d.driftTier]);
+          d.nitro = Math.min(1, d.nitro + [0, 0.06, 0.12, 0.2][d.driftTier]);
+          announce(['', 'TURBO', 'SUPER TURBO', 'ULTRA TURBO'][d.driftTier], 16 + d.driftTier * 2);
+          lifeEvent('drift', 1);
+          spawnBurst(player.x, 0.4, player.z, [0, 0x70c0ff, 0xffa020, 0xc060ff][d.driftTier], 6 + d.driftTier * 4);
+          GH.audio.dash();
+        }
+        d.driftT = 0; d.driftTier = 0;
+      }
+    }
     // gravity works along the slope: climbs bleed speed, descents lend it
     if (!d.air && T.active) {
       d.spd -= slope * 15 * dt;
@@ -3136,7 +3214,8 @@ GH.game = (function () {
     var gNow = T.h(player.x, player.z);
     // the ground fell away (a cliff, a ramp end, the edge of an island)
     if (!d.air && d.groundY !== undefined && d.groundY - gNow > 1.2 && Math.abs(d.fwd) > 1.5) {
-      d.air = true; d.hgt = d.groundY - gNow; d.absY = d.groundY; d.vy = 0;
+      d.air = true; d.hgt = d.groundY - gNow; d.absY = d.groundY; d.vy = 0; d.airT = 0;
+      if (nitroOn) { d.vy += 3.5 * V.jump; d.nitroJump = 0.45; }
     }
     // boost pads on the asphalt
     d.boostCd = Math.max(0, (d.boostCd || 0) - dt);
@@ -3161,8 +3240,9 @@ GH.game = (function () {
     var steepSoft = !d.air && soft > 0.5 && slope > 0.26 && !V.hover;
     if (steepSoft) {
       if (d.fwd > top * 0.58) {
-        d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02;
-        d.vy = Math.max(5, d.fwd * slope * 1.05) * V.jump;
+        d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02; d.airT = 0;
+        d.vy = Math.max(5, d.fwd * slope * 1.05) * V.jump * (nitroOn ? 1.35 : 1);
+        if (nitroOn) d.nitroJump = 0.45;
         if (d.jumpMsgT <= 0) { d.jumpMsgT = 6; announce(surf === 'snow' ? 'DRIFT JUMP' : 'DUNE JUMP', 18); }
         GH.audio.dash();
       } else if (d.fwd < top * 0.48 && d.spd > 0) {
@@ -3170,8 +3250,11 @@ GH.game = (function () {
       }
     }
     // the crest: leave the ground when it falls away under speed
-    if (!d.air && T.active && slope < -0.42 && d.fwd > top * 0.7) {
-      d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02; d.vy = 0.5;
+    // (nitro launches off gentler crests, and launches them higher)
+    if (!d.air && T.active && slope < (nitroOn ? -0.3 : -0.42) && d.fwd > top * 0.7) {
+      d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02; d.airT = 0;
+      d.vy = nitroOn ? 4.5 * V.jump : 0.5;
+      if (nitroOn) { d.nitroJump = 0.45; announce('NITRO JUMP', 18); }
     }
     d.jumpMsgT = Math.max(0, d.jumpMsgT - dt);
     if (d.bog > 0) {
@@ -3190,11 +3273,17 @@ GH.game = (function () {
     } else d.bogMsg = false;
     // airborne: ballistic, barely steerable, and it lands hard
     if (d.air) {
-      d.vy -= T.gravity() * dt;
+      d.airT += dt;
+      // the bottle keeps burning in the air: lift for the first half second
+      // of a nitro launch, and thrust that holds the forward speed
+      if (nitroOn && d.nitroJump > 0) { d.vy += 9 * V.jump * dt; d.nitroJump -= dt; }
+      if (nitroOn) d.spd = Math.min(top, d.spd + 6 * dt);
+      d.vy -= T.gravity() * (V.glide ? 0.55 : 1) * dt;
       d.absY += d.vy * dt;
       d.hgt = d.absY - gNow;
       if (d.hgt <= 0) {
-        d.air = false; d.hgt = 0;
+        d.air = false; d.hgt = 0; d.nitroJump = 0;
+        if (d.airT > 1.2) { d.nitro = Math.min(1, d.nitro + 0.1); announce('BIG AIR', 18); }
         var impact = Math.min(0.5, Math.abs(d.vy) * 0.03);
         shake = Math.min(0.6, shake + impact);
         spawnBurst(player.x, 0.2, player.z, surf === 'snow' ? 0xf0f4ff : 0xd8c090, 8);
@@ -3594,7 +3683,7 @@ GH.game = (function () {
           if (GH.dist2(player.x, player.z, re2.x, re2.z) < rr2b * rr2b &&
             (!re2.ramT || re2.ramT < runTime)) {
             re2.ramT = runTime + 0.8;
-            damageEnemy(re2, (8 + s.flatDamage) * s.damageMult * ((GH.VECTORS[player.def.vector] || GH.VECTORS.bike).ram), { canCrit: false, noRes: true });
+            damageEnemy(re2, (8 + s.flatDamage) * s.damageMult * ((GH.VECTORS[player.vec.kind] || GH.VECTORS.bike).ram), { canCrit: false, noRes: true });
             var ra2 = GH.angleTo(player.x, player.z, re2.x, re2.z);
             re2.vx += Math.sin(ra2) * 15 / re2.def.mass;
             re2.vz += Math.cos(ra2) * 15 / re2.def.mass;
@@ -3647,6 +3736,44 @@ GH.game = (function () {
   var worldH = null;          // {group, nestMeshes, vaultMeshes, layout}
   var interactables = [];
   var nearInteract = null;
+  var veins = [];            // today's alloy veins in the loaded zone
+  var signalT = 0, signalSpot = null; // the next cache signal, and the live one
+
+  // diary / daily payouts announced in the field
+  function payDiary(list) {
+    (list || []).forEach(function (pd) {
+      queueAnnounce('DIARY — ' + pd.name + ' ' + pd.tier.name + ' COMPLETE · +' + pd.tier.reward.alloy + ' ALLOY' +
+        (pd.tier.reward.cores ? ' +' + pd.tier.reward.cores + ' CORES' : '') + (pd.tier.perk ? ' · ' + pd.tier.perk.label.toUpperCase() : ''), 26);
+      GH.audio.win();
+    });
+  }
+  function payDaily(list) {
+    (list || []).forEach(function (t) {
+      queueAnnounce('DAILY TASK DONE — ' + t.desc.toUpperCase() + ' · CLAIM AT THE BROKER', 22);
+      GH.audio.levelup();
+    });
+  }
+  function lifeEvent(kind, n) {
+    if (expActive) payDiary(GH.worldlife.zoneEvent(curZone, kind, n));
+    payDaily(GH.worldlife.dailyEvent(kind, n));
+  }
+  G.lifeEvent = lifeEvent;
+
+  function mineVein(it) {
+    var v = it.vein;
+    if (v.mined) return;
+    v.mined = true;
+    if (v.mesh) v.mesh.visible = false;
+    GH.worldlife.mineNode(curZone, v.idx);
+    var perk = GH.worldlife.zonePerk(curZone);
+    var got = Math.round(v.alloy * perk.alloy);
+    grantMats(got, v.core ? 1 : 0, false);
+    spawnBurst(v.x, 0.8, v.z, 0xc8d8f0, 14);
+    GH.audio.coin();
+    queueAnnounce('VEIN MINED — +' + got + ' ALLOY' + (v.core ? ' · A FRAME CORE INSIDE' : ''), 20);
+    lifeEvent('nodes', 1);
+    saveExpedition();
+  }
   var zoneNow = null;
   var siege = null;           // {relay, phase, timer, burst}
   var wreckMesh = null;
@@ -3950,6 +4077,26 @@ GH.game = (function () {
     camGround = player ? gy(player.x, player.z) : 0;
     zoneNow = worldH.info;
     interactables = GH.world.interactables(worldH.layout, zoneId);
+    // alloy veins (Albion-style gathering): richer in dangerous territory
+    veins = GH.worldlife.nodesFor(zoneId, GH.world.BOUNDS);
+    veins.forEach(function (v) {
+      var sp = openSpot(v.x, v.z, 1.2);
+      if (sp) { v.x = sp.x; v.z = sp.z; }
+      var m = GH.models.buildOreNode(v.rich);
+      m.position.set(v.x, gy(v.x, v.z), v.z);
+      m.visible = !v.mined;
+      worldH.group.add(m);
+      v.mesh = m;
+      interactables.push({ kind: 'vein', vein: v, x: v.x, z: v.z, label: 'MINE THE ' + (v.rich ? 'RICH ' : '') + 'ALLOY VEIN' });
+    });
+    signalT = GH.worldlife.signalInterval(zoneNow.danger) * (0.5 + Math.random() * 0.5);
+    signalSpot = null;
+    if (fromZoneId && !zoneNow.dungeon) {
+      var dp = GH.worldlife.diaryProgress(zoneId);
+      var pk0 = GH.worldlife.zonePerk(zoneId);
+      queueAnnounce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] +
+        ' · DIARY ' + dp.doneTiers + '/' + dp.total + (pk0.labels.length ? ' · ' + pk0.labels.join(', ').toUpperCase() : ''), 22);
+    }
     stage = GH.world.stageFor(zoneId);
     applyZoneLook(zoneNow, stage);
     applyWeatherFor(zoneId);
@@ -4138,6 +4285,7 @@ GH.game = (function () {
     if ((w.dgTier[dungeonState.baseId] || 0) < dungeonState.tier) {
       w.dgTier[dungeonState.baseId] = dungeonState.tier;
     }
+    lifeEvent('tier', dungeonState.tier);
     GH.meta.save();
     queueAnnounce('THE ' + GH.dungeons.ARCHETYPES[dungeonState.arch].name +
       ' ASCENDS — TIER ' + (dungeonState.tier + 1) + ' NOW WAITS AT ITS GATE', 26);
@@ -4161,6 +4309,7 @@ GH.game = (function () {
     GH.factions.deed(curZone, 'dungeon', 6);
     coinsRun += 20 * ds.tier;
     grantMats(12 * ds.tier + zoneNow.danger * 4, 1 + (ds.firstClear ? 1 : 0), false);
+    lifeEvent('caches', 1);
     spawnPickup('gem:' + GH.pick(GH.gems.typeIds), lay.chest.x + 1.5, lay.chest.z + 1.5);
     queueAnnounce('CACHE OPENED — +' + loot + ' SALVAGE BANKED', 26);
     GH.audio.win();
@@ -5125,12 +5274,13 @@ GH.game = (function () {
       if (it.kind === 'objective' && (!dungeonState || dungeonState.defenseActive || dungeonState.done)) continue;
       if (it.kind === 'racestart' && (!dungeonState || dungeonState.race || dungeonState.done)) continue;
       if (it.kind === 'relic' && (!dungeonState || dungeonState.heistCarrying || dungeonState.done)) continue;
+      if (it.kind === 'vein' && it.vein.mined) continue;
       var iR = it.kind === 'objective' || it.kind === 'racestart' || it.kind === 'relic' ? 5.5 : 3.2;
       if (GH.dist2(player.x, player.z, it.x, it.z) < iR * iR) { nearInteract = it; break; }
     }
     var promptEl = document.getElementById('interact-line');
     if (nearInteract && !siege) {
-      promptEl.textContent = '[E] ' + nearInteract.label;
+      promptEl.textContent = '[' + GH.controls.label('interact') + '] ' + nearInteract.label;
       promptEl.classList.remove('hidden');
     } else {
       // approaching a travel gate: name where it leads
@@ -5168,6 +5318,7 @@ GH.game = (function () {
             GH.audio.boss();
           }
         }
+        else if (nearInteract.kind === 'vein') mineVein(nearInteract);
         else if (nearInteract.kind === 'chest') {
           if (chestReady()) openChest();
           else {
@@ -5181,6 +5332,25 @@ GH.game = (function () {
         }
         else if (G.onInteract) { saveExpedition(); G.onInteract(nearInteract.kind); }
       }
+    }
+
+    // cache signals (Albion treasure sites): a ping, a marker, a detour
+    if (!zoneNow.dungeon && !siege && !zoneEvent) {
+      signalT -= dt;
+      if (signalT <= 0 && !signalSpot) {
+        var sgx = (Math.random() * 2 - 1) * GH.world.BOUNDS.x * 0.8, sgz = (Math.random() * 2 - 1) * GH.world.BOUNDS.z * 0.8;
+        var sgs = openSpot(sgx, sgz, 1.2);
+        if (sgs) { sgx = sgs.x; sgz = sgs.z; }
+        spawnPickup('cache', sgx, sgz);
+        pickups[pickups.length - 1].signal = true;
+        pickups[pickups.length - 1].vx = 0; pickups[pickups.length - 1].vz = 0;
+        signalSpot = { x: sgx, z: sgz, t: 0 };
+        var dm = Math.round(Math.sqrt(GH.dist2(player.x, player.z, sgx, sgz)));
+        queueAnnounce('CACHE SIGNAL DETECTED — ' + dm + ' M · MARKED ON THE MAP', 24);
+        GH.audio.levelup();
+        signalT = GH.worldlife.signalInterval(zoneNow.danger);
+      }
+      if (signalSpot) signalSpot.t += dt;
     }
 
     // periodic autosave
@@ -5356,6 +5526,19 @@ GH.game = (function () {
       if (me2.dead || me2.nestId) continue;
       ctx.fillRect(sx(me2.x) - 1, sz(me2.z) - 1, 2, 2);
     }
+    // alloy veins (grey), and a live cache signal (pulsing gold ring)
+    for (var vi = 0; vi < veins.length; vi++) {
+      if (veins[vi].mined) continue;
+      ctx.fillStyle = veins[vi].rich ? '#d8e8ff' : '#a0a8b8';
+      ctx.fillRect(sx(veins[vi].x) - 1.5, sz(veins[vi].z) - 1.5, 3, 3);
+    }
+    if (signalSpot) {
+      ctx.strokeStyle = '#ffd050';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(sx(signalSpot.x), sz(signalSpot.z), 4 + Math.sin(signalSpot.t * 5) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     // you: a facing arrow, outlined so it pops on any biome tint
     ctx.save();
     ctx.translate(sx(player.x), sz(player.z));
@@ -5394,7 +5577,7 @@ GH.game = (function () {
     if (!expActive || !player) return;
     preRacePos = { x: player.x, z: player.z };
     if (!player.speederMesh) {
-      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.def.vector);
+      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.vec.kind, player.vec.shape);
       scene.add(player.speederMesh);
     }
     player.mesh.visible = false;
@@ -5446,6 +5629,7 @@ GH.game = (function () {
       }
     }
     if (res.win) GH.audio.win();
+    lifeEvent('races', 1);
     saveExpedition();
     GH.meta.save();
   }
@@ -5466,7 +5650,7 @@ GH.game = (function () {
 
   function toggleSpeeder() {
     if (!player.speederMesh) {
-      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.def.vector);
+      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.vec.kind, player.vec.shape);
       scene.add(player.speederMesh);
     }
     player.speederOn = !player.speederOn;
@@ -5481,7 +5665,7 @@ GH.game = (function () {
     GH.audio.dash();
     spawnBurst(player.x, 1, player.z, 0x70c0ff, 14);
     announce(player.speederOn
-      ? (GH.VECTORS[player.def.vector] || GH.VECTORS.bike).name + ' FORM — SPACE DRIFTS, SHIFT BURNS NITRO' : 'FRAME FORM', 22);
+      ? player.vec.name + ' — ' + GH.controls.label('boost') + ' DRIFTS, ' + GH.controls.label('special') + ' BURNS NITRO' : 'FRAME FORM', 22);
   }
 
   function startSiege(relay) {
@@ -6447,7 +6631,9 @@ GH.game = (function () {
         el['dh-nitro-fill'].classList.toggle('dh-burning', dvd.nitroT > 0);
         // one status word under the speedo: what the ground is doing to you
         var dstat = dvd.bog > 0.5 ? (player.speederOn && GH.terrain.surface(player.x, player.z) === 'snow' ? 'SNOWBOUND — REVERSE' : 'BOGGED — REVERSE')
-          : dvd.boostT > 0 ? 'BOOST' : dvd.air ? 'AIR' : dvd.offTrack ? 'OFF TRACK' : (dvd.drift && dvd.slip > 1.2) ? 'DRIFT' : '';
+          : dvd.turboT > 0 ? 'TURBO' : dvd.boostT > 0 ? 'BOOST' : dvd.air ? (dvd.nitroJump > 0 ? 'NITRO AIR' : 'AIR')
+          : dvd.offTrack ? 'OFF TRACK' : dvd.driftHeat > 0.5 ? 'SKIDS HOT' : dvd.drift
+            ? (dvd.driftTier >= 3 ? 'DRIFT ●●● RELEASE!' : dvd.driftTier === 2 ? 'DRIFT ●●' : dvd.driftTier === 1 ? 'DRIFT ●' : 'DRIFT') : '';
         if (!dstat && player.item) dstat = ITEM_NAMES[player.item] + ' [G]';
         el['dh-drift'].textContent = dstat;
         el['dh-drift'].classList.toggle('hidden', !dstat);
@@ -6639,6 +6825,8 @@ GH.game = (function () {
     zoneNow = null;
     nearInteract = null;
     interactables = [];
+    veins = [];
+    signalSpot = null;
     wallRing.visible = true;
     floor.visible = true;
     var il = document.getElementById('interact-line');
@@ -7216,6 +7404,7 @@ GH.game = (function () {
       relaysHeld: Object.keys(GH.meta.data.world.relaysHeld).length,
       siege: siege ? siege.phase : 0,
       near: nearInteract ? nearInteract.kind : null,
+      veins: veins.filter(function (v) { return !v.mined; }).length, signal: !!signalSpot,
       wreck: GH.meta.data.world.wreck,
       artifacts: Object.keys(GH.meta.data.world.artifacts),
       artifactOn: GH.meta.data.world.equipped,

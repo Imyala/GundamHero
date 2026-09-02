@@ -500,11 +500,21 @@
       }
       return '<button class="style-btn" data-kind="' + kind + '">' + label + ': ' + curName + '</button>';
     };
+    var vec = GH.vehicles.activeFor(def);
+    var vecOwned = GH.vehicles.forLineage(GH.vehicles.lineageOf(def)).filter(function (d) { return GH.vehicles.owned(d.id); }).length;
+    var vecAll = GH.vehicles.forLineage(GH.vehicles.lineageOf(def)).length;
     wrap.innerHTML =
+      '<button class="style-btn vec-btn" id="vec-cycle" title="' + (vec.desc || '') + '">VECTOR: ' + vec.name + ' (' + (GH.VECTORS[vec.kind] || GH.VECTORS.bike).name + ')' +
+      (vecAll > vecOwned ? ' · build the 2nd in the WORKSHOP' : vecOwned > 1 ? ' · click to swap' : '') + '</button>' +
       mkCycler('trail', 'TRAIL', style.trail) +
       mkCycler('paint', 'PAINT', style.paint) +
       mkCycler('drone', 'DRONE', style.drone);
-    wrap.querySelectorAll('.style-btn').forEach(function (btn) {
+    document.getElementById('vec-cycle').onclick = function () {
+      GH.vehicles.cycle(def);
+      GH.audio.card();
+      renderSelectExtras();
+    };
+    wrap.querySelectorAll('.style-btn:not(.vec-btn)').forEach(function (btn) {
       btn.onclick = function () {
         var kind = btn.getAttribute('data-kind');
         var opts = owned(kind).map(function (c) { return c.id; });
@@ -749,8 +759,8 @@
         open: function () { workshopReturn = 'hub'; openWorkshop(); } },
       { id: 'hub-pilot', glyph: '☺', name: 'PILOT SHEET',
         sub: 'character, inventory, materials', open: function () { openPilot(false, 'hub'); } },
-      { id: 'hub-map', glyph: '🗺', name: 'WORLD MAP',
-        sub: Object.keys(GH.meta.data.world.dgTier || {}).length + '/24 dungeons ascended',
+      { id: 'hub-map', glyph: '🗺', name: 'WORLD MAP & DIARIES',
+        sub: 'diaries ' + GH.worldlife.diaryTotal().done + '/' + GH.worldlife.diaryTotal().total + ' · ' + Object.keys(GH.meta.data.world.dgTier || {}).length + '/24 dungeons ascended',
         open: function () { openWorldMap(false); } },
       { id: 'hub-skills', glyph: '❈', name: 'PILOT TRAINING',
         sub: 'Pilot Lv ' + GH.skills.pilotProgress().lvl +
@@ -760,9 +770,10 @@
         sub: GH.progress.seasonName(s.id) + ' · ' + s.pts + ' pts' +
           (GH.progress.relicPicksAvailable() > 0 ? ' · RELIC READY' : ''),
         open: openSeason },
-      { id: 'hub-broker', glyph: '☰', name: 'THE BROKER',
-        sub: b.active ? GH.progress.contractLabel(b.active) + ' (' + b.active.have + '/' + b.active.need + ')'
-          : b.points + ' pts banked · no active contract',
+      { id: 'hub-broker', glyph: '☰', name: 'BROKER & DAILY TASKS',
+        sub: (GH.worldlife.dailyUnclaimed() ? GH.worldlife.dailyUnclaimed() + ' DAILY REWARD' + (GH.worldlife.dailyUnclaimed() > 1 ? 'S' : '') + ' TO CLAIM · ' : '') +
+          (b.active ? GH.progress.contractLabel(b.active) + ' (' + b.active.have + '/' + b.active.need + ')'
+          : b.points + ' pts banked · no active contract'),
         open: openBroker },
       { id: 'hub-trials', glyph: '⛨', name: 'STAGE TRIALS',
         sub: 'permanent stage perks', open: openTrials },
@@ -982,7 +993,36 @@
     show('broker-screen');
   }
 
+  function renderDaily(wrapId) {
+    var wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+    var dl = GH.worldlife.daily();
+    var html = '<div class="bk-label">DAILY TASK BOARD — ' + dl.day + ' · STREAK ' + dl.streak + (dl.sweptToday ? ' · SWEPT TODAY' : '') + '</div>';
+    dl.tasks.forEach(function (t) {
+      var rw = [];
+      if (t.reward.alloy) rw.push('+' + t.reward.alloy + ' alloy');
+      if (t.reward.cores) rw.push('+' + t.reward.cores + ' core');
+      if (t.reward.salvage) rw.push('+' + t.reward.salvage + ' salvage');
+      html += '<div class="dl-task' + (t.claimed ? ' claimed' : t.done ? ' ready' : '') + '">' +
+        '<span class="dl-desc">' + (t.claimed ? '☑' : t.done ? '★' : '☐') + ' ' + t.desc + '</span>' +
+        '<span class="dl-prog">' + t.have + '/' + t.need + '</span>' +
+        '<span class="dl-reward">' + rw.join(' · ') + '</span>' +
+        (t.done && !t.claimed ? '<button class="dv-buy dl-claim" data-id="' + t.id + '">CLAIM</button>' : '') + '</div>';
+    });
+    html += '<div class="menu-desc">Claim all three for a bonus core and ' + GH.worldlife.SWEEP_BONUS.alloyPerStreakDay + ' alloy per streak day. New board every day; a streak survives one missed day.</div>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.dl-claim').forEach(function (btn) {
+      btn.onclick = function () {
+        var r = GH.worldlife.claimDaily(btn.getAttribute('data-id'));
+        if (r) { GH.audio.win(); if (r.sweep) GH.audio.levelup(); }
+        renderDaily(wrapId);
+        if (wrapId === 'broker-daily') renderBroker();
+      };
+    });
+  }
+
   function renderBroker() {
+    renderDaily('broker-daily');
     var b = GH.meta.data.broker;
     document.getElementById('broker-status').innerHTML =
       'BROKER POINTS: <b>' + b.points + '</b> · CONTRACTS FILLED: <b>' + b.completed +
@@ -1238,7 +1278,9 @@
     var harrow = w.harrowDay !== GH.world.dayStamp() ? GH.world.harrowToday() : null;
     var cleared = 0, totalTiers = 0;
     for (var k in (w.dgTier || {})) { cleared++; totalTiers += w.dgTier[k]; }
+    var dtot = GH.worldlife.diaryTotal();
     document.getElementById('map-head').innerHTML =
+      'DIARIES <b>' + dtot.done + '/' + dtot.total + '</b> · ' +
       'NESTS CLEANSED <b>' + Object.keys(w.nests).length + '/' + GH.world.totalNests() + '</b>' +
       ' · DUNGEONS ASCENDED <b>' + cleared + '/' + (GH.world.ZONES.length * 4) + '</b>' +
       ' · TOTAL TIERS CLIMBED <b>' + totalTiers + '</b>' +
@@ -1257,6 +1299,14 @@
       if (harrow && harrow.zone === zn.id) {
         head += '<div class="mp-harrow">☠ THE HARROW ROOSTS HERE TODAY</div>';
       }
+      var dp = GH.worldlife.diaryProgress(zn.id);
+      var nextTier = null;
+      dp.tiers.forEach(function (t) { if (!nextTier && !t.done) nextTier = t; });
+      var pk = GH.worldlife.zonePerk(zn.id);
+      head += '<div class="mp-diary">DIARY <b>' + dp.doneTiers + '/' + dp.total + '</b>' + (pk.labels.length ? ' · ' + pk.labels.join(' · ') : '') +
+        (nextTier ? '<div class="mp-diary-tasks">' + nextTier.name + ': ' + nextTier.tasks.map(function (t) {
+          return '<span class="' + (t.done ? 'dt-done' : '') + '">' + (t.done ? '☑' : '☐') + ' ' + t.desc.replace(' here', '') + ' ' + t.have + '/' + t.need + '</span>';
+        }).join(' ') + ' → +' + nextTier.reward.alloy + ' alloy' + (nextTier.reward.cores ? ', +' + nextTier.reward.cores + ' cores' : '') + (nextTier.perk ? ', ' + nextTier.perk.label : '') + '</div>' : '<div class="mp-diary-tasks dt-done">ALL TIERS COMPLETE</div>') + '</div>';
       var rows = '';
       var archList = ['depths'].concat(GH.dungeons.ZONE_SETS[zn.id] || []);
       archList.forEach(function (arch) {
@@ -1456,9 +1506,11 @@
     tabs.innerHTML = '';
     var lineages = GH.roster.BASE.map(function (b) { return { id: b.id, name: b.name, icon: b.icon }; });
     lineages.push({ id: 'relic', name: 'RELICS', icon: '★' });
+    lineages.push({ id: 'vectors', name: 'VECTORS', icon: '⛟' });
     lineages.forEach(function (ln) {
       var owned = 0, total = 0;
-      GH.mechs.forEach(function (m) {
+      if (ln.id === 'vectors') { total = GH.vehicles.DESIGNS.length; owned = GH.vehicles.ownedCount(); }
+      else GH.mechs.forEach(function (m) {
         if ((m.lineage || m.id) !== ln.id) return;
         total++; if (GH.meta.data.shells[m.id]) owned++;
       });
@@ -1472,6 +1524,7 @@
     var grid = document.getElementById('ws-grid');
     grid.innerHTML = '';
     var first = null;
+    if (wsLineage === 'vectors') { renderVectorGrid(grid); return; }
     GH.mechs.forEach(function (m) {
       if ((m.lineage || m.id) !== wsLineage) return;
       var st = GH.roster.status(m.id);
@@ -1491,6 +1544,44 @@
     });
     if (!wsPick) wsPick = first;
     renderWorkshopDetail();
+  }
+
+  // the VECTORS tab: every vehicle design, by lineage
+  function renderVectorGrid(grid) {
+    var first = null;
+    GH.vehicles.DESIGNS.forEach(function (d) {
+      var owned = GH.vehicles.owned(d.id);
+      var can = GH.vehicles.canBuild(d.id);
+      var base = GH.mechById(d.lineage);
+      var cell = document.createElement('div');
+      cell.className = 'ws-cell' + (owned ? ' owned' : (can ? ' ready' : ' locked')) + (wsPick === d.id ? ' pick' : '');
+      cell.innerHTML = '<div class="ws-icon">' + base.icon + '</div><div class="ws-name">' + d.name + '</div>' +
+        '<div class="ws-sub">' + base.name + ' · ' + (GH.VECTORS[d.kind] || GH.VECTORS.bike).name + '</div>' +
+        '<div class="ws-state">' + (owned ? (d.free ? '✓ STANDARD' : '✓ BUILT') : can ? '⚒ READY TO BUILD' : GH.meta.data.shells[d.lineage] ? '⬡ NEED MATERIALS' : '🔒 NEEDS ' + base.name) + '</div>';
+      cell.onclick = function () { wsPick = d.id; GH.audio.card(); renderWorkshop(); };
+      grid.appendChild(cell);
+      if (!first) first = d.id;
+    });
+    if (!wsPick || !GH.vehicles.byId(wsPick)) wsPick = first;
+    var box = document.getElementById('ws-detail');
+    var d = GH.vehicles.byId(wsPick);
+    if (!d) { box.innerHTML = ''; return; }
+    var base = GH.mechById(d.lineage), K = GH.VECTORS[d.kind] || GH.VECTORS.bike;
+    var owned = GH.vehicles.owned(d.id), can = GH.vehicles.canBuild(d.id), c = GH.vehicles.BUILD_COST, m = GH.meta.data.mats;
+    var need = function (have, want, label) { return '<span class="' + (have >= want ? 'ws-ok' : 'ws-short') + '">' + label + ' ' + have + '/' + want + '</span>'; };
+    box.innerHTML = '<div class="ws-d-name">' + base.icon + ' ' + d.name + '</div>' +
+      '<div class="ws-d-role">' + base.name + ' lineage · ' + K.name + '</div>' +
+      '<div class="ws-d-desc">' + d.desc + '</div>' +
+      '<div class="ws-d-stats">Top speed ×' + K.top + ' · accel ×' + K.accel + ' · grip ×' + K.grip + ' · drift grip ×' + K.driftGrip + ' · jump ×' + K.jump + ' · ram ×' + K.ram + (K.hover ? ' · hovers over water and mud' : '') + (K.glide ? ' · glides' : '') + '</div>' +
+      (owned ? '<div class="ws-d-status owned">' + (d.free ? 'STANDARD ISSUE' : 'BUILT') + ' — pick it with the VECTOR button on the frame select screen.</div>'
+        : '<div class="ws-d-bill">BILL: ' + need(m.alloy, c.alloy, '⬡ ALLOY') + ' · ' + need(m.cores, c.cores, '◈ CORES') + ' · ' + need(GH.meta.data.salvage, c.salvage, '$ SALVAGE') + '</div>' +
+          (GH.meta.data.shells[d.lineage] ? '' : '<div class="ws-d-req ws-short">REQUIRES: ' + base.name + ' (own the frame first)</div>') +
+          '<button class="menu-btn small" id="ws-build" ' + (can ? '' : 'disabled') + '>' + (can ? '⚒ BUILD ' + d.name : 'NOT YET') + '</button>');
+    var bb = document.getElementById('ws-build');
+    if (bb) bb.onclick = function () {
+      if (GH.vehicles.build(d.id)) { GH.audio.win(); GH.game.lifeEvent('build', 1); renderWorkshop(); }
+      else GH.audio.hit();
+    };
   }
 
   function renderWorkshopDetail() {
@@ -1529,6 +1620,7 @@
     if (bb) bb.onclick = function () {
       if (GH.roster.build(m.id)) {
         GH.audio.win();
+        GH.game.lifeEvent('build', 1);
         renderWorkshop();
         if (GH.game.refreshPilot) GH.game.refreshPilot();
       } else GH.audio.hit();
@@ -1573,7 +1665,9 @@
       '<div class="pl-row">Cosmetics owned <b>' + Object.keys(d.style.owned).length + '</b> — set on the frame select screen</div>' +
       '<div class="pl-row">Active devotion <b>' + devName + '</b> · broker points <b>' + d.broker.points + '</b></div>' +
       '<div class="pl-row">House: <b>' + factionsSub() + '</b></div>' +
+      '<div class="pl-row">Vehicles <b>' + GH.vehicles.ownedCount() + '/' + GH.vehicles.DESIGNS.length + '</b> · zone diaries <b>' + GH.worldlife.diaryTotal().done + '/' + GH.worldlife.diaryTotal().total + '</b> · daily streak <b>' + GH.worldlife.daily().streak + '</b>' + (GH.worldlife.dailyUnclaimed() ? ' · <b class="pl-hot">' + GH.worldlife.dailyUnclaimed() + ' daily reward(s) to claim at the BROKER</b>' : '') + '</div>' +
       '</div>' +
+      '<div class="pl-block" id="pilot-daily"></div>' +
       (live ? '<div class="pl-block"><div class="pl-h">CURRENT RUN</div><div class="pl-row pl-pre">' + live + '</div></div>' : '') +
       '</div>' +
       '<div class="pl-col">' +
@@ -1592,6 +1686,7 @@
       '</div></div></div>';
     var body = document.getElementById('pilot-body');
     body.innerHTML = html;
+    renderDaily('pilot-daily');
     body.querySelectorAll('[data-go]').forEach(function (b) {
       b.onclick = function () {
         var g = b.getAttribute('data-go');
@@ -1705,6 +1800,12 @@
       '<li><b>Relic frames</b> need a feat first:<ul>' + relics + '</ul></li></ul>' +
       '<div class="hp-h">MATERIALS</div><ul>' +
       GH.roster.SOURCES.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul>' +
+      '<div class="hp-h">LIVING IN THE REACH</div>' +
+      '<ul><li><b>Zone diaries</b> (WORLD MAP): four task tiers per territory. Each tier pays alloy and cores; HARD and ELITE add a permanent perk in that zone.</li>' +
+      '<li><b>Daily task board</b> (BROKER or PILOT): three tasks a day, claim each, sweep all three for a bonus core and a growing streak.</li>' +
+      '<li><b>Alloy veins</b>: grey crystal clusters in every territory. Press ' + L('interact') + ' to mine. Danger III–IV veins can hold a frame core. They regrow daily.</li>' +
+      '<li><b>Cache signals</b>: every few minutes a treasure site pings and is marked gold on the minimap. Worth the detour.</li>' +
+      '<li>Higher DANGER zones pay more alloy per drop, richer veins, and richer signals — Albion rules: risk buys reward.</li></ul>' +
       '<div class="hp-h">TIPS</div>' +
       '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run CLASSIC to wave 20 for cores.</li>' +
       '<li>Sparks feed your persistent PILOT LEVEL — every level is a skill point for PILOT TRAINING.</li>' +

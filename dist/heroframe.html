@@ -1182,6 +1182,22 @@ body.looking #crosshair { opacity: 0.4; }
 #select-rack { bottom: 3vh; }
 .coop-btn { top: 68px !important; }
 
+/* ---------------- daily board / diaries ---------------- */
+#broker-daily, #pilot-daily { width: min(92vw, 720px); background: rgba(2, 4, 12, 0.85); border: 1px solid #3a4456; padding: 8px 12px; font-size: 12px; }
+.dl-task { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid #1c2236; }
+.dl-task.ready { color: #ffd050; }
+.dl-task.claimed { opacity: 0.55; }
+.dl-desc { flex: 1; }
+.dl-prog { color: #8898c8; min-width: 56px; text-align: right; }
+.dl-reward { color: #9ae8c0; min-width: 130px; }
+.dl-claim { padding: 2px 10px; }
+.mp-diary { font-size: 11px; color: #c8d0e8; margin-top: 3px; }
+.mp-diary b { color: #ffd050; }
+.mp-diary-tasks { color: #8898c8; margin-top: 2px; line-height: 1.5; }
+.mp-diary-tasks span { margin-right: 8px; }
+.dt-done { color: #60c890; }
+.vec-btn { border-color: #80d8ff; }
+
 </style>
 </head>
 <body>
@@ -1372,6 +1388,7 @@ body.looking #crosshair { opacity: 0.4; }
   <div id="broker-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-broker-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;BROKER</h2><span class="esc-hint">ESC closes</span></div>
     <div id="broker-status"></div>
+    <div id="broker-daily"></div>
     <div id="broker-contract"></div>
     <div id="broker-shop"></div>
   </div>
@@ -2258,6 +2275,33 @@ GH.models = (function () {
   // Humanoid mech. cfg: { body, accent, dark, trim, prop, corrupt }
   // Chunky fifth-gen proportions: broad chest, pauldrons, thrusters.
   // ---------------------------------------------------------------
+  // Lineage silhouettes. Rule from the design bible: head = tier, colour =
+  // allegiance, asymmetry = specialisation. Each base prop (the frame's
+  // weapon) carries a whole body language, so the eight lineages read as
+  // different machines at 64 px, not eight palettes of one.
+  //   sword   HERO      twin eyes, V-fin, chest intakes, skirt, blade hilts
+  //   guns    GRUNT     single visor, boxy shoulders, ammo drums on the hips
+  //   claws   MONO-EYE  one glowing eye, commander horn, one spiked pauldron
+  //   staff   NEWTYPE   hidden eyes, sweeping horns, flared back binders
+  //   daggers STEALTH   hooded narrow head, thin limbs, cloak plates
+  //   scythe  RELIC     jaw face, exposed inner frame, slab armour, reactors
+  //   lance   VARIABLE  narrow visor, fin crest, swept wings, pointed feet
+  //   mortar  HEAVY     mono-slit, huge skirt, bell legs, hover jets, hunched
+  //   eva     BIO       muzzle jaw, one optic, pylons, restraint plates, core
+  //   drill   SPIRAL    a face on the chest, drill forearms, sunglasses crest
+  var STYLES = {
+    sword:   { head: 'hero', chest: 1.0, pad: 1.0, legs: 'std', skirt: 1, pack: 'hilts' },
+    guns:    { head: 'visor', chest: 1.12, pad: 1.2, legs: 'std', skirt: 0, pack: 'drums' },
+    claws:   { head: 'mono', chest: 0.92, pad: 'spike', legs: 'digit', skirt: 0, pack: 'tail' },
+    staff:   { head: 'newtype', chest: 0.86, pad: 0.8, legs: 'slim', skirt: 1, pack: 'binders' },
+    daggers: { head: 'hood', chest: 0.8, pad: 0.7, legs: 'slim', skirt: 0, pack: 'cloak' },
+    scythe:  { head: 'jaw', chest: 1.06, pad: 1.1, legs: 'exposed', skirt: 1, pack: 'reactors' },
+    lance:   { head: 'narrow', chest: 0.9, pad: 0.9, legs: 'point', skirt: 0, pack: 'wings' },
+    mortar:  { head: 'slit', chest: 1.28, pad: 1.35, legs: 'bell', skirt: 2, pack: 'jets', hunch: 0.16 },
+    eva:     { head: 'muzzle', chest: 0.78, pad: 0.6, legs: 'slim', skirt: 0, pack: 'pylons', hunch: 0.1 },
+    drill:   { head: 'shades', chest: 1.1, pad: 1.0, legs: 'std', skirt: 1, pack: 'drillpack' }
+  };
+
   M.buildMech = function (cfg) {
     var g = new THREE.Group();
     var body = cfg.body, accent = cfg.accent;
@@ -2266,32 +2310,78 @@ GH.models = (function () {
     if (cfg.corrupt) {
       body = 0x2c2430; dark = 0x141018; trim = 0x584050; accent = 0xff2838;
     }
+    var S = STYLES[cfg.style] || STYLES[cfg.prop] || STYLES.sword;
     var parts = {};
+    var glowMat = function (c) { return mat(c, { emissive: c, emissiveIntensity: 0.7 }); };
 
     // ---- legs ----
     var legL = new THREE.Group(), legR = new THREE.Group();
     [legL, legR].forEach(function (leg, i) {
+      var side = i === 0 ? -1 : 1;
+      var L = S.legs;
+      var tw = L === 'slim' ? 0.28 : L === 'bell' ? 0.4 : L === 'exposed' ? 0.18 : 0.36;
+      var sw = L === 'slim' ? 0.24 : L === 'bell' ? 0.5 : 0.3;
       var hip = box(0.3, 0.22, 0.34, dark); hip.position.y = 0.02;
-      var thigh = box(0.36, 0.52, 0.4, body); thigh.position.y = -0.3;
+      var thigh = box(tw, 0.52, L === 'exposed' ? 0.2 : 0.4, L === 'exposed' ? dark : body); thigh.position.y = -0.3;
       var knee = box(0.3, 0.16, 0.32, trim); knee.position.y = -0.6;
-      var shin = box(0.3, 0.48, 0.34, dark); shin.position.y = -0.85;
-      var foot = box(0.4, 0.18, 0.62, body); foot.position.set(0, -1.12, 0.1);
-      var toe = box(0.32, 0.12, 0.16, dark); toe.position.set(0, -1.14, 0.44);
+      var shin = box(sw, 0.48, L === 'bell' ? 0.5 : 0.34, dark); shin.position.y = -0.85;
+      var foot = box(L === 'bell' ? 0.56 : 0.4, 0.18, L === 'point' ? 0.7 : 0.62, body); foot.position.set(0, -1.12, 0.1);
+      var toe = L === 'point' ? box(0.12, 0.12, 0.3, accent) : box(0.32, 0.12, 0.16, dark);
+      toe.position.set(0, -1.14, L === 'point' ? 0.55 : 0.44);
       leg.add(hip, thigh, knee, shin, foot, toe);
-      leg.position.set(i === 0 ? -0.28 : 0.28, 1.22, 0);
+      if (L === 'exposed') {
+        // slab plates hung on a bare inner frame
+        var slab = box(0.14, 0.5, 0.42, body); slab.position.set(side * 0.2, -0.3, 0);
+        var shinSlab = box(0.34, 0.3, 0.1, body); shinSlab.position.set(0, -0.85, 0.2);
+        leg.add(slab, shinSlab);
+      }
+      if (L === 'digit') {
+        // beast stance: thigh forward, shin back, claw toes
+        thigh.rotation.x = -0.35; thigh.position.z = 0.1;
+        shin.rotation.x = 0.45; shin.position.z = -0.1;
+        [-0.12, 0, 0.12].forEach(function (x) { var cl = box(0.06, 0.08, 0.2, accent); cl.position.set(x, -1.16, 0.5); leg.add(cl); });
+      }
+      if (L === 'bell') {
+        var bell = box(0.6, 0.22, 0.6, body); bell.position.y = -1.0; leg.add(bell);
+        var jet = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.12, 6), mat(0x1a1a20)); jet.position.set(0, -1.2, -0.2); leg.add(jet);
+      }
+      leg.position.set(side * (L === 'bell' ? 0.36 : 0.28), 1.22, 0);
       g.add(leg);
     });
     parts.legL = legL; parts.legR = legR;
 
     // ---- waist/torso group (rotates toward aim) ----
     var torso = new THREE.Group();
-    var waist = box(0.6, 0.24, 0.44, dark); waist.position.y = -0.14;
-    var chest = box(1.0, 0.62, 0.66, body); chest.position.y = 0.32;
-    var chestTop = box(0.8, 0.2, 0.7, trim); chestTop.position.y = 0.64;
+    var cw = S.chest;
+    var waist = box(0.6 * cw, 0.24, 0.44, dark); waist.position.y = -0.14;
+    var chest = box(1.0 * cw, 0.62, 0.66, body); chest.position.y = 0.32;
+    var chestTop = box(0.8 * cw, 0.2, 0.7, trim); chestTop.position.y = 0.64;
     var vent = box(0.5, 0.16, 0.1, accent); vent.position.set(0, 0.34, 0.36);
     var cockpit = box(0.24, 0.14, 0.08, cfg.corrupt ? 0xff2838 : 0x202830);
     cockpit.position.set(0, 0.55, 0.38);
     torso.add(waist, chest, chestTop, vent, cockpit);
+    if (S.head === 'hero') {
+      [-0.3, 0.3].forEach(function (x) { var intake = box(0.18, 0.28, 0.08, dark); intake.position.set(x, 0.3, 0.36); torso.add(intake); });
+    }
+    if (S.head === 'shades') {
+      // the face on the chest
+      [-0.22, 0.22].forEach(function (x) { var eye = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.06), glowMat(accent)); eye.position.set(x, 0.42, 0.36); torso.add(eye); });
+      var grin = box(0.5, 0.06, 0.06, 0x101418); grin.position.set(0, 0.18, 0.36); torso.add(grin);
+      var teeth = box(0.46, 0.04, 0.05, 0xf0f0f0); teeth.position.set(0, 0.2, 0.37); torso.add(teeth);
+    }
+    if (S.head === 'muzzle') {
+      var core = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), glowMat(0xff3040)); core.position.set(0, 0.3, 0.36); torso.add(core);
+      [-0.3, 0.3].forEach(function (x) { var clamp = box(0.12, 0.5, 0.1, trim); clamp.position.set(x, 0.32, 0.34); torso.add(clamp); });
+    }
+    // skirt armour
+    if (S.skirt) {
+      var sk = S.skirt === 2 ? 1.4 : 1;
+      [-1, 1].forEach(function (side) {
+        var plate = box(0.34 * sk, 0.4 * sk, 0.5, body); plate.position.set(side * 0.34 * sk, -0.42, 0);
+        torso.add(plate);
+      });
+      var front = box(0.36 * sk, 0.34 * sk, 0.1, trim); front.position.set(0, -0.4, 0.24); torso.add(front);
+    }
 
     // backpack + thrusters
     var pack = box(0.7, 0.5, 0.24, dark); pack.position.set(0, 0.4, -0.42);
@@ -2310,33 +2400,124 @@ GH.models = (function () {
       flames.push(flame);
     });
     parts.flames = flames;
+    // lineage backpack
+    var P = S.pack;
+    if (P === 'hilts') {
+      [-0.3, 0.3].forEach(function (x) { var h = box(0.08, 0.5, 0.08, trim); h.position.set(x, 0.85, -0.5); h.rotation.z = x > 0 ? -0.25 : 0.25; torso.add(h); var pommel = box(0.12, 0.08, 0.12, accent); pommel.position.set(x - x * 0.4, 1.1, -0.5); torso.add(pommel); });
+    } else if (P === 'drums') {
+      [-1, 1].forEach(function (side) { var drum = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.36, 8), mat(dark)); drum.rotation.z = Math.PI / 2; drum.position.set(side * 0.55, -0.32, -0.1); torso.add(drum); });
+      var rack = box(0.9, 0.3, 0.2, trim); rack.position.set(0, 0.7, -0.5); torso.add(rack);
+    } else if (P === 'tail') {
+      var tail = box(0.16, 0.16, 0.9, dark); tail.position.set(0, -0.1, -0.8); tail.rotation.x = -0.5; torso.add(tail);
+      var tailTip = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.4, 4), mat(accent)); tailTip.rotation.x = -Math.PI / 2 - 0.5; tailTip.position.set(0, -0.4, -1.3); torso.add(tailTip);
+    } else if (P === 'binders') {
+      [-1, 1].forEach(function (side) { var b = box(0.12, 1.2, 0.7, body); b.position.set(side * 0.62, 0.55, -0.55); b.rotation.z = side * 0.35; b.rotation.x = -0.2; torso.add(b); var edge = box(0.14, 1.0, 0.08, accent); edge.position.set(side * 0.62, 0.55, -0.9); edge.rotation.z = side * 0.35; edge.rotation.x = -0.2; torso.add(edge); });
+    } else if (P === 'cloak') {
+      [-1, 1].forEach(function (side) { var c = box(0.36, 1.3, 0.08, dark); c.position.set(side * 0.3, -0.2, -0.56); c.rotation.z = side * 0.12; torso.add(c); });
+    } else if (P === 'reactors') {
+      [-0.28, 0.28].forEach(function (x) { var r = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.7, 7), mat(dark)); r.position.set(x, 0.5, -0.6); torso.add(r); var cap = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.1, 7), glowMat(accent)); cap.position.set(x, 0.9, -0.6); torso.add(cap); });
+    } else if (P === 'wings') {
+      [-1, 1].forEach(function (side) { var w = box(0.08, 0.36, 1.1, trim); w.position.set(side * 0.5, 0.7, -0.75); w.rotation.y = side * 0.5; w.rotation.z = side * 0.6; torso.add(w); var tipW = box(0.06, 0.12, 0.4, accent); tipW.position.set(side * 0.9, 1.0, -1.1); tipW.rotation.y = side * 0.5; tipW.rotation.z = side * 0.6; torso.add(tipW); });
+    } else if (P === 'jets') {
+      [-0.36, 0.36].forEach(function (x) { var j = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.5, 7), mat(0x1a1a20)); j.position.set(x, -0.5, -0.5); torso.add(j); });
+      var plate = box(1.1, 0.7, 0.14, trim); plate.position.set(0, 0.45, -0.55); torso.add(plate);
+    } else if (P === 'pylons') {
+      [-1, 1].forEach(function (side) { var py = box(0.14, 0.9, 0.24, trim); py.position.set(side * 0.55, 1.0, -0.15); torso.add(py); var pyt = box(0.1, 0.14, 0.14, accent); pyt.position.set(side * 0.55, 1.5, -0.15); torso.add(pyt); });
+    } else if (P === 'drillpack') {
+      [-0.3, 0.3].forEach(function (x) { var dr = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.6, 6), mat(trim)); dr.position.set(x, 0.95, -0.5); torso.add(dr); });
+    }
 
     // ---- head ----
-    var head = box(0.44, 0.38, 0.46, body); head.position.y = 0.98;
-    var visor = box(0.36, 0.1, 0.06, accent); visor.position.set(0, 0.98, 0.25);
-    var chin = box(0.2, 0.1, 0.1, dark); chin.position.set(0, 0.86, 0.24);
-    var crest = box(0.08, 0.32, 0.34, trim); crest.position.set(0, 1.22, -0.02);
-    var antenna = box(0.03, 0.34, 0.03, dark); antenna.position.set(0.2, 1.3, -0.1);
-    torso.add(head, visor, chin, crest, antenna);
+    var H = S.head;
+    var hw = H === 'slit' ? 0.62 : H === 'hood' || H === 'narrow' ? 0.36 : H === 'mono' ? 0.5 : 0.44;
+    var hy = H === 'slit' ? 0.86 : 0.98;
+    var head = box(hw, H === 'slit' ? 0.26 : 0.38, H === 'muzzle' ? 0.6 : 0.46, H === 'jaw' ? dark : body); head.position.y = hy;
+    torso.add(head);
+    var visor;
+    if (H === 'hero' || H === 'jaw' || H === 'shades') {
+      // twin eyes
+      [-0.1, 0.1].forEach(function (x) { var eye = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.06), H === 'jaw' ? mat(accent) : glowMat(accent)); eye.position.set(x, hy + 0.02, 0.24); torso.add(eye); });
+      visor = box(0.3, 0.04, 0.06, accent); visor.position.set(0, hy + 0.1, 0.24); visor.visible = H === 'hero'; torso.add(visor);
+      var chin = box(0.2, 0.1, 0.1, dark); chin.position.set(0, hy - 0.12, 0.24); torso.add(chin);
+      if (H === 'hero') {
+        // V-fin
+        [-1, 1].forEach(function (side) { var fin = box(0.03, 0.34, 0.06, accent); fin.position.set(side * 0.14, hy + 0.32, 0.18); fin.rotation.z = side * -0.6; torso.add(fin); });
+        var jewel = box(0.08, 0.08, 0.04, 0xff3040); jewel.position.set(0, hy + 0.14, 0.24); torso.add(jewel);
+      }
+      if (H === 'jaw') {
+        var jaw = box(0.36, 0.14, 0.2, body); jaw.position.set(0, hy - 0.16, 0.2); torso.add(jaw);
+        var neck = box(0.16, 0.2, 0.16, dark); neck.position.set(0, hy - 0.26, 0); torso.add(neck);
+      }
+      if (H === 'shades') {
+        var shades = box(0.5, 0.1, 0.08, 0xff2020); shades.position.set(0, hy + 0.04, 0.26); torso.add(shades);
+        var spike = box(0.06, 0.32, 0.06, accent); spike.position.set(0, hy + 0.32, -0.05); torso.add(spike);
+      }
+    } else if (H === 'visor' || H === 'narrow') {
+      visor = new THREE.Mesh(new THREE.BoxGeometry(H === 'narrow' ? 0.22 : 0.38, H === 'narrow' ? 0.05 : 0.1, 0.06), glowMat(accent)); visor.position.set(0, hy, 0.25); torso.add(visor);
+      var chin2 = box(0.2, 0.1, 0.1, dark); chin2.position.set(0, hy - 0.12, 0.24); torso.add(chin2);
+      if (H === 'narrow') { var finN = box(0.06, 0.4, 0.3, trim); finN.position.set(0, hy + 0.28, -0.02); torso.add(finN); }
+      else { var brow = box(0.48, 0.06, 0.5, trim); brow.position.set(0, hy + 0.18, 0); torso.add(brow); }
+    } else if (H === 'mono') {
+      var rail = box(0.42, 0.1, 0.06, 0x101418); rail.position.set(0, hy, 0.25); torso.add(rail);
+      visor = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), glowMat(accent)); visor.position.set(0.06, hy, 0.27); torso.add(visor);
+      var horn = box(0.05, 0.42, 0.08, trim); horn.position.set(0.02, hy + 0.36, 0.06); horn.rotation.z = -0.15; horn.rotation.x = -0.3; torso.add(horn);
+      var cable = box(0.05, 0.05, 0.36, 0x1a1a20); cable.position.set(0.2, hy - 0.16, -0.1); torso.add(cable);
+    } else if (H === 'newtype') {
+      visor = box(0.36, 0.1, 0.06, 0x101418); visor.position.set(0, hy, 0.25); torso.add(visor);
+      var brow2 = box(0.5, 0.08, 0.5, trim); brow2.position.set(0, hy + 0.2, 0.02); torso.add(brow2);
+      [-1, 1].forEach(function (side) { var hornN = box(0.05, 0.5, 0.08, accent); hornN.position.set(side * 0.22, hy + 0.34, -0.1); hornN.rotation.z = side * 0.5; hornN.rotation.x = 0.5; torso.add(hornN); });
+    } else if (H === 'hood') {
+      var hood = box(0.5, 0.2, 0.52, dark); hood.position.set(0, hy + 0.2, -0.02); torso.add(hood);
+      var hoodBack = box(0.5, 0.36, 0.1, dark); hoodBack.position.set(0, hy, -0.24); torso.add(hoodBack);
+      visor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.06), glowMat(accent)); visor.position.set(0, hy, 0.22); torso.add(visor);
+    } else if (H === 'slit') {
+      // sunk into the shoulders, one wide slit
+      visor = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.05, 0.06), glowMat(accent)); visor.position.set(0, hy, 0.33); torso.add(visor);
+      var dome = box(0.7, 0.14, 0.5, trim); dome.position.set(0, hy + 0.18, -0.02); torso.add(dome);
+    } else if (H === 'muzzle') {
+      visor = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), glowMat(accent)); visor.position.set(0, hy + 0.06, 0.28); torso.add(visor);
+      var muzzle = box(0.24, 0.16, 0.24, dark); muzzle.position.set(0, hy - 0.1, 0.36); torso.add(muzzle);
+      var teeth2 = box(0.22, 0.04, 0.04, 0xf0f0f0); teeth2.position.set(0, hy - 0.12, 0.49); torso.add(teeth2);
+      var hornM = box(0.05, 0.4, 0.06, trim); hornM.position.set(0, hy + 0.34, 0.08); hornM.rotation.x = -0.4; torso.add(hornM);
+    }
+    if (!visor) { visor = box(0.36, 0.1, 0.06, accent); visor.position.set(0, hy, 0.25); torso.add(visor); }
+    var antenna = box(0.03, 0.34, 0.03, dark); antenna.position.set(0.2, hy + 0.32, -0.1); antenna.visible = H === 'visor' || H === 'narrow';
+    torso.add(antenna);
     parts.visor = visor;
 
     // ---- arms ----
     var armL = new THREE.Group(), armR = new THREE.Group();
     [armL, armR].forEach(function (arm, i) {
       var side = i === 0 ? -1 : 1;
-      var pad = box(0.5, 0.36, 0.54, trim); pad.position.set(side * 0.06, 0.16, 0);
-      var padTop = box(0.42, 0.1, 0.46, accent); padTop.position.set(side * 0.06, 0.38, 0);
-      var upper = box(0.28, 0.5, 0.3, body); upper.position.y = -0.2;
+      var ps = typeof S.pad === 'number' ? S.pad : 1.0;
+      var slim = S.legs === 'slim';
+      var pad = box(0.5 * ps, 0.36 * ps, 0.54 * ps, trim); pad.position.set(side * 0.06, 0.16, 0);
+      var padTop = box(0.42 * ps, 0.1, 0.46 * ps, accent); padTop.position.set(side * 0.06, 0.38 * ps, 0);
+      var upper = box(slim ? 0.22 : 0.28, 0.5, slim ? 0.24 : 0.3, body); upper.position.y = -0.2;
       var elbow = box(0.22, 0.12, 0.24, dark); elbow.position.y = -0.46;
-      var fore = box(0.3, 0.34, 0.32, dark); fore.position.y = -0.66;
+      var fore = box(slim ? 0.24 : 0.3, 0.34, slim ? 0.26 : 0.32, dark); fore.position.y = -0.66;
       var fist = box(0.26, 0.22, 0.26, body); fist.position.y = -0.88;
       arm.add(pad, padTop, upper, elbow, fore, fist);
-      arm.position.set(side * 0.76, 0.48, 0);
+      if (S.pad === 'spike') {
+        if (i === 0) {
+          // the spiked pauldron
+          var bigPad = box(0.6, 0.44, 0.6, trim); bigPad.position.set(-0.1, 0.2, 0); arm.add(bigPad);
+          for (var sp = 0; sp < 3; sp++) { var spk = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 4), mat(accent)); spk.position.set(-0.2 - sp * 0.08, 0.5 + sp * 0.02, -0.2 + sp * 0.2); arm.add(spk); }
+        } else {
+          var shield = box(0.08, 0.7, 0.5, body); shield.position.set(0.32, 0.0, 0); arm.add(shield);
+        }
+      }
+      if (S.legs === 'exposed') { var slabA = box(0.12, 0.4, 0.34, body); slabA.position.set(side * 0.18, -0.2, 0); arm.add(slabA); }
+      if (cfg.style === 'drill' || cfg.prop === 'drill') {
+        var dfore = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.6, 6), mat(trim)); dfore.rotation.x = Math.PI; dfore.position.y = -1.05; arm.add(dfore);
+      }
+      arm.position.set(side * (0.62 + 0.14 * cw), 0.48, 0);
       torso.add(arm);
     });
     parts.armL = armL; parts.armR = armR;
 
     torso.position.y = 1.72;
+    if (S.hunch) { torso.rotation.x = S.hunch; torso.position.y -= S.hunch * 0.5; }
     g.add(torso);
     parts.torso = torso;
 
@@ -2760,6 +2941,26 @@ GH.models = (function () {
       mat(0xe83838, { emissive: 0x601010 }));
     m.rotation.x = Math.PI / 2;
     return m;
+  };
+
+  // an alloy vein: a cluster of grey-blue crystals, richer ones taller and lit
+  M.buildOreNode = function (rich) {
+    var g = new THREE.Group();
+    var n = rich ? 6 : 4;
+    for (var i = 0; i < n; i++) {
+      var a = (i / n) * Math.PI * 2 + 0.3;
+      var h = (rich ? 1.1 : 0.7) + (i % 2) * 0.35;
+      var c = new THREE.Mesh(new THREE.ConeGeometry(0.22, h, 5),
+        mat(rich ? 0xc8d8f0 : 0x9aa4b0, rich ? { emissive: 0x304060, emissiveIntensity: 0.5 } : {}));
+      c.position.set(Math.cos(a) * 0.45, h / 2, Math.sin(a) * 0.45);
+      c.rotation.z = Math.cos(a) * 0.3; c.rotation.x = Math.sin(a) * 0.3;
+      g.add(c);
+    }
+    var base = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 0.25, 7), mat(0x50565e));
+    base.position.y = 0.12;
+    g.add(base);
+    blobShadow(g, 2.0);
+    return g;
   };
 
   // workshop materials: a grey alloy ingot, and a frame core that glows
@@ -3285,47 +3486,239 @@ GH.models = (function () {
   };
 
   // transformed frame: a folded speeder / skimmer form
-  M.buildSpeeder = function (cfg, kind) {
-    var g = new THREE.Group();
-    var body = cfg.body, accent = cfg.accent, dark = cfg.dark || 0x30343a;
-    if (kind === 'tank') {
-      // hover-tank: wide hull, a turret, skirts
-      var hullT = box(1.7, 0.5, 2.6, body); hullT.position.y = 0.7; g.add(hullT);
-      var skirtL = box(0.3, 0.3, 2.4, dark); skirtL.position.set(-0.95, 0.5, 0); g.add(skirtL);
-      var skirtR = box(0.3, 0.3, 2.4, dark); skirtR.position.set(0.95, 0.5, 0); g.add(skirtR);
-      var turret = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.4, 8), mat(accent)); turret.position.set(0, 1.15, -0.2); g.add(turret);
-      var barrel = box(0.16, 0.16, 1.6, dark); barrel.position.set(0, 1.2, 0.9); g.add(barrel);
-      var canopyT = box(0.5, 0.22, 0.5, 0x202830); canopyT.position.set(0, 1.45, -0.2); g.add(canopyT);
-    } else if (kind === 'disc') {
-      // disc: a flat saucer with an underslung cannon
-      var disc = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.1, 0.35, 10), mat(body)); disc.position.y = 0.8; g.add(disc);
-      var dome = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 5), mat(0x202830)); dome.position.y = 1.05; g.add(dome);
-      var ring = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.08, 4, 12), mat(accent)); ring.rotation.x = Math.PI / 2; ring.position.y = 0.8; g.add(ring);
-      var gunD = box(0.14, 0.14, 1.2, dark); gunD.position.set(0, 0.5, 0.9); g.add(gunD);
-    } else if (kind === 'bike') {
-      // hover-bike: narrow, long, a fork and a spine
-      var spine = box(0.5, 0.36, 2.6, body); spine.position.y = 0.8; g.add(spine);
-      var fork = box(0.3, 0.3, 0.9, dark); fork.position.set(0, 0.7, 1.5); fork.rotation.x = 0.4; g.add(fork);
-      var noseB = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.9, 4), mat(accent)); noseB.rotation.x = Math.PI / 2; noseB.position.set(0, 0.8, 1.9); g.add(noseB);
-      var seat = box(0.42, 0.18, 0.9, 0x202830); seat.position.set(0, 1.05, -0.2); g.add(seat);
-      var barL = box(0.6, 0.06, 0.06, dark); barL.position.set(0, 1.15, 0.7); g.add(barL);
-      var finB = box(0.08, 0.5, 0.7, dark); finB.position.set(0, 1.1, -1.1); g.add(finB);
-    } else {
-      var hull = box(0.9, 0.4, 2.4, body); hull.position.y = 0.75;
-      var nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.1, 4), mat(accent));
-      nose.rotation.x = Math.PI / 2;
-      nose.position.set(0, 0.75, 1.6);
-      var canopy = box(0.5, 0.28, 0.8, 0x202830); canopy.position.set(0, 1.05, 0.2);
-      var finL = box(0.1, 0.5, 0.9, dark); finL.position.set(-0.55, 0.95, -0.8); finL.rotation.z = 0.5;
-      var finR = box(0.1, 0.5, 0.9, dark); finR.position.set(0.55, 0.95, -0.8); finR.rotation.z = -0.5;
-      g.add(hull, nose, canopy, finL, finR);
+  // ---------------------------------------------------------------
+  // Vehicles (VECTOR forms). One builder per silhouette; the frame's
+  // palette carries over so a folded frame still reads as that frame.
+  // buildSpeeder(cfg, kind, shape): kind = drivetrain, shape = look.
+  // ---------------------------------------------------------------
+  var SHAPES = {};
+  function vcyl(rt, rb, h, seg, c, o) { return new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat(c, o)); }
+  function vcone(r, h, seg, c) { return new THREE.Mesh(new THREE.ConeGeometry(r, h, seg), mat(c)); }
+  function at(m, x, y, z) { m.position.set(x, y, z); return m; }
+  function glow(c) { return mat(c, { emissive: c, emissiveIntensity: 0.6 }); }
+
+  // --- hover-tank family ---
+  SHAPES.tank = function (g, P) {
+    g.add(at(box(1.7, 0.5, 2.6, P.body), 0, 0.7, 0));
+    g.add(at(box(0.3, 0.3, 2.4, P.dark), -0.95, 0.5, 0), at(box(0.3, 0.3, 2.4, P.dark), 0.95, 0.5, 0));
+    g.add(at(vcyl(0.5, 0.6, 0.4, 8, P.accent), 0, 1.15, -0.2));
+    g.add(at(box(0.16, 0.16, 1.6, P.dark), 0, 1.2, 0.9));
+    g.add(at(box(0.5, 0.22, 0.5, 0x202830), 0, 1.45, -0.2));
+  };
+  SHAPES.shieldtank = function (g, P) {
+    SHAPES.tank(g, P);
+    var sh = at(box(1.9, 1.0, 0.16, P.trim), 0, 0.9, 1.5); sh.rotation.x = -0.25; g.add(sh);
+    g.add(at(box(0.5, 0.5, 0.06, P.accent), 0, 0.95, 1.6));
+    g.add(at(box(0.12, 0.7, 0.4, P.accent), 0, 1.7, -0.6));
+  };
+  SHAPES.guntank = function (g, P) {
+    g.add(at(box(1.6, 0.6, 2.4, P.body), 0, 0.7, 0));
+    [-0.85, 0.85].forEach(function (x) { g.add(at(box(0.36, 0.5, 2.6, P.dark), x, 0.5, 0)); });
+    var ring = at(vcyl(0.7, 0.7, 0.24, 10, P.trim), 0, 1.12, -0.2); g.add(ring);
+    [-0.3, 0.3].forEach(function (x) {
+      g.add(at(box(0.14, 0.14, 1.9, P.dark), x, 1.3, 0.8));
+      g.add(at(box(0.2, 0.2, 0.3, P.accent), x, 1.3, 1.8));
+    });
+    g.add(at(box(0.6, 0.26, 0.6, 0x202830), 0, 1.4, -0.5));
+    g.add(at(vcyl(0.22, 0.22, 0.5, 6, P.accent), -0.6, 1.2, -0.9));
+  };
+  SHAPES.halftrack = function (g, P) {
+    g.add(at(box(1.3, 0.6, 1.2, P.body), 0, 0.85, 0.8));
+    g.add(at(box(1.0, 0.5, 0.8, 0x202830), 0, 1.3, 0.9));
+    g.add(at(box(1.6, 0.5, 1.6, P.dark), 0, 0.6, -0.7));
+    [-0.7, 0.7].forEach(function (x) { g.add(at(box(0.4, 0.55, 1.6, P.trim), x, 0.45, -0.7)); });
+    [-0.55, 0.55].forEach(function (x) { g.add(at(vcyl(0.3, 0.3, 0.2, 8, P.dark), x, 0.35, 1.3)); });
+    var rot = at(vcyl(0.2, 0.2, 1.4, 6, P.accent), 0, 1.35, -0.4); rot.rotation.x = Math.PI / 2; g.add(rot);
+    [0, 1, 2].forEach(function (i) { var b = at(vcyl(0.05, 0.05, 1.4, 4, P.dark), Math.cos(i * 2.1) * 0.2, 1.35 + Math.sin(i * 2.1) * 0.2, -0.4); b.rotation.x = Math.PI / 2; g.add(b); });
+  };
+  SHAPES.crawler = function (g, P) {
+    g.add(at(box(2.0, 0.6, 2.8, P.body), 0, 0.75, 0));
+    [-1.1, 1.1].forEach(function (x) { g.add(at(box(0.5, 0.7, 3.0, P.dark), x, 0.5, 0)); for (var i = -1; i <= 1; i++) g.add(at(vcyl(0.22, 0.22, 0.55, 8, P.trim), x, 0.35, i * 1.0)); });
+    var m = at(vcyl(0.3, 0.36, 1.6, 7, P.dark), 0, 1.3, 0.2); m.rotation.x = Math.PI / 2 - 0.55; g.add(m);
+    g.add(at(box(0.9, 0.5, 0.9, P.accent), 0, 1.25, -0.5));
+    g.add(at(box(0.4, 0.2, 0.4, 0x202830), 0, 1.6, -0.5));
+  };
+  SHAPES.sled = function (g, P) {
+    g.add(at(box(2.2, 0.36, 2.6, P.body), 0, 0.55, 0));
+    var prow = at(box(2.2, 0.8, 0.3, P.trim), 0, 0.8, 1.35); prow.rotation.x = -0.35; g.add(prow);
+    [-0.6, 0.6].forEach(function (x) { var l = at(vcone(0.12, 1.2, 4, P.accent), x, 0.85, 2.2); l.rotation.x = Math.PI / 2; g.add(l); });
+    [-1.0, 1.0].forEach(function (x) { g.add(at(box(0.3, 0.2, 2.8, P.dark), x, 0.35, 0)); });
+    g.add(at(box(0.6, 0.4, 0.8, 0x202830), 0, 0.95, -0.4));
+    g.add(at(box(1.2, 0.5, 0.2, P.accent), 0, 1.0, -1.3));
+  };
+  SHAPES.hearse = function (g, P) {
+    g.add(at(box(1.4, 0.7, 3.0, P.body), 0, 0.8, 0));
+    g.add(at(box(1.5, 0.12, 3.1, P.trim), 0, 1.2, 0));
+    [-0.85, 0.85].forEach(function (x) { g.add(at(box(0.3, 0.5, 3.0, P.dark), x, 0.45, 0)); });
+    [-0.8, 0.8].forEach(function (x) { var fin = at(box(0.06, 0.8, 1.2, P.accent), x, 1.5, -0.6); fin.rotation.z = x > 0 ? -0.3 : 0.3; g.add(fin); });
+    var scythe = at(box(0.08, 0.1, 1.6, P.accent), 0, 1.35, 1.2); scythe.rotation.y = 0.5; g.add(scythe);
+    g.add(at(box(0.5, 0.3, 0.6, 0x202830), 0, 1.35, 0.6));
+  };
+  SHAPES.barge = function (g, P) {
+    g.add(at(box(2.4, 0.8, 3.2, P.body), 0, 0.9, 0));
+    g.add(at(box(2.6, 0.2, 3.4, P.trim), 0, 1.35, 0));
+    [-1.3, 1.3].forEach(function (x) { g.add(at(box(0.5, 0.9, 3.2, P.dark), x, 0.5, 0)); });
+    [-0.7, 0.7].forEach(function (x) { g.add(at(vcyl(0.4, 0.45, 0.4, 8, P.dark), x, 1.65, -0.4)); g.add(at(box(0.14, 0.14, 1.3, P.accent), x, 1.7, 0.4)); });
+    g.add(at(box(0.8, 0.5, 0.8, 0x202830), 0, 1.7, -1.0));
+    var core = at(new THREE.Mesh(new THREE.OctahedronGeometry(0.3), glow(P.accent)), 0, 1.6, 1.2); g.add(core);
+  };
+
+  // --- hover-bike family ---
+  SHAPES.bike = function (g, P) {
+    g.add(at(box(0.5, 0.36, 2.6, P.body), 0, 0.8, 0));
+    var fork = at(box(0.3, 0.3, 0.9, P.dark), 0, 0.7, 1.5); fork.rotation.x = 0.4; g.add(fork);
+    var nose = at(vcone(0.3, 0.9, 4, P.accent), 0, 0.8, 1.9); nose.rotation.x = Math.PI / 2; g.add(nose);
+    g.add(at(box(0.42, 0.18, 0.9, 0x202830), 0, 1.05, -0.2));
+    g.add(at(box(0.6, 0.06, 0.06, P.dark), 0, 1.15, 0.7));
+    g.add(at(box(0.08, 0.5, 0.7, P.dark), 0, 1.1, -1.1));
+    [-0.35, 0.35].forEach(function (x) { var claw = at(box(0.1, 0.16, 0.5, P.trim), x, 0.5, 0.6); claw.rotation.z = x > 0 ? 0.4 : -0.4; g.add(claw); });
+  };
+  SHAPES.stealthbike = function (g, P) {
+    var hull = at(box(0.6, 0.26, 2.8, P.dark), 0, 0.72, 0); g.add(hull);
+    var top = at(box(0.5, 0.2, 1.4, P.body), 0, 0.92, 0.3); top.rotation.x = -0.1; g.add(top);
+    var nose = at(vcone(0.28, 1.1, 3, P.dark), 0, 0.75, 1.9); nose.rotation.x = Math.PI / 2; g.add(nose);
+    g.add(at(box(0.34, 0.12, 0.7, 0x101418), 0, 1.05, -0.3));
+    [-0.4, 0.4].forEach(function (x) { var fin = at(box(0.05, 0.4, 0.9, P.accent), x, 0.9, -1.0); fin.rotation.z = x > 0 ? -0.9 : 0.9; g.add(fin); });
+    g.add(at(box(0.5, 0.05, 0.05, glow(P.accent) && P.accent), 0, 0.72, 1.2));
+  };
+  SHAPES.lancebike = function (g, P) {
+    SHAPES.bike(g, P);
+    var lance = at(vcyl(0.05, 0.1, 2.2, 6, P.trim), 0, 0.85, 2.0); lance.rotation.x = Math.PI / 2; g.add(lance);
+    (function () { var _m = at(vcone(0.12, 0.5, 4, P.accent), 0, 0.85, 3.2); _m.rotation.x = Math.PI / 2; g.add(_m); })();
+  };
+  SHAPES.drillbike = function (g, P) {
+    g.add(at(box(0.8, 0.5, 2.0, P.body), 0, 0.9, -0.2));
+    var drill = at(vcone(0.45, 1.5, 8, P.accent), 0, 0.9, 1.5); drill.rotation.x = Math.PI / 2; g.add(drill);
+    [[-0.5, 0.6], [0.5, 0.6], [-0.5, -0.9], [0.5, -0.9]].forEach(function (l) {
+      g.add(at(box(0.2, 0.7, 0.2, P.dark), l[0], 0.4, l[1]));
+      g.add(at(box(0.3, 0.14, 0.4, P.trim), l[0], 0.08, l[1] + 0.1));
+    });
+    g.add(at(box(0.5, 0.3, 0.6, 0x202830), 0, 1.25, -0.4));
+    g.add(at(box(0.7, 0.08, 0.3, P.accent), 0, 1.15, 0.5)); // the shades
+  };
+
+  // --- beast family (four legs) ---
+  SHAPES.beast = function (g, P) {
+    g.add(at(box(0.9, 0.6, 2.2, P.body), 0, 0.95, 0));
+    var head = at(box(0.6, 0.45, 0.7, P.body), 0, 1.15, 1.35); g.add(head);
+    g.add(at(box(0.36, 0.08, 0.1, P.accent), 0, 1.2, 1.72));
+    [[-0.5, 0.7], [0.5, 0.7], [-0.5, -0.8], [0.5, -0.8]].forEach(function (l) {
+      var thigh = at(box(0.24, 0.6, 0.3, P.dark), l[0], 0.65, l[1]); thigh.rotation.x = l[1] > 0 ? -0.5 : 0.5; g.add(thigh);
+      g.add(at(box(0.2, 0.5, 0.2, P.trim), l[0], 0.28, l[1] + (l[1] > 0 ? 0.25 : -0.25)));
+    });
+    var tail = at(box(0.14, 0.14, 1.0, P.dark), 0, 1.1, -1.5); tail.rotation.x = -0.4; g.add(tail);
+    [-0.25, 0.25].forEach(function (x) { g.add(at(box(0.06, 0.3, 0.1, P.accent), x, 1.5, 1.3)); });
+  };
+  SHAPES.drillpod = function (g, P) {
+    g.add(at(box(1.0, 0.9, 1.0, P.body), 0, 0.95, 0));
+    g.add(at(box(0.7, 0.14, 0.1, P.accent), 0, 1.1, 0.52));   // the grin
+    g.add(at(box(0.5, 0.1, 0.1, 0x101418), 0, 0.8, 0.52));
+    var drill = at(vcone(0.35, 1.0, 8, P.trim), 0, 0.95, 1.0); drill.rotation.x = Math.PI / 2; g.add(drill);
+    [[-0.45, 0.35], [0.45, 0.35], [-0.45, -0.35], [0.45, -0.35]].forEach(function (l) { g.add(at(box(0.2, 0.5, 0.2, P.dark), l[0], 0.28, l[1])); });
+    var key = at(box(0.1, 0.5, 0.1, P.accent), 0, 1.55, -0.2); g.add(key);
+    g.add(at(box(0.3, 0.1, 0.1, P.accent), 0, 1.8, -0.2));
+  };
+  SHAPES.feral = function (g, P) {
+    g.add(at(box(0.7, 0.5, 2.4, P.body), 0, 0.9, 0));
+    var skull = at(box(0.5, 0.4, 0.8, P.dark), 0, 1.0, 1.5); g.add(skull);
+    g.add(at(box(0.4, 0.06, 0.06, P.accent), 0, 1.1, 1.9));
+    [[-0.45, 0.6], [0.45, 0.6], [-0.45, -0.7], [0.45, -0.7]].forEach(function (l) {
+      var arm = at(box(0.18, 0.9, 0.18, P.dark), l[0], 0.5, l[1]); arm.rotation.x = l[1] > 0 ? -0.4 : 0.4; g.add(arm);
+      g.add(at(box(0.3, 0.1, 0.34, P.trim), l[0], 0.06, l[1] + (l[1] > 0 ? 0.35 : -0.35)));
+    });
+    [-0.3, 0.3].forEach(function (x) { g.add(at(box(0.08, 0.7, 0.16, P.trim), x, 1.4, -0.4)); }); // shoulder pylons
+    g.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5), glow(0xff3040)), 0, 1.0, 0.4)); // the core
+  };
+
+  // --- disc family ---
+  SHAPES.disc = function (g, P) {
+    g.add(at(vcyl(1.3, 1.1, 0.35, 10, P.body), 0, 0.8, 0));
+    g.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 5), mat(0x202830)), 0, 1.05, 0));
+    var ring = at(new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.08, 4, 12), mat(P.accent)), 0, 0.8, 0); ring.rotation.x = Math.PI / 2; g.add(ring);
+    g.add(at(box(0.14, 0.14, 1.2, P.dark), 0, 0.5, 0.9));
+    for (var i = 0; i < 6; i++) { var a = i / 6 * Math.PI * 2; g.add(at(box(0.16, 0.06, 0.3, glow(P.accent) && P.accent), Math.cos(a) * 1.0, 1.0, Math.sin(a) * 1.0)); }
+  };
+  SHAPES.reaperdisc = function (g, P) {
+    g.add(at(vcyl(1.2, 1.0, 0.4, 8, P.dark), 0, 0.8, 0));
+    g.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 5), mat(P.body)), 0, 1.05, 0));
+    for (var i = 0; i < 4; i++) {
+      var a = i / 4 * Math.PI * 2;
+      var blade = at(box(0.9, 0.06, 0.28, P.accent), Math.cos(a) * 1.5, 0.8, Math.sin(a) * 1.5);
+      blade.rotation.y = -a + 0.6; g.add(blade);
     }
+    g.add(at(box(0.5, 0.3, 0.5, 0x101418), 0, 1.3, -0.2));
+  };
+  SHAPES.fortressdisc = function (g, P) {
+    g.add(at(vcyl(1.6, 1.4, 0.6, 10, P.body), 0, 0.85, 0));
+    g.add(at(vcyl(1.7, 1.7, 0.12, 10, P.trim), 0, 1.2, 0));
+    var m = at(vcyl(0.28, 0.34, 1.5, 7, P.dark), 0, 1.6, 0.2); m.rotation.x = Math.PI / 2 - 0.6; g.add(m);
+    g.add(at(box(0.7, 0.5, 0.7, P.accent), 0, 1.5, -0.4));
+    for (var i = 0; i < 4; i++) { var a = i / 4 * Math.PI * 2 + 0.4; g.add(at(box(0.5, 0.36, 0.5, P.dark), Math.cos(a) * 1.3, 1.35, Math.sin(a) * 1.3)); }
+    g.add(at(box(0.5, 0.24, 0.5, 0x202830), 0, 1.9, -0.4));
+  };
+  SHAPES.binderdisc = function (g, P) {
+    SHAPES.disc(g, P);
+    [-1, 1].forEach(function (side) {
+      var b = at(box(0.14, 1.2, 0.9, P.trim), side * 1.4, 1.3, -0.4); b.rotation.z = side * 0.35; g.add(b);
+      for (var i = 0; i < 3; i++) g.add(at(box(0.06, 0.2, 0.3, glow(P.accent) && P.accent), side * 1.45, 0.9 + i * 0.35, -0.4 - i * 0.2));
+    });
+  };
+
+  // --- waverider / jet family ---
+  SHAPES.wing = function (g, P) {
+    var hull = at(box(0.9, 0.3, 2.6, P.body), 0, 0.8, 0); g.add(hull);
+    [-1, 1].forEach(function (side) {
+      var w = at(box(1.6, 0.08, 1.2, P.dark), side * 1.0, 0.8, -0.5); w.rotation.y = side * -0.5; g.add(w);
+      var blade = at(box(0.9, 0.05, 0.16, P.accent), side * 1.6, 0.82, 0.2); blade.rotation.y = side * -0.5; g.add(blade);
+    });
+    g.add(at(box(0.5, 0.22, 0.9, 0x202830), 0, 1.0, 0.3));
+    var nose = at(vcone(0.3, 1.2, 4, P.trim), 0, 0.8, 1.9); nose.rotation.x = Math.PI / 2; g.add(nose);
+  };
+  SHAPES.jet = function (g, P) {
+    var hull = at(box(0.7, 0.5, 3.0, P.body), 0, 0.85, 0); g.add(hull);
+    var lance = at(vcone(0.25, 1.6, 4, P.accent), 0, 0.85, 2.3); lance.rotation.x = Math.PI / 2; g.add(lance);
+    [-1, 1].forEach(function (side) {
+      var w = at(box(1.4, 0.08, 0.9, P.trim), side * 1.0, 0.85, -0.6); w.rotation.y = side * -0.35; g.add(w);
+      var tail = at(box(0.06, 0.7, 0.6, P.dark), side * 0.35, 1.25, -1.3); tail.rotation.z = side * -0.5; g.add(tail);
+    });
+    g.add(at(box(0.44, 0.24, 1.0, 0x202830), 0, 1.15, 0.4));
+    [-0.25, 0.25].forEach(function (x) { (function () { var _m = at(vcyl(0.16, 0.2, 0.5, 6, P.dark), x, 0.85, -1.4); _m.rotation.x = Math.PI / 2; g.add(_m); })(); });
+  };
+  SHAPES.broom = function (g, P) {
+    var staff = at(vcyl(0.12, 0.16, 3.4, 6, P.dark), 0, 0.85, 0); staff.rotation.x = Math.PI / 2; g.add(staff);
+    g.add(at(new THREE.Mesh(new THREE.OctahedronGeometry(0.4), glow(P.accent)), 0, 0.85, 1.9));
+    [-1, 1].forEach(function (side) { var w = at(box(1.1, 0.06, 0.7, P.body), side * 0.7, 0.85, -0.3); w.rotation.y = side * -0.6; g.add(w); });
+    g.add(at(box(0.4, 0.2, 0.9, 0x202830), 0, 1.02, -0.2));
+    for (var i = 0; i < 5; i++) (function () { var _m = at(box(0.06, 0.4, 0.06, P.trim), 0, 0.85, -1.5 - i * 0.12); _m.rotation.z = (i - 2) * 0.35; g.add(_m); })();
+  };
+  SHAPES.skiff = function (g, P) {
+    var hull = at(box(0.8, 0.36, 2.8, P.body), 0, 0.85, 0); g.add(hull);
+    var wing = at(box(0.1, 1.8, 1.4, P.trim), 0.6, 1.4, -0.6); wing.rotation.z = -0.9; wing.rotation.x = 0.3; g.add(wing);
+    g.add(at(box(0.44, 0.22, 0.9, 0x202830), 0, 1.05, 0.2));
+    var nose = at(vcone(0.28, 1.0, 5, P.accent), 0, 0.85, 1.9); nose.rotation.x = Math.PI / 2; g.add(nose);
+    (function () { var _m = at(new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.05, 4, 10), glow(P.accent)), 0, 0.85, -1.5); _m.rotation.y = 0; g.add(_m); })();
+  };
+  SHAPES.comet = function (g, P) {
+    var hull = at(box(0.8, 0.4, 3.2, P.body), 0, 0.85, 0); g.add(hull);
+    [-1, 1].forEach(function (side) { var w = at(box(1.2, 0.08, 1.0, P.body), side * 0.9, 0.85, -0.8); w.rotation.y = side * -0.7; g.add(w); });
+    [-0.3, 0, 0.3].forEach(function (x) { (function () { var _m = at(vcyl(0.16, 0.22, 0.6, 6, P.dark), x, 0.85, -1.7); _m.rotation.x = Math.PI / 2; g.add(_m); })(); });
+    g.add(at(box(0.4, 0.2, 0.9, 0x202830), 0, 1.08, 0.5));
+    var nose = at(vcone(0.3, 1.2, 4, P.accent), 0, 0.85, 2.2); nose.rotation.x = Math.PI / 2; g.add(nose);
+    g.add(at(box(0.6, 0.5, 0.1, P.accent), 0, 1.2, -1.2)); // the emblem plate
+  };
+
+  M.buildSpeeder = function (cfg, kind, shape) {
+    var g = new THREE.Group();
+    var P = { body: cfg.body, accent: cfg.accent, dark: cfg.dark || 0x30343a, trim: cfg.trim || cfg.accent };
+    var fn = SHAPES[shape] || SHAPES[kind] || SHAPES.bike;
+    fn(g, P);
     var flames = [];
+    var isBeast = kind === 'beast';
     [-0.28, 0.28].forEach(function (x) {
       var flame = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.9, 4),
         new THREE.MeshBasicMaterial({ color: 0x70c0ff, transparent: true, opacity: 0.85 }));
       flame.rotation.x = -Math.PI / 2;
-      flame.position.set(x, 0.75, -1.5);
+      flame.position.set(x, isBeast ? 1.0 : 0.75, isBeast ? -1.3 : -1.5);
       g.add(flame);
       flames.push(flame);
     });
@@ -6212,6 +6605,13 @@ GH.meta = (function () {
       feats: {},
       // a CLASSIC / ARENA / WEEKLY run left mid-way with EXIT RUN
       suspended: null,
+      // vehicle designs: chosen per lineage, and the second designs bought
+      vectorPick: {},
+      vectorsOwned: {},
+      // world life: zone diaries, the daily board, today's mined veins
+      diary: {},
+      daily: null,
+      nodesMined: {},
       stages: 1,
       devotion: { sol: 0, pyre: 0, keen: 0, verd: 0, ruin: 0 },
       activeDevotion: 'sol',
@@ -7722,19 +8122,19 @@ GH.roster = (function () {
   R.PACKS = [
     { id: 'aile', name: 'AILE', glyph: '▲', css: '#80d8ff', accent: 0x60c8ff,
       desc: 'Mobility pack: lighter plate, hotter servos. Faster, a little thinner.',
-      stats: { speed: 1.12, maxHP: 0.92, armor: -1, crit: 2 }, weapon: { interval: 0.93 }, vector: 'bike' },
+      stats: { speed: 1.12, maxHP: 0.95, armor: -1, crit: 2 }, weapon: { interval: 0.92 }, vector: 'bike' },
     { id: 'sword', name: 'SWORD', glyph: '⚔', css: '#ff9070', accent: 0xff6040,
       desc: 'Strike pack: overcharged actuators. Hits harder and reaches farther.',
-      stats: { maxHP: 1.0, crit: 3 }, weapon: { damage: 1.15, range: 1.12, aoe: 1.1 } },
+      stats: { maxHP: 0.98, crit: 2 }, weapon: { damage: 1.10, range: 1.08, aoe: 1.06 } },
     { id: 'launcher', name: 'LAUNCHER', glyph: '◆', css: '#f0c060', accent: 0xf0a030,
       desc: 'Siege pack: layered plating and stabilisers. Tough and slow.',
-      stats: { maxHP: 1.22, armor: 3, block: 3, speed: 0.9 }, weapon: { damage: 1.06 }, vector: 'tank' },
+      stats: { maxHP: 1.10, armor: 2, block: 1, speed: 0.88 }, weapon: { damage: 0.98 }, vector: 'tank' },
     { id: 'storm', name: 'STORM', glyph: '϶', css: '#c090ff', accent: 0xa060ff,
       desc: 'Element pack: a reactor tuned for arc and flame. Sharp crits, elemental bite.',
-      stats: { crit: 6, maxHP: 0.96 }, weapon: { damage: 1.04 }, elemMult: 1.2 },
+      stats: { crit: 4, maxHP: 0.95 }, weapon: { damage: 1.0 }, elemMult: 1.2 },
     { id: 'phantom', name: 'PHANTOM', glyph: '☾', css: '#9ae8c0', accent: 0x60e8a0,
       desc: 'Hunter pack: siphon coils and a quiet drive. Lifesteal, speed, precision.',
-      stats: { lifesteal: 5, crit: 4, speed: 1.05, maxHP: 0.94 }, weapon: { interval: 0.97 } }
+      stats: { lifesteal: 5, crit: 3, speed: 1.03, maxHP: 0.93 }, weapon: { interval: 0.98 } }
   ];
 
   R.MARKS = [
@@ -7777,44 +8177,44 @@ GH.roster = (function () {
   var RELICS = [
     { id: 'relic_moonlight', name: 'MOONLIGHT', icon: '☽', base: 'aegis', vector: 'disc', prop: 'sword',
       role: 'Relic frame · sword saint', model: { body: 0xe8e8f0, accent: 0xc0e0ff, dark: 0x303848, trim: 0x8090b0 },
-      stats: { maxHP: 170, speed: 19, armor: 7, block: 18, crit: 14, lifesteal: 4 },
-      weapon: { damage: 1.5, interval: 0.8, range: 1.25, knockback: 1.4 },
+      stats: { maxHP: 150, speed: 19, armor: 6, block: 14, crit: 12, lifesteal: 3 },
+      weapon: { damage: 1.3, interval: 0.85, range: 1.2, knockback: 1.4 },
       desc: 'A white relic that eats its pilot slowly and gives back everything. The finest blade in the hangar.',
       feat: { kind: 'stages', n: 6, desc: 'Clear all six CLASSIC stages.' } },
     { id: 'relic_ark', name: 'ARK HULL', icon: '⛫', base: 'titan', vector: 'tank', prop: 'mortar',
       role: 'Relic frame · walking fortress', model: { body: 0x3a3a48, accent: 0xff6020, dark: 0x181820, trim: 0x707080 },
-      stats: { maxHP: 260, speed: 12, armor: 14, block: 8, crit: 4, lifesteal: 0 },
-      weapon: { damage: 1.6, interval: 0.9, aoe: 1.3 },
+      stats: { maxHP: 215, speed: 12, armor: 10, block: 7, crit: 4, lifesteal: 0 },
+      weapon: { damage: 1.4, interval: 0.92, aoe: 1.25 },
       desc: 'A captured siege hull folded into a frame. Nothing walks slower; nothing walks through it.',
       feat: { kind: 'nests', n: 12, desc: 'Break 12 nests in the Shattered Reach.' } },
-    { id: 'relic_corebreaker', name: 'COREBREAKER', icon: '⟁', base: 'fang', vector: 'bike', prop: 'claws',
+    { id: 'relic_corebreaker', name: 'COREBREAKER', icon: '⟁', base: 'fang', vector: 'bike', prop: 'claws', style: 'drill',
       role: 'Relic frame · hype engine', model: { body: 0xc02030, accent: 0xffd040, dark: 0x301010, trim: 0xe08030 },
-      stats: { maxHP: 130, speed: 21, armor: 3, block: 0, crit: 18, lifesteal: 8 },
-      weapon: { damage: 1.7, interval: 0.95, range: 1.1 },
+      stats: { maxHP: 125, speed: 21, armor: 3, block: 0, crit: 16, lifesteal: 7 },
+      weapon: { damage: 1.4, interval: 0.95, range: 1.1 },
       desc: 'Drills for hands and a stolen red mid-frame. Every boost is a battle cry.',
       feat: { kind: 'dungeonTier', n: 3, desc: 'Ascend any dungeon to tier 3.' } },
     { id: 'relic_seer', name: 'SEER', icon: '◎', base: 'hexen', vector: 'disc', prop: 'staff',
       role: 'Relic frame · remote weapons', model: { body: 0xf0d8f0, accent: 0xff70c0, dark: 0x402040, trim: 0xa070c0 },
-      stats: { maxHP: 120, speed: 18, armor: 3, block: 0, crit: 16, lifesteal: 0 },
-      weapon: { damage: 1.35, interval: 0.75, homing: 2, aoe: 1.2 }, elemMult: 1.35,
+      stats: { maxHP: 115, speed: 18, armor: 3, block: 0, crit: 12, lifesteal: 0 },
+      weapon: { damage: 1.15, interval: 0.78, homing: 2, aoe: 1.15 }, elemMult: 1.25,
       desc: 'Hidden eyes and sweeping binders. Its shots think for themselves.',
       feat: { kind: 'pilot', n: 12, desc: 'Reach pilot level 12.' } },
     { id: 'relic_crimson', name: 'CRIMSON', icon: '☄', base: 'viper', vector: 'bike', prop: 'daggers',
       role: 'Relic frame · the rival', model: { body: 0xb01828, accent: 0xffe060, dark: 0x300810, trim: 0x702030 },
-      stats: { maxHP: 125, speed: 21, armor: 4, block: 2, crit: 24, lifesteal: 3 },
-      weapon: { damage: 1.5, interval: 0.85 },
+      stats: { maxHP: 118, speed: 21, armor: 3, block: 2, crit: 20, lifesteal: 3 },
+      weapon: { damage: 1.2, interval: 0.9 },
       desc: 'Three times faster, they said. Painted red until you beat it — and then it is yours.',
       feat: { kind: 'harrow', n: 1, desc: 'Bring down THE HARROW.' } },
-    { id: 'relic_keyhead', name: 'KEYHEAD', icon: '⌘', base: 'strix', vector: 'bike', prop: 'lance',
+    { id: 'relic_keyhead', name: 'KEYHEAD', icon: '⌘', base: 'strix', vector: 'bike', prop: 'lance', style: 'drill',
       role: 'Relic frame · spike-dock trainer', model: { body: 0x50c050, accent: 0xffffff, dark: 0x183018, trim: 0x90e090 },
-      stats: { maxHP: 110, speed: 23, armor: 2, block: 6, crit: 22, lifesteal: 0 },
-      weapon: { damage: 1.4, interval: 0.8, range: 1.15 },
+      stats: { maxHP: 105, speed: 23, armor: 2, block: 5, crit: 16, lifesteal: 0 },
+      weapon: { damage: 1.25, interval: 0.85, range: 1.12 },
       desc: 'The smallest relic and the fastest thing on the ground. A drill-pod with a lance.',
       feat: { kind: 'race', n: 1, desc: 'Win the SUNSPIRE CIRCUIT or a TRACE DUEL.' } },
-    { id: 'relic_revenant', name: 'REVENANT-13', icon: '♆', base: 'morrow', vector: 'disc', prop: 'scythe',
+    { id: 'relic_revenant', name: 'REVENANT-13', icon: '♆', base: 'morrow', vector: 'disc', prop: 'scythe', style: 'eva',
       role: 'Relic frame · bio-organic', model: { body: 0x6040a0, accent: 0x60ff80, dark: 0x201040, trim: 0xa080e0 },
-      stats: { maxHP: 150, speed: 18, armor: 5, block: 0, crit: 10, lifesteal: 20 },
-      weapon: { damage: 1.55, interval: 0.85, range: 1.2 },
+      stats: { maxHP: 135, speed: 18, armor: 4, block: 0, crit: 10, lifesteal: 14 },
+      weapon: { damage: 1.4, interval: 0.88, range: 1.15 },
       desc: 'Grown, not built. Four arms, one hunger. Wounds feed it faster than any reactor could.',
       feat: { kind: 'mastery', n: 20, desc: 'Reach a total pilot mastery of 20 (any frames).' } }
   ];
@@ -7914,9 +8314,9 @@ GH.roster = (function () {
   RELICS.forEach(function (rl) {
     var base = GH.mechById(rl.base);
     var def = {
-      id: rl.id, lineage: 'relic', kind: 'relic', vector: rl.vector,
+      id: rl.id, lineage: 'relic', relicBase: rl.base, kind: 'relic', vector: rl.vector,
       name: rl.name, role: rl.role, icon: rl.icon, desc: rl.desc,
-      model: { body: rl.model.body, accent: rl.model.accent, dark: rl.model.dark, trim: rl.model.trim, prop: rl.prop, pack: 'relic', mark: 4 },
+      model: { body: rl.model.body, accent: rl.model.accent, dark: rl.model.dark, trim: rl.model.trim, prop: rl.prop, style: rl.style || null, pack: 'relic', mark: 4 },
       stats: rl.stats,
       levelUp: clone(base.levelUp), levelText: base.levelText,
       baseText: fmtStats(rl.stats) + '\nRELIC — ' + rl.feat.desc,
@@ -8010,6 +8410,382 @@ GH.roster = (function () {
   ];
 
   return R;
+})();
+
+</script>
+<script>
+// HERO FRAME — vehicle (VECTOR) designs. Every lineage folds into two
+// different machines; relics have their own. A design pairs a drivetrain
+// (GH.VECTORS kind — how it handles) with a silhouette (models.buildSpeeder
+// shape) and a name. The first design of a lineage is free; the second is
+// built in the workshop. The pick is remembered per lineage.
+GH.vehicles = (function () {
+  var V = {};
+
+  // handling models (extends mechs.js GH.VECTORS)
+  GH.VECTORS.wing = { name: 'WAVERIDER', top: 1.2, accel: 1.05, grip: 0.85, driftGrip: 0.75, jump: 1.6, ram: 1.1, glide: true };
+  GH.VECTORS.beast = { name: 'BEAST', top: 1.0, accel: 1.3, grip: 1.5, driftGrip: 1.1, jump: 1.45, ram: 1.3 };
+  GH.VECTORS.crawler = { name: 'SIEGE CRAWLER', top: 0.78, accel: 0.8, grip: 1.6, driftGrip: 1.6, jump: 0.55, ram: 2.2 };
+
+  V.DESIGNS = [
+    // AEGIS — paladin: a shield-nosed hover-tank, then a war-sled that rams
+    { id: 'aegis_paladin', lineage: 'aegis', name: 'PALADIN TANK', kind: 'tank', shape: 'shieldtank', free: true,
+      desc: 'A hover-tank with the heater shield bolted to its bow. Rams like a battering ram.' },
+    { id: 'aegis_sled', lineage: 'aegis', name: 'WAR-SLED', kind: 'crawler', shape: 'sled',
+      desc: 'Low, wide, and unstoppable: a siege sled with twin lances forward. Slow, but nothing pushes it around.' },
+    // VULCAN — gunner: a gun-tank, then a halftrack with a rotary cannon
+    { id: 'vulcan_guntank', lineage: 'vulcan', name: 'GUN-TANK', kind: 'tank', shape: 'guntank', free: true,
+      desc: 'Twin cannons on a turret ring. The foundry on treads.' },
+    { id: 'vulcan_halftrack', lineage: 'vulcan', name: 'HALFTRACK', kind: 'crawler', shape: 'halftrack',
+      desc: 'Rotary cannon over an armoured cab. Grips anything, drifts nothing.' },
+    // FANG — striker: a talon bike, then a four-legged beast
+    { id: 'fang_talon', lineage: 'fang', name: 'TALON BIKE', kind: 'bike', shape: 'bike', free: true,
+      desc: 'A hover-bike with claw skids. Quick off the line, quick to slide.' },
+    { id: 'fang_beast', lineage: 'fang', name: 'RIDGE-CAT', kind: 'beast', shape: 'beast',
+      desc: 'The frame drops to all fours. Pounces off crests, never bogs, holds a line like it has teeth in the ground.' },
+    // HEXEN — wizard: a sigil disc, then a staff-glider
+    { id: 'hexen_sigil', lineage: 'hexen', name: 'SIGIL DISC', kind: 'disc', shape: 'disc', free: true,
+      desc: 'A hovering saucer ringed with runes. Loiters, floats over water, turns on nothing.' },
+    { id: 'hexen_broom', lineage: 'hexen', name: 'STAFF-GLIDER', kind: 'wing', shape: 'broom',
+      desc: 'The spellcannon staff becomes the keel of a narrow glider. Fast and long in the air.' },
+    // VIPER — rogue: a stealth bike, then a blade-wing waverider
+    { id: 'viper_stealth', lineage: 'viper', name: 'STEALTH BIKE', kind: 'bike', shape: 'stealthbike', free: true,
+      desc: 'Low, black, faceted. A knife on skids.' },
+    { id: 'viper_bladewing', lineage: 'viper', name: 'BLADE-WING', kind: 'wing', shape: 'wing',
+      desc: 'Both daggers swing out into a flat delta wing. Long jumps, thin grip.' },
+    // MORROW — reaper: a reaper disc, then a hearse crawler
+    { id: 'morrow_reaper', lineage: 'morrow', name: 'REAPER DISC', kind: 'disc', shape: 'reaperdisc', free: true,
+      desc: 'A dark saucer with the scythe folded around its rim. Everything it passes gets cut.' },
+    { id: 'morrow_hearse', lineage: 'morrow', name: 'HEARSE', kind: 'crawler', shape: 'hearse',
+      desc: 'A long armoured crawler with blade fins. Heavy, grim, and it rams like a funeral.' },
+    // STRIX — duelist: an interceptor jet, then a lance bike
+    { id: 'strix_jet', lineage: 'strix', name: 'INTERCEPTOR', kind: 'wing', shape: 'jet', free: true,
+      desc: 'The lance is the fuselage. A true jet: fastest on the straight, widest in the air.' },
+    { id: 'strix_lancebike', lineage: 'strix', name: 'LANCE BIKE', kind: 'bike', shape: 'lancebike',
+      desc: 'A slim hover-bike with the lance run forward as a ram spike.' },
+    // TITAN — artillery: a siege crawler, then a fortress disc
+    { id: 'titan_crawler', lineage: 'titan', name: 'SIEGE CRAWLER', kind: 'crawler', shape: 'crawler', free: true,
+      desc: 'The mortar rides a tracked hull. The slowest thing on the Reach and the hardest to stop.' },
+    { id: 'titan_fortress', lineage: 'titan', name: 'FORTRESS DISC', kind: 'disc', shape: 'fortressdisc',
+      desc: 'A heavy hover-platform with the mortar on a pintle. Floats over mud and lakes it would otherwise sink in.' },
+    // RELICS — one bespoke machine each
+    { id: 'relic_moonlight_v', lineage: 'relic_moonlight', name: 'MOONLIGHT SKIFF', kind: 'wing', shape: 'skiff', free: true, desc: 'A white sky-skiff with a single sweeping wing.' },
+    { id: 'relic_ark_v', lineage: 'relic_ark', name: 'ARK BARGE', kind: 'crawler', shape: 'barge', free: true, desc: 'The fortress on the move: a walking barge with two turrets.' },
+    { id: 'relic_corebreaker_v', lineage: 'relic_corebreaker', name: 'DRILL-BIKE', kind: 'beast', shape: 'drillbike', free: true, desc: 'A drill for a nose and legs for wheels. It digs in and launches.' },
+    { id: 'relic_seer_v', lineage: 'relic_seer', name: 'BINDER DISC', kind: 'disc', shape: 'binderdisc', free: true, desc: 'A saucer flanked by fin-funnel binders.' },
+    { id: 'relic_crimson_v', lineage: 'relic_crimson', name: 'COMET', kind: 'wing', shape: 'comet', free: true, desc: 'Red, three times faster, tail of fire.' },
+    { id: 'relic_keyhead_v', lineage: 'relic_keyhead', name: 'DRILL-POD', kind: 'beast', shape: 'drillpod', free: true, desc: 'A head-sized pod on stub legs. The fastest thing on the ground.' },
+    { id: 'relic_revenant_v', lineage: 'relic_revenant', name: 'FERAL GAIT', kind: 'beast', shape: 'feral', free: true, desc: 'The frame crawls on four arms. Grown, not built.' }
+  ];
+  V.BUILD_COST = { alloy: 120, cores: 1, salvage: 150 };
+
+  V.byId = function (id) {
+    for (var i = 0; i < V.DESIGNS.length; i++) if (V.DESIGNS[i].id === id) return V.DESIGNS[i];
+    return null;
+  };
+  V.forLineage = function (lineage) {
+    return V.DESIGNS.filter(function (d) { return d.lineage === lineage; });
+  };
+  function lineageOf(def) { return def.kind === 'relic' ? def.id : (def.lineage || def.id); }
+  V.lineageOf = lineageOf;
+
+  V.owned = function (id) {
+    var d = V.byId(id);
+    if (!d) return false;
+    if (d.free) return true;
+    var o = GH.meta.data.vectorsOwned || {};
+    return !!o[id];
+  };
+
+  // the design a frame currently folds into
+  V.activeFor = function (def) {
+    var ln = lineageOf(def);
+    var list = V.forLineage(ln);
+    if (!list.length) return { id: null, kind: def.vector || 'bike', shape: def.vector || 'bike', name: (GH.VECTORS[def.vector] || GH.VECTORS.bike).name };
+    var picks = GH.meta.data.vectorPick || {};
+    var pick = picks[ln] ? V.byId(picks[ln]) : null;
+    if (!pick || !V.owned(pick.id) || pick.lineage !== ln) pick = list[0];
+    return pick;
+  };
+
+  V.setPick = function (lineage, id) {
+    if (!V.owned(id)) return false;
+    GH.meta.data.vectorPick = GH.meta.data.vectorPick || {};
+    GH.meta.data.vectorPick[lineage] = id;
+    GH.meta.save();
+    return true;
+  };
+
+  // cycle the pick among owned designs for a frame's lineage
+  V.cycle = function (def) {
+    var ln = lineageOf(def);
+    var list = V.forLineage(ln).filter(function (d) { return V.owned(d.id); });
+    if (list.length < 2) return V.activeFor(def);
+    var cur = V.activeFor(def);
+    var i = 0;
+    for (var k = 0; k < list.length; k++) if (list[k].id === cur.id) i = k;
+    var next = list[(i + 1) % list.length];
+    V.setPick(ln, next.id);
+    return next;
+  };
+
+  V.canBuild = function (id) {
+    var d = V.byId(id);
+    if (!d || V.owned(id)) return false;
+    var m = GH.meta.data.mats, c = V.BUILD_COST;
+    // the lineage's base frame has to be yours first
+    if (!GH.meta.data.shells[d.lineage]) return false;
+    return m.alloy >= c.alloy && m.cores >= c.cores && GH.meta.data.salvage >= c.salvage;
+  };
+  V.build = function (id) {
+    if (!V.canBuild(id)) return false;
+    var c = V.BUILD_COST;
+    GH.meta.data.mats.alloy -= c.alloy; GH.meta.data.mats.cores -= c.cores; GH.meta.data.salvage -= c.salvage;
+    GH.meta.data.vectorsOwned = GH.meta.data.vectorsOwned || {};
+    GH.meta.data.vectorsOwned[id] = true;
+    GH.meta.save();
+    return true;
+  };
+  V.ownedCount = function () {
+    var n = 0;
+    V.DESIGNS.forEach(function (d) { if (V.owned(d.id)) n++; });
+    return n;
+  };
+
+  return V;
+})();
+
+</script>
+<script>
+// HERO FRAME — world life: the loops that make the Reach worth living in.
+// Borrowed shapes, not content:
+//   RuneScape  — Achievement Diaries (per-area task ladders paying area
+//                perks), daily challenges, slayer-style hunt tasks.
+//   Albion     — zone tiers as risk/reward (higher danger = richer
+//                resources), gathering nodes in the open world, random
+//                treasure sites worth a detour.
+// Everything here is state in GH.meta.data plus pure functions; game.js
+// reports events, main.js renders the boards.
+GH.worldlife = (function () {
+  var L = {};
+
+  function day() { return GH.world && GH.world.dayStamp ? GH.world.dayStamp() : new Date().toISOString().slice(0, 10); }
+  function seeded(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    var s = h >>> 0 || 1;
+    return function () { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+  }
+  function zoneName(id) { return GH.world && GH.world.stageFor ? GH.world.stageFor(id).name : id; }
+  function zoneDanger(id) {
+    if (!GH.world) return 1;
+    for (var i = 0; i < GH.world.ZONES.length; i++) if (GH.world.ZONES[i].id === id) return GH.world.ZONES[i].danger;
+    return 1;
+  }
+  // dungeons report to their parent territory
+  L.rootZone = function (zoneId) {
+    if (!zoneId) return 'wreck';
+    var dg = GH.dungeons && GH.dungeons.parseId ? GH.dungeons.parseId(zoneId) : null;
+    return dg ? dg.zone : zoneId;
+  };
+
+  // =================================================================
+  // ZONE DIARIES — four tiers per territory
+  // =================================================================
+  L.TIERS = [
+    { id: 'easy', name: 'EASY', reward: { alloy: 40, cores: 0, salvage: 60 }, perk: null,
+      tasks: [['kills', 25, 'Destroy 25 hostiles here'], ['nodes', 3, 'Mine 3 alloy veins here'], ['driveT', 45, 'Drive 45 s in vehicle form here']] },
+    { id: 'medium', name: 'MEDIUM', reward: { alloy: 100, cores: 1, salvage: 150 }, perk: null,
+      tasks: [['kills', 120, 'Destroy 120 hostiles here'], ['elites', 5, 'Destroy 5 elites here'], ['nests', 1, 'Break a nest here'], ['caches', 1, 'Open a dungeon reward cache here']] },
+    { id: 'hard', name: 'HARD', reward: { alloy: 220, cores: 3, salvage: 300 }, perk: { salvage: 1.1, label: '+10% salvage here' },
+      tasks: [['kills', 350, 'Destroy 350 hostiles here'], ['nests', 3, 'Break 3 nests here'], ['tier', 2, 'Ascend a dungeon here to tier 2'], ['signals', 3, 'Recover 3 cache signals here']] },
+    { id: 'elite', name: 'ELITE', reward: { alloy: 420, cores: 6, salvage: 600 }, perk: { alloy: 1.25, label: '+25% alloy here' },
+      tasks: [['kills', 900, 'Destroy 900 hostiles here'], ['elites', 30, 'Destroy 30 elites here'], ['tier', 3, 'Ascend a dungeon here to tier 3'], ['caches', 4, 'Open 4 dungeon reward caches here']] }
+  ];
+
+  function diary(zone) {
+    var d = GH.meta.data;
+    d.diary = d.diary || {};
+    if (!d.diary[zone]) d.diary[zone] = { kills: 0, elites: 0, nests: 0, caches: 0, nodes: 0, driveT: 0, tier: 0, signals: 0, done: {} };
+    return d.diary[zone];
+  }
+  L.diary = diary;
+
+  L.diaryProgress = function (zone) {
+    var st = diary(zone);
+    var tiers = L.TIERS.map(function (t) {
+      var tasks = t.tasks.map(function (tk) {
+        var have = st[tk[0]] || 0;
+        return { kind: tk[0], need: tk[1], desc: tk[2], have: Math.min(have, tk[1]), done: have >= tk[1] };
+      });
+      return { id: t.id, name: t.name, tasks: tasks, done: !!st.done[t.id], reward: t.reward, perk: t.perk,
+        complete: tasks.every(function (x) { return x.done; }) };
+    });
+    var n = 0; tiers.forEach(function (t) { if (t.done) n++; });
+    return { tiers: tiers, doneTiers: n, total: L.TIERS.length };
+  };
+
+  // report a thing that happened in a zone; pays out any tier just finished
+  L.zoneEvent = function (zoneId, kind, n) {
+    var zone = L.rootZone(zoneId);
+    var st = diary(zone);
+    if (kind === 'tier') st.tier = Math.max(st.tier, n);
+    else st[kind] = (st[kind] || 0) + (n === undefined ? 1 : n);
+    var paid = [];
+    L.TIERS.forEach(function (t) {
+      if (st.done[t.id]) return;
+      var ok = t.tasks.every(function (tk) { return (st[tk[0]] || 0) >= tk[1]; });
+      if (!ok) return;
+      st.done[t.id] = true;
+      GH.meta.data.mats.alloy += t.reward.alloy;
+      GH.meta.data.mats.cores += t.reward.cores;
+      GH.meta.data.salvage += t.reward.salvage;
+      paid.push({ zone: zone, name: zoneName(zone), tier: t });
+    });
+    if (paid.length || kind !== 'driveT') GH.meta.save();
+    return paid;
+  };
+
+  L.zonePerk = function (zoneId) {
+    var st = diary(L.rootZone(zoneId));
+    var out = { salvage: 1, alloy: 1, labels: [] };
+    L.TIERS.forEach(function (t) {
+      if (!st.done[t.id] || !t.perk) return;
+      if (t.perk.salvage) out.salvage *= t.perk.salvage;
+      if (t.perk.alloy) out.alloy *= t.perk.alloy;
+      out.labels.push(t.perk.label);
+    });
+    return out;
+  };
+
+  L.diaryTotal = function () {
+    var done = 0, total = 0;
+    (GH.world ? GH.world.ZONES : []).forEach(function (z) { var p = L.diaryProgress(z.id); done += p.doneTiers; total += p.total; });
+    return { done: done, total: total };
+  };
+
+  // =================================================================
+  // DAILY TASK BOARD — three a day, a streak for the sweep
+  // =================================================================
+  var DAILY_POOL = [
+    { id: 'kills', need: 150, desc: 'Destroy 150 hostiles (anywhere)', reward: { alloy: 30 } },
+    { id: 'elites', need: 6, desc: 'Destroy 6 elites', reward: { alloy: 40, cores: 1 } },
+    { id: 'nodes', need: 5, desc: 'Mine 5 alloy veins in the Reach', reward: { alloy: 40 } },
+    { id: 'driveT', need: 120, desc: 'Drive 120 s in vehicle form', reward: { alloy: 30 } },
+    { id: 'drift', need: 12, desc: 'Pay out 12 drift turbos', reward: { alloy: 35 } },
+    { id: 'nests', need: 1, desc: 'Break a nest', reward: { alloy: 40, cores: 1 } },
+    { id: 'caches', need: 1, desc: 'Open a dungeon reward cache', reward: { cores: 1 } },
+    { id: 'races', need: 1, desc: 'Finish a race or duel', reward: { alloy: 50 } },
+    { id: 'wave10', need: 1, desc: 'Reach wave 10 in CLASSIC or ARENA', reward: { alloy: 40 } },
+    { id: 'build', need: 1, desc: 'Build a frame or a vehicle in the workshop', reward: { cores: 1 } },
+    { id: 'alloy', need: 60, desc: 'Pick up 60 alloy', reward: { salvage: 150 } },
+    { id: 'signals', need: 2, desc: 'Recover 2 cache signals', reward: { alloy: 45 } },
+    { id: 'contract', need: 1, desc: "Fill a Broker contract", reward: { alloy: 45, cores: 1 } }
+  ];
+  L.SWEEP_BONUS = { cores: 1, alloyPerStreakDay: 10, streakCap: 10 };
+
+  function dailyState() {
+    var d = GH.meta.data;
+    var today = day();
+    if (!d.daily || d.daily.day !== today) {
+      var rnd = seeded('daily:' + today);
+      var pool = DAILY_POOL.slice(), picks = [];
+      for (var i = 0; i < 3; i++) picks.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0].id);
+      var prev = d.daily;
+      // a streak survives one missed day, no more
+      var streak = prev && prev.sweptDay ? (dayDiff(prev.sweptDay, today) <= 2 ? prev.streak || 0 : 0) : 0;
+      d.daily = { day: today, picks: picks, have: {}, claimed: {}, streak: streak, sweptDay: prev ? prev.sweptDay : null };
+      GH.meta.save();
+    }
+    return d.daily;
+  }
+  function dayDiff(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
+
+  L.daily = function () {
+    var st = dailyState();
+    var tasks = st.picks.map(function (id) {
+      var t = null; DAILY_POOL.forEach(function (x) { if (x.id === id) t = x; });
+      var have = st.have[id] || 0;
+      return { id: id, desc: t.desc, need: t.need, have: Math.min(have, t.need), done: have >= t.need, claimed: !!st.claimed[id], reward: t.reward };
+    });
+    var swept = tasks.every(function (t) { return t.claimed; });
+    return { day: st.day, tasks: tasks, streak: st.streak || 0, swept: swept, sweptToday: st.sweptDay === st.day };
+  };
+
+  // report progress toward today's board; returns tasks that just completed
+  L.dailyEvent = function (kind, n) {
+    var st = dailyState();
+    if (st.picks.indexOf(kind) === -1) return [];
+    var before = st.have[kind] || 0;
+    st.have[kind] = before + (n === undefined ? 1 : n);
+    var t = null; DAILY_POOL.forEach(function (x) { if (x.id === kind) t = x; });
+    if (kind !== 'driveT') GH.meta.save();
+    return (before < t.need && st.have[kind] >= t.need) ? [t] : [];
+  };
+
+  L.claimDaily = function (id) {
+    var st = dailyState();
+    var t = null; DAILY_POOL.forEach(function (x) { if (x.id === id) t = x; });
+    if (!t || st.claimed[id] || (st.have[id] || 0) < t.need) return null;
+    st.claimed[id] = true;
+    var m = GH.meta.data.mats;
+    m.alloy += t.reward.alloy || 0; m.cores += t.reward.cores || 0; GH.meta.data.salvage += t.reward.salvage || 0;
+    var out = { reward: t.reward, sweep: null };
+    var all = st.picks.every(function (pid) { return st.claimed[pid]; });
+    if (all && st.sweptDay !== st.day) {
+      st.streak = (st.streak || 0) + 1;
+      st.sweptDay = st.day;
+      var bonusAlloy = Math.min(L.SWEEP_BONUS.streakCap, st.streak) * L.SWEEP_BONUS.alloyPerStreakDay;
+      m.cores += L.SWEEP_BONUS.cores; m.alloy += bonusAlloy;
+      out.sweep = { streak: st.streak, cores: L.SWEEP_BONUS.cores, alloy: bonusAlloy };
+    }
+    GH.meta.save();
+    return out;
+  };
+
+  L.dailyUnclaimed = function () {
+    var n = 0; L.daily().tasks.forEach(function (t) { if (t.done && !t.claimed) n++; });
+    return n;
+  };
+
+  // =================================================================
+  // ALLOY VEINS — gathering nodes, richer in dangerous zones
+  // =================================================================
+  L.nodesFor = function (zoneId, bounds) {
+    var zone = L.rootZone(zoneId);
+    if (zone !== zoneId) return []; // dungeons: no veins
+    var danger = zoneDanger(zone);
+    var rnd = seeded('veins:' + day() + ':' + zone);
+    var n = 5 + danger * 2;
+    var out = [];
+    var mined = (GH.meta.data.nodesMined || {})[day() + ':' + zone] || {};
+    for (var i = 0; i < n; i++) {
+      var x = (rnd() * 2 - 1) * bounds.x * 0.82, z = (rnd() * 2 - 1) * bounds.z * 0.82;
+      if (zone === 'wreck' && GH.world && GH.dist2(x, z, GH.world.CAMP.x, GH.world.CAMP.z) < 30 * 30) z -= 70;
+      var rich = rnd() < 0.2 + danger * 0.05;
+      out.push({ idx: i, x: x, z: z, rich: rich, danger: danger, mined: !!mined[i],
+        alloy: 3 + danger * 2 + Math.floor(rnd() * 4) + (rich ? 6 : 0),
+        core: danger >= 3 && rnd() < (rich ? 0.35 : 0.12) });
+    }
+    return out;
+  };
+  L.mineNode = function (zoneId, idx) {
+    var d = GH.meta.data;
+    d.nodesMined = d.nodesMined || {};
+    var key = day() + ':' + zoneId;
+    // forget other days
+    for (var k in d.nodesMined) if (k.indexOf(day() + ':') !== 0) delete d.nodesMined[k];
+    d.nodesMined[key] = d.nodesMined[key] || {};
+    d.nodesMined[key][idx] = true;
+    GH.meta.save();
+  };
+
+  // =================================================================
+  // CACHE SIGNALS — a treasure site pings every few minutes
+  // =================================================================
+  L.signalInterval = function (danger) { return 110 - danger * 10; };
+
+  return L;
 })();
 
 </script>
@@ -10544,6 +11320,7 @@ GH.game = (function () {
     var skl = GH.skills.bonuses(); // the pilot's trained tree
     var p = {
       def: mechDef,
+      vec: GH.vehicles.activeFor(mechDef),
       mesh: GH.models.buildMech(mechDef.model),
       x: 0, z: 0, facing: 0, moveX: 0, moveZ: 0,
       stats: {
@@ -10928,6 +11705,7 @@ GH.game = (function () {
         GH.audio.win();
         coinsRun += 25;
         grantMats(8 + (zoneNow ? zoneNow.danger * 3 : 0), Math.random() < 0.3 ? 1 : 0, false);
+        lifeEvent('nests', 1);
         saveExpedition();
       }
       // THE HARROW falls — locked out until it re-roosts tomorrow
@@ -10978,11 +11756,17 @@ GH.game = (function () {
       }
     }
 
+    // world life: diaries and the daily board
+    if (!e.nestId) {
+      lifeEvent('kills', 1);
+      if (e.elite) lifeEvent('elites', 1);
+    }
     // progression hooks: collection log, contracts, trials, season, ciphers
     GH.progress.logKill(e.id);
     var cdone = GH.progress.contractKill(e.id, stage.id);
     if (cdone && expActive) GH.factions.deed(curZone, 'contract', 8);
     if (cdone) {
+      lifeEvent('contract', 1);
       queueAnnounce('CONTRACT COMPLETE — +' + cdone.salvage + ' SALVAGE, +' + cdone.pts + ' PTS', 22);
       GH.audio.win();
       seasonAwardNotify(GH.progress.seasonCounter('contracts', 1));
@@ -12643,6 +13427,13 @@ GH.game = (function () {
     else if (pk.type === 'cache') {
       var loot = GH.progress.openCache();
       coinsRun += loot.salvage;
+      if (pk.signal) {
+        signalSpot = null;
+        var sgPerk = expActive ? GH.worldlife.zonePerk(curZone).alloy : 1;
+        grantMats(Math.round((18 + (zoneNow ? zoneNow.danger * 8 : 0)) * sgPerk), zoneNow && zoneNow.danger >= 3 && Math.random() < 0.4 ? 1 : 0, true);
+        queueAnnounce('SIGNAL CACHE RECOVERED', 22);
+        lifeEvent('signals', 1);
+      }
       if (loot.unique) {
         queueAnnounce('CACHE — ' + loot.unique.name.toUpperCase() + ' UNLOCKED', 24);
       } else if (loot.gem) {
@@ -12651,7 +13442,12 @@ GH.game = (function () {
       }
       if (!silent) GH.audio.win();
     }
-    else if (pk.type === 'alloy') { grantMats(GH.rand(1, 3) | 0 || 1, 0, silent); }
+    else if (pk.type === 'alloy') {
+      var alN = (GH.rand(1, 3) | 0) || 1;
+      if (expActive) alN = Math.round(alN * GH.worldlife.zonePerk(curZone).alloy * (1 + (zoneNow ? (zoneNow.danger - 1) * 0.25 : 0)));
+      grantMats(alN, 0, silent);
+      lifeEvent('alloy', alN);
+    }
     else if (pk.type === 'core') { grantMats(0, 1, silent); }
     else { coinsRun++; if (!silent) GH.audio.coin(); }
   }
@@ -12917,6 +13713,7 @@ GH.game = (function () {
   // =================================================================
   function startWave(n) {
     waveNum = n;
+    if (n === 10) lifeEvent('wave10', 1);
     wavePlan = GH.wavePlan(stage, n, G.mode !== 'classic');
     if (weekly) {
       wavePlan.rate *= weekly.mods.rate;
@@ -13300,7 +14097,10 @@ GH.game = (function () {
       heading: player.facing || 0, spd: 0, nitro: 0, nitroT: 0,
       slip: 0, fwd: 0, top: 1, drift: false, crashCd: 0,
       skidT: 0, streakT: 0, score: 0,
-      air: false, hgt: 0, vy: 0, bog: 0, bogMsg: false, offTrack: false, jumpMsgT: 0
+      // drift state: time in the slide, charge tier, cooldown after a release,
+      // how long the wheel has been straight, turbo left from the last release
+      driftT: 0, driftTier: 0, driftCd: 0, straightT: 0, turboT: 0, driftHeat: 0,
+      air: false, hgt: 0, vy: 0, airT: 0, nitroJump: 0, bog: 0, bogMsg: false, offTrack: false, jumpMsgT: 0
     };
   }
 
@@ -13308,7 +14108,7 @@ GH.game = (function () {
     var d = player.drive;
     if (!d || d.bog === undefined) d = player.drive = freshDrive();
     player.dashTime = 0; // no frame-dash on the throttle
-    var V = GH.VECTORS[player.def.vector] || GH.VECTORS.bike;
+    var V = GH.VECTORS[player.vec.kind] || GH.VECTORS.bike;
     var top = spd * 3.3 * V.top;
     // the bottle: SHIFT burns while there's charge
     var wantNitro = !!input.special && d.nitro > 0.03 && !d.air;
@@ -13321,7 +14121,7 @@ GH.game = (function () {
     var nitroOn = d.nitroT > 0;
     if (nitroOn) top *= 1.5;
     var hasInput = player.moveX !== 0 || player.moveZ !== 0;
-    d.drift = !!input.boostHeld && d.spd > top * 0.2 && !d.air;
+    var steerIn = 0; // -1..1, filled by whichever steering model runs below
     var T = GH.terrain;
     var fx0 = Math.sin(d.heading), fz0 = Math.cos(d.heading);
     // the ground ahead: how steep, how soft, what it is
@@ -13335,6 +14135,7 @@ GH.game = (function () {
       var sfM = GH.clamp(Math.abs(d.spd) / Math.max(0.01, top), 0, 1);
       var turnM = (d.drift ? 3.8 : 2.6 - sfM * 1.1) * dt * authority;
       // a standing skimmer still pivots, just slower
+      steerIn = mmo.steer;
       if (mmo.steer) d.heading -= mmo.steer * turnM * (d.spd < -0.5 ? -1 : 1) * (Math.abs(d.spd) < 1 ? 0.6 : 1);
       if (mmo.thr > 0.05 && !d.air) {
         d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * V.accel * mmo.thr * dt);
@@ -13349,6 +14150,8 @@ GH.game = (function () {
       var speedFrac = GH.clamp(Math.abs(d.spd) / Math.max(0.01, top), 0, 1);
       // grip narrows the wheel at speed; a drift throws it wide open
       var turn = (d.drift ? 3.8 : 2.6 - speedFrac * 1.1) * dt * authority;
+      var wdiff = Math.atan2(Math.sin(want - d.heading), Math.cos(want - d.heading));
+      steerIn = GH.clamp(-wdiff / 0.8, -1, 1);
       d.heading = approachAngle(d.heading, want, turn);
       var dot = Math.sin(d.heading) * player.moveX + Math.cos(d.heading) * player.moveZ;
       if (dot < -0.55 && d.spd > 1.5) {
@@ -13361,7 +14164,58 @@ GH.game = (function () {
     } else {
       d.spd = d.spd > 0 ? Math.max(0, d.spd - (d.drift ? 6 : 12) * dt) : Math.min(0, d.spd + 12 * dt);
     }
-    if (d.drift) d.spd = Math.max(0, d.spd - 3.5 * dt); // the slide scrubs speed
+    // ---- the drift, arcade rules (Underground entry, Ridge Racer exit, Kart turbo) ----
+    // Entry: hold the drift button while steering at speed. The tail steps
+    // out with a lateral kick. Sustain: the slide charges a turbo through
+    // three tiers (0.8 / 1.8 / 2.8 s) and scrubs speed the whole time.
+    // Exit: let go, straighten the wheel for a quarter second, hit a wall,
+    // run out of speed, or cook the skids past 3.4 s (forced release).
+    // Every exit pays the charged turbo and starts a short cooldown, so a
+    // held button can never slide forever.
+    d.driftCd = Math.max(0, d.driftCd - dt);
+    d.turboT = Math.max(0, d.turboT - dt);
+    // seat time counts for the diaries and the daily board
+    d.lifeT = (d.lifeT || 0) + dt;
+    if (d.lifeT >= 5) { lifeEvent('driveT', d.lifeT); d.lifeT = 0; }
+    d.driftHeat = Math.max(0, d.driftHeat - dt * 0.5);
+    var wantDrift = !!input.boostHeld && !d.air && d.driftCd <= 0 && d.driftHeat < 0.5;
+    if (!d.drift) {
+      if (wantDrift && d.spd > top * 0.35 && Math.abs(steerIn) > 0.25) {
+        d.drift = true; d.driftT = 0; d.driftTier = 0; d.straightT = 0;
+        d.spd *= 0.95;
+        // lateral kick toward the outside of the turn
+        var kick = 0.32 * d.spd * steerIn;
+        player.velX += Math.cos(d.heading) * kick;
+        player.velZ += -Math.sin(d.heading) * kick;
+        GH.audio.dash();
+      }
+    } else {
+      d.driftT += dt;
+      d.driftTier = d.driftT > 2.8 ? 3 : d.driftT > 1.8 ? 2 : d.driftT > 0.8 ? 1 : 0;
+      d.spd = Math.max(0, d.spd - (3.5 + d.slip * 0.25) * dt); // the slide scrubs speed
+      // a straight wheel with a settled tail snaps back into grip
+      if (Math.abs(steerIn) < 0.15 && d.slip < 1.0) d.straightT += dt; else d.straightT = 0;
+      var cooked = d.driftT > 3.4;
+      var release = !input.boostHeld || d.air || d.straightT > 0.25 || d.spd < top * 0.18 || d.crashCd > 0.9 || cooked;
+      if (release) {
+        d.drift = false;
+        d.driftCd = cooked ? 0.9 : 0.35;
+        if (cooked) d.driftHeat = 1;
+        if (d.driftTier > 0 && d.crashCd <= 0.9) {
+          // mini-turbo: the charged slide pays out on release
+          var tb = [0, 0.5, 1.0, 1.6][d.driftTier];
+          d.turboT = tb;
+          d.boostT = Math.max(d.boostT || 0, tb);
+          d.spd = Math.min(top * 1.35, d.spd + top * [0, 0.15, 0.25, 0.35][d.driftTier]);
+          d.nitro = Math.min(1, d.nitro + [0, 0.06, 0.12, 0.2][d.driftTier]);
+          announce(['', 'TURBO', 'SUPER TURBO', 'ULTRA TURBO'][d.driftTier], 16 + d.driftTier * 2);
+          lifeEvent('drift', 1);
+          spawnBurst(player.x, 0.4, player.z, [0, 0x70c0ff, 0xffa020, 0xc060ff][d.driftTier], 6 + d.driftTier * 4);
+          GH.audio.dash();
+        }
+        d.driftT = 0; d.driftTier = 0;
+      }
+    }
     // gravity works along the slope: climbs bleed speed, descents lend it
     if (!d.air && T.active) {
       d.spd -= slope * 15 * dt;
@@ -13372,7 +14226,8 @@ GH.game = (function () {
     var gNow = T.h(player.x, player.z);
     // the ground fell away (a cliff, a ramp end, the edge of an island)
     if (!d.air && d.groundY !== undefined && d.groundY - gNow > 1.2 && Math.abs(d.fwd) > 1.5) {
-      d.air = true; d.hgt = d.groundY - gNow; d.absY = d.groundY; d.vy = 0;
+      d.air = true; d.hgt = d.groundY - gNow; d.absY = d.groundY; d.vy = 0; d.airT = 0;
+      if (nitroOn) { d.vy += 3.5 * V.jump; d.nitroJump = 0.45; }
     }
     // boost pads on the asphalt
     d.boostCd = Math.max(0, (d.boostCd || 0) - dt);
@@ -13397,8 +14252,9 @@ GH.game = (function () {
     var steepSoft = !d.air && soft > 0.5 && slope > 0.26 && !V.hover;
     if (steepSoft) {
       if (d.fwd > top * 0.58) {
-        d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02;
-        d.vy = Math.max(5, d.fwd * slope * 1.05) * V.jump;
+        d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02; d.airT = 0;
+        d.vy = Math.max(5, d.fwd * slope * 1.05) * V.jump * (nitroOn ? 1.35 : 1);
+        if (nitroOn) d.nitroJump = 0.45;
         if (d.jumpMsgT <= 0) { d.jumpMsgT = 6; announce(surf === 'snow' ? 'DRIFT JUMP' : 'DUNE JUMP', 18); }
         GH.audio.dash();
       } else if (d.fwd < top * 0.48 && d.spd > 0) {
@@ -13406,8 +14262,11 @@ GH.game = (function () {
       }
     }
     // the crest: leave the ground when it falls away under speed
-    if (!d.air && T.active && slope < -0.42 && d.fwd > top * 0.7) {
-      d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02; d.vy = 0.5;
+    // (nitro launches off gentler crests, and launches them higher)
+    if (!d.air && T.active && slope < (nitroOn ? -0.3 : -0.42) && d.fwd > top * 0.7) {
+      d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02; d.airT = 0;
+      d.vy = nitroOn ? 4.5 * V.jump : 0.5;
+      if (nitroOn) { d.nitroJump = 0.45; announce('NITRO JUMP', 18); }
     }
     d.jumpMsgT = Math.max(0, d.jumpMsgT - dt);
     if (d.bog > 0) {
@@ -13426,11 +14285,17 @@ GH.game = (function () {
     } else d.bogMsg = false;
     // airborne: ballistic, barely steerable, and it lands hard
     if (d.air) {
-      d.vy -= T.gravity() * dt;
+      d.airT += dt;
+      // the bottle keeps burning in the air: lift for the first half second
+      // of a nitro launch, and thrust that holds the forward speed
+      if (nitroOn && d.nitroJump > 0) { d.vy += 9 * V.jump * dt; d.nitroJump -= dt; }
+      if (nitroOn) d.spd = Math.min(top, d.spd + 6 * dt);
+      d.vy -= T.gravity() * (V.glide ? 0.55 : 1) * dt;
       d.absY += d.vy * dt;
       d.hgt = d.absY - gNow;
       if (d.hgt <= 0) {
-        d.air = false; d.hgt = 0;
+        d.air = false; d.hgt = 0; d.nitroJump = 0;
+        if (d.airT > 1.2) { d.nitro = Math.min(1, d.nitro + 0.1); announce('BIG AIR', 18); }
         var impact = Math.min(0.5, Math.abs(d.vy) * 0.03);
         shake = Math.min(0.6, shake + impact);
         spawnBurst(player.x, 0.2, player.z, surf === 'snow' ? 0xf0f4ff : 0xd8c090, 8);
@@ -13830,7 +14695,7 @@ GH.game = (function () {
           if (GH.dist2(player.x, player.z, re2.x, re2.z) < rr2b * rr2b &&
             (!re2.ramT || re2.ramT < runTime)) {
             re2.ramT = runTime + 0.8;
-            damageEnemy(re2, (8 + s.flatDamage) * s.damageMult * ((GH.VECTORS[player.def.vector] || GH.VECTORS.bike).ram), { canCrit: false, noRes: true });
+            damageEnemy(re2, (8 + s.flatDamage) * s.damageMult * ((GH.VECTORS[player.vec.kind] || GH.VECTORS.bike).ram), { canCrit: false, noRes: true });
             var ra2 = GH.angleTo(player.x, player.z, re2.x, re2.z);
             re2.vx += Math.sin(ra2) * 15 / re2.def.mass;
             re2.vz += Math.cos(ra2) * 15 / re2.def.mass;
@@ -13883,6 +14748,44 @@ GH.game = (function () {
   var worldH = null;          // {group, nestMeshes, vaultMeshes, layout}
   var interactables = [];
   var nearInteract = null;
+  var veins = [];            // today's alloy veins in the loaded zone
+  var signalT = 0, signalSpot = null; // the next cache signal, and the live one
+
+  // diary / daily payouts announced in the field
+  function payDiary(list) {
+    (list || []).forEach(function (pd) {
+      queueAnnounce('DIARY — ' + pd.name + ' ' + pd.tier.name + ' COMPLETE · +' + pd.tier.reward.alloy + ' ALLOY' +
+        (pd.tier.reward.cores ? ' +' + pd.tier.reward.cores + ' CORES' : '') + (pd.tier.perk ? ' · ' + pd.tier.perk.label.toUpperCase() : ''), 26);
+      GH.audio.win();
+    });
+  }
+  function payDaily(list) {
+    (list || []).forEach(function (t) {
+      queueAnnounce('DAILY TASK DONE — ' + t.desc.toUpperCase() + ' · CLAIM AT THE BROKER', 22);
+      GH.audio.levelup();
+    });
+  }
+  function lifeEvent(kind, n) {
+    if (expActive) payDiary(GH.worldlife.zoneEvent(curZone, kind, n));
+    payDaily(GH.worldlife.dailyEvent(kind, n));
+  }
+  G.lifeEvent = lifeEvent;
+
+  function mineVein(it) {
+    var v = it.vein;
+    if (v.mined) return;
+    v.mined = true;
+    if (v.mesh) v.mesh.visible = false;
+    GH.worldlife.mineNode(curZone, v.idx);
+    var perk = GH.worldlife.zonePerk(curZone);
+    var got = Math.round(v.alloy * perk.alloy);
+    grantMats(got, v.core ? 1 : 0, false);
+    spawnBurst(v.x, 0.8, v.z, 0xc8d8f0, 14);
+    GH.audio.coin();
+    queueAnnounce('VEIN MINED — +' + got + ' ALLOY' + (v.core ? ' · A FRAME CORE INSIDE' : ''), 20);
+    lifeEvent('nodes', 1);
+    saveExpedition();
+  }
   var zoneNow = null;
   var siege = null;           // {relay, phase, timer, burst}
   var wreckMesh = null;
@@ -14186,6 +15089,26 @@ GH.game = (function () {
     camGround = player ? gy(player.x, player.z) : 0;
     zoneNow = worldH.info;
     interactables = GH.world.interactables(worldH.layout, zoneId);
+    // alloy veins (Albion-style gathering): richer in dangerous territory
+    veins = GH.worldlife.nodesFor(zoneId, GH.world.BOUNDS);
+    veins.forEach(function (v) {
+      var sp = openSpot(v.x, v.z, 1.2);
+      if (sp) { v.x = sp.x; v.z = sp.z; }
+      var m = GH.models.buildOreNode(v.rich);
+      m.position.set(v.x, gy(v.x, v.z), v.z);
+      m.visible = !v.mined;
+      worldH.group.add(m);
+      v.mesh = m;
+      interactables.push({ kind: 'vein', vein: v, x: v.x, z: v.z, label: 'MINE THE ' + (v.rich ? 'RICH ' : '') + 'ALLOY VEIN' });
+    });
+    signalT = GH.worldlife.signalInterval(zoneNow.danger) * (0.5 + Math.random() * 0.5);
+    signalSpot = null;
+    if (fromZoneId && !zoneNow.dungeon) {
+      var dp = GH.worldlife.diaryProgress(zoneId);
+      var pk0 = GH.worldlife.zonePerk(zoneId);
+      queueAnnounce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] +
+        ' · DIARY ' + dp.doneTiers + '/' + dp.total + (pk0.labels.length ? ' · ' + pk0.labels.join(', ').toUpperCase() : ''), 22);
+    }
     stage = GH.world.stageFor(zoneId);
     applyZoneLook(zoneNow, stage);
     applyWeatherFor(zoneId);
@@ -14374,6 +15297,7 @@ GH.game = (function () {
     if ((w.dgTier[dungeonState.baseId] || 0) < dungeonState.tier) {
       w.dgTier[dungeonState.baseId] = dungeonState.tier;
     }
+    lifeEvent('tier', dungeonState.tier);
     GH.meta.save();
     queueAnnounce('THE ' + GH.dungeons.ARCHETYPES[dungeonState.arch].name +
       ' ASCENDS — TIER ' + (dungeonState.tier + 1) + ' NOW WAITS AT ITS GATE', 26);
@@ -14397,6 +15321,7 @@ GH.game = (function () {
     GH.factions.deed(curZone, 'dungeon', 6);
     coinsRun += 20 * ds.tier;
     grantMats(12 * ds.tier + zoneNow.danger * 4, 1 + (ds.firstClear ? 1 : 0), false);
+    lifeEvent('caches', 1);
     spawnPickup('gem:' + GH.pick(GH.gems.typeIds), lay.chest.x + 1.5, lay.chest.z + 1.5);
     queueAnnounce('CACHE OPENED — +' + loot + ' SALVAGE BANKED', 26);
     GH.audio.win();
@@ -15361,12 +16286,13 @@ GH.game = (function () {
       if (it.kind === 'objective' && (!dungeonState || dungeonState.defenseActive || dungeonState.done)) continue;
       if (it.kind === 'racestart' && (!dungeonState || dungeonState.race || dungeonState.done)) continue;
       if (it.kind === 'relic' && (!dungeonState || dungeonState.heistCarrying || dungeonState.done)) continue;
+      if (it.kind === 'vein' && it.vein.mined) continue;
       var iR = it.kind === 'objective' || it.kind === 'racestart' || it.kind === 'relic' ? 5.5 : 3.2;
       if (GH.dist2(player.x, player.z, it.x, it.z) < iR * iR) { nearInteract = it; break; }
     }
     var promptEl = document.getElementById('interact-line');
     if (nearInteract && !siege) {
-      promptEl.textContent = '[E] ' + nearInteract.label;
+      promptEl.textContent = '[' + GH.controls.label('interact') + '] ' + nearInteract.label;
       promptEl.classList.remove('hidden');
     } else {
       // approaching a travel gate: name where it leads
@@ -15404,6 +16330,7 @@ GH.game = (function () {
             GH.audio.boss();
           }
         }
+        else if (nearInteract.kind === 'vein') mineVein(nearInteract);
         else if (nearInteract.kind === 'chest') {
           if (chestReady()) openChest();
           else {
@@ -15417,6 +16344,25 @@ GH.game = (function () {
         }
         else if (G.onInteract) { saveExpedition(); G.onInteract(nearInteract.kind); }
       }
+    }
+
+    // cache signals (Albion treasure sites): a ping, a marker, a detour
+    if (!zoneNow.dungeon && !siege && !zoneEvent) {
+      signalT -= dt;
+      if (signalT <= 0 && !signalSpot) {
+        var sgx = (Math.random() * 2 - 1) * GH.world.BOUNDS.x * 0.8, sgz = (Math.random() * 2 - 1) * GH.world.BOUNDS.z * 0.8;
+        var sgs = openSpot(sgx, sgz, 1.2);
+        if (sgs) { sgx = sgs.x; sgz = sgs.z; }
+        spawnPickup('cache', sgx, sgz);
+        pickups[pickups.length - 1].signal = true;
+        pickups[pickups.length - 1].vx = 0; pickups[pickups.length - 1].vz = 0;
+        signalSpot = { x: sgx, z: sgz, t: 0 };
+        var dm = Math.round(Math.sqrt(GH.dist2(player.x, player.z, sgx, sgz)));
+        queueAnnounce('CACHE SIGNAL DETECTED — ' + dm + ' M · MARKED ON THE MAP', 24);
+        GH.audio.levelup();
+        signalT = GH.worldlife.signalInterval(zoneNow.danger);
+      }
+      if (signalSpot) signalSpot.t += dt;
     }
 
     // periodic autosave
@@ -15592,6 +16538,19 @@ GH.game = (function () {
       if (me2.dead || me2.nestId) continue;
       ctx.fillRect(sx(me2.x) - 1, sz(me2.z) - 1, 2, 2);
     }
+    // alloy veins (grey), and a live cache signal (pulsing gold ring)
+    for (var vi = 0; vi < veins.length; vi++) {
+      if (veins[vi].mined) continue;
+      ctx.fillStyle = veins[vi].rich ? '#d8e8ff' : '#a0a8b8';
+      ctx.fillRect(sx(veins[vi].x) - 1.5, sz(veins[vi].z) - 1.5, 3, 3);
+    }
+    if (signalSpot) {
+      ctx.strokeStyle = '#ffd050';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(sx(signalSpot.x), sz(signalSpot.z), 4 + Math.sin(signalSpot.t * 5) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     // you: a facing arrow, outlined so it pops on any biome tint
     ctx.save();
     ctx.translate(sx(player.x), sz(player.z));
@@ -15630,7 +16589,7 @@ GH.game = (function () {
     if (!expActive || !player) return;
     preRacePos = { x: player.x, z: player.z };
     if (!player.speederMesh) {
-      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.def.vector);
+      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.vec.kind, player.vec.shape);
       scene.add(player.speederMesh);
     }
     player.mesh.visible = false;
@@ -15682,6 +16641,7 @@ GH.game = (function () {
       }
     }
     if (res.win) GH.audio.win();
+    lifeEvent('races', 1);
     saveExpedition();
     GH.meta.save();
   }
@@ -15702,7 +16662,7 @@ GH.game = (function () {
 
   function toggleSpeeder() {
     if (!player.speederMesh) {
-      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.def.vector);
+      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.vec.kind, player.vec.shape);
       scene.add(player.speederMesh);
     }
     player.speederOn = !player.speederOn;
@@ -15717,7 +16677,7 @@ GH.game = (function () {
     GH.audio.dash();
     spawnBurst(player.x, 1, player.z, 0x70c0ff, 14);
     announce(player.speederOn
-      ? (GH.VECTORS[player.def.vector] || GH.VECTORS.bike).name + ' FORM — SPACE DRIFTS, SHIFT BURNS NITRO' : 'FRAME FORM', 22);
+      ? player.vec.name + ' — ' + GH.controls.label('boost') + ' DRIFTS, ' + GH.controls.label('special') + ' BURNS NITRO' : 'FRAME FORM', 22);
   }
 
   function startSiege(relay) {
@@ -16683,7 +17643,9 @@ GH.game = (function () {
         el['dh-nitro-fill'].classList.toggle('dh-burning', dvd.nitroT > 0);
         // one status word under the speedo: what the ground is doing to you
         var dstat = dvd.bog > 0.5 ? (player.speederOn && GH.terrain.surface(player.x, player.z) === 'snow' ? 'SNOWBOUND — REVERSE' : 'BOGGED — REVERSE')
-          : dvd.boostT > 0 ? 'BOOST' : dvd.air ? 'AIR' : dvd.offTrack ? 'OFF TRACK' : (dvd.drift && dvd.slip > 1.2) ? 'DRIFT' : '';
+          : dvd.turboT > 0 ? 'TURBO' : dvd.boostT > 0 ? 'BOOST' : dvd.air ? (dvd.nitroJump > 0 ? 'NITRO AIR' : 'AIR')
+          : dvd.offTrack ? 'OFF TRACK' : dvd.driftHeat > 0.5 ? 'SKIDS HOT' : dvd.drift
+            ? (dvd.driftTier >= 3 ? 'DRIFT ●●● RELEASE!' : dvd.driftTier === 2 ? 'DRIFT ●●' : dvd.driftTier === 1 ? 'DRIFT ●' : 'DRIFT') : '';
         if (!dstat && player.item) dstat = ITEM_NAMES[player.item] + ' [G]';
         el['dh-drift'].textContent = dstat;
         el['dh-drift'].classList.toggle('hidden', !dstat);
@@ -16875,6 +17837,8 @@ GH.game = (function () {
     zoneNow = null;
     nearInteract = null;
     interactables = [];
+    veins = [];
+    signalSpot = null;
     wallRing.visible = true;
     floor.visible = true;
     var il = document.getElementById('interact-line');
@@ -17452,6 +18416,7 @@ GH.game = (function () {
       relaysHeld: Object.keys(GH.meta.data.world.relaysHeld).length,
       siege: siege ? siege.phase : 0,
       near: nearInteract ? nearInteract.kind : null,
+      veins: veins.filter(function (v) { return !v.mined; }).length, signal: !!signalSpot,
       wreck: GH.meta.data.world.wreck,
       artifacts: Object.keys(GH.meta.data.world.artifacts),
       artifactOn: GH.meta.data.world.equipped,
@@ -18046,11 +19011,21 @@ GH.game = (function () {
       }
       return '<button class="style-btn" data-kind="' + kind + '">' + label + ': ' + curName + '</button>';
     };
+    var vec = GH.vehicles.activeFor(def);
+    var vecOwned = GH.vehicles.forLineage(GH.vehicles.lineageOf(def)).filter(function (d) { return GH.vehicles.owned(d.id); }).length;
+    var vecAll = GH.vehicles.forLineage(GH.vehicles.lineageOf(def)).length;
     wrap.innerHTML =
+      '<button class="style-btn vec-btn" id="vec-cycle" title="' + (vec.desc || '') + '">VECTOR: ' + vec.name + ' (' + (GH.VECTORS[vec.kind] || GH.VECTORS.bike).name + ')' +
+      (vecAll > vecOwned ? ' · build the 2nd in the WORKSHOP' : vecOwned > 1 ? ' · click to swap' : '') + '</button>' +
       mkCycler('trail', 'TRAIL', style.trail) +
       mkCycler('paint', 'PAINT', style.paint) +
       mkCycler('drone', 'DRONE', style.drone);
-    wrap.querySelectorAll('.style-btn').forEach(function (btn) {
+    document.getElementById('vec-cycle').onclick = function () {
+      GH.vehicles.cycle(def);
+      GH.audio.card();
+      renderSelectExtras();
+    };
+    wrap.querySelectorAll('.style-btn:not(.vec-btn)').forEach(function (btn) {
       btn.onclick = function () {
         var kind = btn.getAttribute('data-kind');
         var opts = owned(kind).map(function (c) { return c.id; });
@@ -18295,8 +19270,8 @@ GH.game = (function () {
         open: function () { workshopReturn = 'hub'; openWorkshop(); } },
       { id: 'hub-pilot', glyph: '☺', name: 'PILOT SHEET',
         sub: 'character, inventory, materials', open: function () { openPilot(false, 'hub'); } },
-      { id: 'hub-map', glyph: '🗺', name: 'WORLD MAP',
-        sub: Object.keys(GH.meta.data.world.dgTier || {}).length + '/24 dungeons ascended',
+      { id: 'hub-map', glyph: '🗺', name: 'WORLD MAP & DIARIES',
+        sub: 'diaries ' + GH.worldlife.diaryTotal().done + '/' + GH.worldlife.diaryTotal().total + ' · ' + Object.keys(GH.meta.data.world.dgTier || {}).length + '/24 dungeons ascended',
         open: function () { openWorldMap(false); } },
       { id: 'hub-skills', glyph: '❈', name: 'PILOT TRAINING',
         sub: 'Pilot Lv ' + GH.skills.pilotProgress().lvl +
@@ -18306,9 +19281,10 @@ GH.game = (function () {
         sub: GH.progress.seasonName(s.id) + ' · ' + s.pts + ' pts' +
           (GH.progress.relicPicksAvailable() > 0 ? ' · RELIC READY' : ''),
         open: openSeason },
-      { id: 'hub-broker', glyph: '☰', name: 'THE BROKER',
-        sub: b.active ? GH.progress.contractLabel(b.active) + ' (' + b.active.have + '/' + b.active.need + ')'
-          : b.points + ' pts banked · no active contract',
+      { id: 'hub-broker', glyph: '☰', name: 'BROKER & DAILY TASKS',
+        sub: (GH.worldlife.dailyUnclaimed() ? GH.worldlife.dailyUnclaimed() + ' DAILY REWARD' + (GH.worldlife.dailyUnclaimed() > 1 ? 'S' : '') + ' TO CLAIM · ' : '') +
+          (b.active ? GH.progress.contractLabel(b.active) + ' (' + b.active.have + '/' + b.active.need + ')'
+          : b.points + ' pts banked · no active contract'),
         open: openBroker },
       { id: 'hub-trials', glyph: '⛨', name: 'STAGE TRIALS',
         sub: 'permanent stage perks', open: openTrials },
@@ -18528,7 +19504,36 @@ GH.game = (function () {
     show('broker-screen');
   }
 
+  function renderDaily(wrapId) {
+    var wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+    var dl = GH.worldlife.daily();
+    var html = '<div class="bk-label">DAILY TASK BOARD — ' + dl.day + ' · STREAK ' + dl.streak + (dl.sweptToday ? ' · SWEPT TODAY' : '') + '</div>';
+    dl.tasks.forEach(function (t) {
+      var rw = [];
+      if (t.reward.alloy) rw.push('+' + t.reward.alloy + ' alloy');
+      if (t.reward.cores) rw.push('+' + t.reward.cores + ' core');
+      if (t.reward.salvage) rw.push('+' + t.reward.salvage + ' salvage');
+      html += '<div class="dl-task' + (t.claimed ? ' claimed' : t.done ? ' ready' : '') + '">' +
+        '<span class="dl-desc">' + (t.claimed ? '☑' : t.done ? '★' : '☐') + ' ' + t.desc + '</span>' +
+        '<span class="dl-prog">' + t.have + '/' + t.need + '</span>' +
+        '<span class="dl-reward">' + rw.join(' · ') + '</span>' +
+        (t.done && !t.claimed ? '<button class="dv-buy dl-claim" data-id="' + t.id + '">CLAIM</button>' : '') + '</div>';
+    });
+    html += '<div class="menu-desc">Claim all three for a bonus core and ' + GH.worldlife.SWEEP_BONUS.alloyPerStreakDay + ' alloy per streak day. New board every day; a streak survives one missed day.</div>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.dl-claim').forEach(function (btn) {
+      btn.onclick = function () {
+        var r = GH.worldlife.claimDaily(btn.getAttribute('data-id'));
+        if (r) { GH.audio.win(); if (r.sweep) GH.audio.levelup(); }
+        renderDaily(wrapId);
+        if (wrapId === 'broker-daily') renderBroker();
+      };
+    });
+  }
+
   function renderBroker() {
+    renderDaily('broker-daily');
     var b = GH.meta.data.broker;
     document.getElementById('broker-status').innerHTML =
       'BROKER POINTS: <b>' + b.points + '</b> · CONTRACTS FILLED: <b>' + b.completed +
@@ -18784,7 +19789,9 @@ GH.game = (function () {
     var harrow = w.harrowDay !== GH.world.dayStamp() ? GH.world.harrowToday() : null;
     var cleared = 0, totalTiers = 0;
     for (var k in (w.dgTier || {})) { cleared++; totalTiers += w.dgTier[k]; }
+    var dtot = GH.worldlife.diaryTotal();
     document.getElementById('map-head').innerHTML =
+      'DIARIES <b>' + dtot.done + '/' + dtot.total + '</b> · ' +
       'NESTS CLEANSED <b>' + Object.keys(w.nests).length + '/' + GH.world.totalNests() + '</b>' +
       ' · DUNGEONS ASCENDED <b>' + cleared + '/' + (GH.world.ZONES.length * 4) + '</b>' +
       ' · TOTAL TIERS CLIMBED <b>' + totalTiers + '</b>' +
@@ -18803,6 +19810,14 @@ GH.game = (function () {
       if (harrow && harrow.zone === zn.id) {
         head += '<div class="mp-harrow">☠ THE HARROW ROOSTS HERE TODAY</div>';
       }
+      var dp = GH.worldlife.diaryProgress(zn.id);
+      var nextTier = null;
+      dp.tiers.forEach(function (t) { if (!nextTier && !t.done) nextTier = t; });
+      var pk = GH.worldlife.zonePerk(zn.id);
+      head += '<div class="mp-diary">DIARY <b>' + dp.doneTiers + '/' + dp.total + '</b>' + (pk.labels.length ? ' · ' + pk.labels.join(' · ') : '') +
+        (nextTier ? '<div class="mp-diary-tasks">' + nextTier.name + ': ' + nextTier.tasks.map(function (t) {
+          return '<span class="' + (t.done ? 'dt-done' : '') + '">' + (t.done ? '☑' : '☐') + ' ' + t.desc.replace(' here', '') + ' ' + t.have + '/' + t.need + '</span>';
+        }).join(' ') + ' → +' + nextTier.reward.alloy + ' alloy' + (nextTier.reward.cores ? ', +' + nextTier.reward.cores + ' cores' : '') + (nextTier.perk ? ', ' + nextTier.perk.label : '') + '</div>' : '<div class="mp-diary-tasks dt-done">ALL TIERS COMPLETE</div>') + '</div>';
       var rows = '';
       var archList = ['depths'].concat(GH.dungeons.ZONE_SETS[zn.id] || []);
       archList.forEach(function (arch) {
@@ -19002,9 +20017,11 @@ GH.game = (function () {
     tabs.innerHTML = '';
     var lineages = GH.roster.BASE.map(function (b) { return { id: b.id, name: b.name, icon: b.icon }; });
     lineages.push({ id: 'relic', name: 'RELICS', icon: '★' });
+    lineages.push({ id: 'vectors', name: 'VECTORS', icon: '⛟' });
     lineages.forEach(function (ln) {
       var owned = 0, total = 0;
-      GH.mechs.forEach(function (m) {
+      if (ln.id === 'vectors') { total = GH.vehicles.DESIGNS.length; owned = GH.vehicles.ownedCount(); }
+      else GH.mechs.forEach(function (m) {
         if ((m.lineage || m.id) !== ln.id) return;
         total++; if (GH.meta.data.shells[m.id]) owned++;
       });
@@ -19018,6 +20035,7 @@ GH.game = (function () {
     var grid = document.getElementById('ws-grid');
     grid.innerHTML = '';
     var first = null;
+    if (wsLineage === 'vectors') { renderVectorGrid(grid); return; }
     GH.mechs.forEach(function (m) {
       if ((m.lineage || m.id) !== wsLineage) return;
       var st = GH.roster.status(m.id);
@@ -19037,6 +20055,44 @@ GH.game = (function () {
     });
     if (!wsPick) wsPick = first;
     renderWorkshopDetail();
+  }
+
+  // the VECTORS tab: every vehicle design, by lineage
+  function renderVectorGrid(grid) {
+    var first = null;
+    GH.vehicles.DESIGNS.forEach(function (d) {
+      var owned = GH.vehicles.owned(d.id);
+      var can = GH.vehicles.canBuild(d.id);
+      var base = GH.mechById(d.lineage);
+      var cell = document.createElement('div');
+      cell.className = 'ws-cell' + (owned ? ' owned' : (can ? ' ready' : ' locked')) + (wsPick === d.id ? ' pick' : '');
+      cell.innerHTML = '<div class="ws-icon">' + base.icon + '</div><div class="ws-name">' + d.name + '</div>' +
+        '<div class="ws-sub">' + base.name + ' · ' + (GH.VECTORS[d.kind] || GH.VECTORS.bike).name + '</div>' +
+        '<div class="ws-state">' + (owned ? (d.free ? '✓ STANDARD' : '✓ BUILT') : can ? '⚒ READY TO BUILD' : GH.meta.data.shells[d.lineage] ? '⬡ NEED MATERIALS' : '🔒 NEEDS ' + base.name) + '</div>';
+      cell.onclick = function () { wsPick = d.id; GH.audio.card(); renderWorkshop(); };
+      grid.appendChild(cell);
+      if (!first) first = d.id;
+    });
+    if (!wsPick || !GH.vehicles.byId(wsPick)) wsPick = first;
+    var box = document.getElementById('ws-detail');
+    var d = GH.vehicles.byId(wsPick);
+    if (!d) { box.innerHTML = ''; return; }
+    var base = GH.mechById(d.lineage), K = GH.VECTORS[d.kind] || GH.VECTORS.bike;
+    var owned = GH.vehicles.owned(d.id), can = GH.vehicles.canBuild(d.id), c = GH.vehicles.BUILD_COST, m = GH.meta.data.mats;
+    var need = function (have, want, label) { return '<span class="' + (have >= want ? 'ws-ok' : 'ws-short') + '">' + label + ' ' + have + '/' + want + '</span>'; };
+    box.innerHTML = '<div class="ws-d-name">' + base.icon + ' ' + d.name + '</div>' +
+      '<div class="ws-d-role">' + base.name + ' lineage · ' + K.name + '</div>' +
+      '<div class="ws-d-desc">' + d.desc + '</div>' +
+      '<div class="ws-d-stats">Top speed ×' + K.top + ' · accel ×' + K.accel + ' · grip ×' + K.grip + ' · drift grip ×' + K.driftGrip + ' · jump ×' + K.jump + ' · ram ×' + K.ram + (K.hover ? ' · hovers over water and mud' : '') + (K.glide ? ' · glides' : '') + '</div>' +
+      (owned ? '<div class="ws-d-status owned">' + (d.free ? 'STANDARD ISSUE' : 'BUILT') + ' — pick it with the VECTOR button on the frame select screen.</div>'
+        : '<div class="ws-d-bill">BILL: ' + need(m.alloy, c.alloy, '⬡ ALLOY') + ' · ' + need(m.cores, c.cores, '◈ CORES') + ' · ' + need(GH.meta.data.salvage, c.salvage, '$ SALVAGE') + '</div>' +
+          (GH.meta.data.shells[d.lineage] ? '' : '<div class="ws-d-req ws-short">REQUIRES: ' + base.name + ' (own the frame first)</div>') +
+          '<button class="menu-btn small" id="ws-build" ' + (can ? '' : 'disabled') + '>' + (can ? '⚒ BUILD ' + d.name : 'NOT YET') + '</button>');
+    var bb = document.getElementById('ws-build');
+    if (bb) bb.onclick = function () {
+      if (GH.vehicles.build(d.id)) { GH.audio.win(); GH.game.lifeEvent('build', 1); renderWorkshop(); }
+      else GH.audio.hit();
+    };
   }
 
   function renderWorkshopDetail() {
@@ -19075,6 +20131,7 @@ GH.game = (function () {
     if (bb) bb.onclick = function () {
       if (GH.roster.build(m.id)) {
         GH.audio.win();
+        GH.game.lifeEvent('build', 1);
         renderWorkshop();
         if (GH.game.refreshPilot) GH.game.refreshPilot();
       } else GH.audio.hit();
@@ -19119,7 +20176,9 @@ GH.game = (function () {
       '<div class="pl-row">Cosmetics owned <b>' + Object.keys(d.style.owned).length + '</b> — set on the frame select screen</div>' +
       '<div class="pl-row">Active devotion <b>' + devName + '</b> · broker points <b>' + d.broker.points + '</b></div>' +
       '<div class="pl-row">House: <b>' + factionsSub() + '</b></div>' +
+      '<div class="pl-row">Vehicles <b>' + GH.vehicles.ownedCount() + '/' + GH.vehicles.DESIGNS.length + '</b> · zone diaries <b>' + GH.worldlife.diaryTotal().done + '/' + GH.worldlife.diaryTotal().total + '</b> · daily streak <b>' + GH.worldlife.daily().streak + '</b>' + (GH.worldlife.dailyUnclaimed() ? ' · <b class="pl-hot">' + GH.worldlife.dailyUnclaimed() + ' daily reward(s) to claim at the BROKER</b>' : '') + '</div>' +
       '</div>' +
+      '<div class="pl-block" id="pilot-daily"></div>' +
       (live ? '<div class="pl-block"><div class="pl-h">CURRENT RUN</div><div class="pl-row pl-pre">' + live + '</div></div>' : '') +
       '</div>' +
       '<div class="pl-col">' +
@@ -19138,6 +20197,7 @@ GH.game = (function () {
       '</div></div></div>';
     var body = document.getElementById('pilot-body');
     body.innerHTML = html;
+    renderDaily('pilot-daily');
     body.querySelectorAll('[data-go]').forEach(function (b) {
       b.onclick = function () {
         var g = b.getAttribute('data-go');
@@ -19251,6 +20311,12 @@ GH.game = (function () {
       '<li><b>Relic frames</b> need a feat first:<ul>' + relics + '</ul></li></ul>' +
       '<div class="hp-h">MATERIALS</div><ul>' +
       GH.roster.SOURCES.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul>' +
+      '<div class="hp-h">LIVING IN THE REACH</div>' +
+      '<ul><li><b>Zone diaries</b> (WORLD MAP): four task tiers per territory. Each tier pays alloy and cores; HARD and ELITE add a permanent perk in that zone.</li>' +
+      '<li><b>Daily task board</b> (BROKER or PILOT): three tasks a day, claim each, sweep all three for a bonus core and a growing streak.</li>' +
+      '<li><b>Alloy veins</b>: grey crystal clusters in every territory. Press ' + L('interact') + ' to mine. Danger III–IV veins can hold a frame core. They regrow daily.</li>' +
+      '<li><b>Cache signals</b>: every few minutes a treasure site pings and is marked gold on the minimap. Worth the detour.</li>' +
+      '<li>Higher DANGER zones pay more alloy per drop, richer veins, and richer signals — Albion rules: risk buys reward.</li></ul>' +
       '<div class="hp-h">TIPS</div>' +
       '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run CLASSIC to wave 20 for cores.</li>' +
       '<li>Sparks feed your persistent PILOT LEVEL — every level is a skill point for PILOT TRAINING.</li>' +
