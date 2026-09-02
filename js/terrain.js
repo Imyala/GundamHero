@@ -54,6 +54,65 @@ GH.terrain = (function () {
   T.ridged = ridged;
   T.sstep = sstep;
 
+  // ---------------- colliders ----------------
+  // Trees, walls and buildings are solid. Circles {x,z,r} and axis-aligned
+  // rects {x,z,hw,hd} live in a coarse spatial hash; resolve() pushes a
+  // moving disc out of everything in the neighbouring cells.
+  var CELL = 12;
+  var colliders = { map: {}, count: 0 };
+  function ckey(cx, cz) { return cx + ',' + cz; }
+  T.clearColliders = function () { colliders = { map: {}, count: 0 }; };
+  T.addCollider = function (c) {
+    var minX = Math.floor((c.x - (c.r || c.hw)) / CELL), maxX = Math.floor((c.x + (c.r || c.hw)) / CELL);
+    var minZ = Math.floor((c.z - (c.r || c.hd)) / CELL), maxZ = Math.floor((c.z + (c.r || c.hd)) / CELL);
+    for (var cx = minX; cx <= maxX; cx++) {
+      for (var cz = minZ; cz <= maxZ; cz++) {
+        var k = ckey(cx, cz);
+        (colliders.map[k] || (colliders.map[k] = [])).push(c);
+      }
+    }
+    colliders.count++;
+  };
+  T.colliderCount = function () { return colliders.count; };
+  var resOut = { x: 0, z: 0, hit: false };
+  T.resolve = function (x, z, r) {
+    resOut.x = x; resOut.z = z; resOut.hit = false;
+    if (!colliders.count) return resOut;
+    var cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+    for (var ix = cx - 1; ix <= cx + 1; ix++) {
+      for (var iz = cz - 1; iz <= cz + 1; iz++) {
+        var list = colliders.map[ckey(ix, iz)];
+        if (!list) continue;
+        for (var i = 0; i < list.length; i++) {
+          var c = list[i];
+          if (c.r !== undefined) {
+            var dx = resOut.x - c.x, dz = resOut.z - c.z;
+            var d2 = dx * dx + dz * dz, minD = c.r + r;
+            if (d2 < minD * minD) {
+              var d = Math.sqrt(d2);
+              if (d < 0.001) { dx = 1; dz = 0; d = 1; } // dead centre: pick a way out
+              resOut.x = c.x + dx / d * minD; resOut.z = c.z + dz / d * minD; resOut.hit = true;
+            }
+          } else {
+            // rect: push out along the shallowest axis
+            var ox = resOut.x - c.x, oz = resOut.z - c.z;
+            var px = c.hw + r - Math.abs(ox), pz = c.hd + r - Math.abs(oz);
+            if (px > 0 && pz > 0) {
+              if (px < pz) resOut.x = c.x + (ox < 0 ? -1 : 1) * (c.hw + r);
+              else resOut.z = c.z + (oz < 0 ? -1 : 1) * (c.hd + r);
+              resOut.hit = true;
+            }
+          }
+        }
+      }
+    }
+    return resOut;
+  };
+  T.blockedAt = function (x, z, r) {
+    var o = T.resolve(x, z, r);
+    return o.hit;
+  };
+
   // ---------------- biomes ----------------
   // base(x,z): raw height before pads/rim. color(h, slope, x, z, out).
   // soft(x,z): 0..1 bog-ability of the ground under a vehicle.
@@ -192,6 +251,201 @@ GH.terrain = (function () {
     }
   };
 
+  // ---------------- built territories ----------------
+  // These zones are made of structures as much as ground: a hive city on
+  // a plateau, a walled keep with a moat, drowned ruins, cave warrens cut
+  // into solid rock, and islands hanging in the sky. Each biome's macro()
+  // lays the big shapes (districts, caverns, islands) from the zone seed
+  // so the field, the buildings and the AI all agree on them.
+  function zrng(seedStr) {
+    var s0 = 0;
+    for (var i = 0; i < seedStr.length; i++) s0 = (Math.imul(s0, 31) + seedStr.charCodeAt(i)) >>> 0;
+    s0 = s0 || 1;
+    return function () { s0 ^= s0 << 13; s0 >>>= 0; s0 ^= s0 >> 17; s0 ^= s0 << 5; s0 >>>= 0; return s0 / 4294967296; };
+  }
+  T.zrng = zrng;
+  function segDist2(px, pz, x1, z1, x2, z2) {
+    var vx = x2 - x1, vz = z2 - z1, wx = px - x1, wz = pz - z1;
+    var c2 = vx * vx + vz * vz || 1;
+    var t = GH.clamp((vx * wx + vz * wz) / c2, 0, 1);
+    return GH.dist2(px, pz, x1 + vx * t, z1 + vz * t);
+  }
+  T.segDist2 = segDist2;
+
+  T.BIOMES.hive = {
+    name: 'SPIRE HIVE', ground: 'slate', gravity: 24, built: true,
+    macro: function (size, rnd, lay) { return { spire: { x: 0, z: 0, r: 52 } }; },
+    base: function (x, z, m) {
+      var h = 1.5 + fbm(x * 0.03, z * 0.03, 71) * 0.7;
+      // the central district climbs toward the spire in terraces
+      var d = Math.sqrt(x * x + z * z);
+      h += sstep(160, 60, d) * 6 + sstep(80, 40, d) * 5;
+      return h;
+    },
+    soft: function () { return 0; },
+    color: function (h, s, x, z, o) {
+      var n = fbm(x * 0.2, z * 0.2, 72);
+      o[0] = 0.3 + n * 0.08; o[1] = 0.3 + n * 0.08; o[2] = 0.34 + n * 0.08;
+      var grime = sstep(0.5, 0.75, fbm(x * 0.04, z * 0.04, 73));
+      o[0] -= grime * 0.1; o[1] -= grime * 0.08; o[2] -= grime * 0.08;
+    },
+    surface: function () { return 'slate'; }
+  };
+  T.BIOMES.ruins = {
+    name: 'FALLEN CITADEL', ground: 'moss', gravity: 24, built: true,
+    water: { level: -0.4, color: 0x2a4a48, opacity: 0.7 },
+    macro: function (size, rnd, lay) { return {}; },
+    base: function (x, z) {
+      var h = fbm(x * 0.02, z * 0.02, 81) * 4.5 + 0.8;
+      var lake = fbm(x * 0.014 + 2, z * 0.014, 82);
+      h -= sstep(0.34, 0.26, lake) * 3.2;
+      return h;
+    },
+    soft: function () { return 0.2; },
+    color: function (h, s, x, z, o) {
+      var n = fbm(x * 0.12, z * 0.12, 83);
+      var stone = sstep(0.55, 0.7, fbm(x * 0.05, z * 0.05, 84));
+      o[0] = 0.3 + n * 0.1; o[1] = 0.42 + n * 0.12; o[2] = 0.24 + n * 0.06;
+      o[0] = o[0] * (1 - stone) + 0.5 * stone; o[1] = o[1] * (1 - stone) + 0.48 * stone; o[2] = o[2] * (1 - stone) + 0.44 * stone;
+      var mud = sstep(0.6, -0.2, h); o[0] += mud * 0.1; o[1] -= mud * 0.12;
+    },
+    surface: function (x, z, h) { return h < -0.6 ? 'water' : h < 0.2 ? 'mud' : 'moss'; }
+  };
+  T.BIOMES.keep = {
+    name: 'BASTION KEEP', ground: 'slate', gravity: 24, built: true,
+    water: { level: -1.6, color: 0x1e3a4a, opacity: 0.78 },
+    macro: function (size, rnd, lay) { return { wallR: 118, moatR: 134, moatW: 9 }; },
+    base: function (x, z, m) {
+      var h = 1 + fbm(x * 0.025, z * 0.025, 91) * 1.6;
+      var d = Math.sqrt(x * x + z * z);
+      // the moat ring, and a raised inner ward
+      var moat = 1 - sstep(0, m.moatW, Math.abs(d - m.moatR));
+      h -= moat * 4.2;
+      h += sstep(m.wallR, m.wallR - 30, d) * 1.5;
+      return h;
+    },
+    soft: function () { return 0; },
+    color: function (h, s, x, z, o) {
+      var n = fbm(x * 0.15, z * 0.15, 92);
+      var grass = sstep(0.4, 0.6, fbm(x * 0.05, z * 0.05, 93));
+      o[0] = 0.42 + n * 0.08; o[1] = 0.4 + n * 0.08; o[2] = 0.36 + n * 0.06;
+      o[0] = o[0] * (1 - grass) + 0.32 * grass; o[1] = o[1] * (1 - grass) + 0.46 * grass; o[2] = o[2] * (1 - grass) + 0.22 * grass;
+    },
+    surface: function (x, z, h) { return h < -1.8 ? 'water' : 'slate'; }
+  };
+  T.BIOMES.warrens = {
+    name: 'DEEP WARRENS', ground: 'basalt', gravity: 24, built: true, wallH: 5.5, dark: true,
+    macro: function (size, rnd, lay) {
+      // cavern cities joined by tunnels; every gate and pad gets its own cavern
+      var cav = [];
+      var anchors = [{ x: 0, z: 0, r: 46 }];
+      lay.gates.forEach(function (g) { anchors.push({ x: g.x, z: g.z, r: 24 }); });
+      lay.nests.forEach(function (n) { anchors.push({ x: n.x, z: n.z, r: 16 }); });
+      if (lay.relay) anchors.push({ x: lay.relay.x, z: lay.relay.z, r: 18 });
+      for (var i = 0; i < 9; i++) anchors.push({ x: (rnd() - 0.5) * (size - 80), z: (rnd() - 0.5) * (size - 80), r: 26 + rnd() * 20 });
+      anchors.forEach(function (a) { cav.push(a); });
+      // tunnels: each cavern links to its two nearest neighbours
+      var tun = [];
+      cav.forEach(function (a, i) {
+        var near = cav.map(function (b, j) { return { j: j, d: GH.dist2(a.x, a.z, b.x, b.z) }; })
+          .filter(function (e) { return e.j !== i; }).sort(function (p, q) { return p.d - q.d; }).slice(0, 2);
+        near.forEach(function (e) { tun.push({ x1: a.x, z1: a.z, x2: cav[e.j].x, z2: cav[e.j].z, w: 7 + rnd() * 5 }); });
+      });
+      return { caverns: cav, tunnels: tun };
+    },
+    open: function (x, z, m) {
+      // how far inside open space we are (positive = open)
+      var best = -1e9;
+      var wob = (fbm(x * 0.08, z * 0.08, 101) - 0.5) * 8;
+      for (var i = 0; i < m.caverns.length; i++) {
+        var c = m.caverns[i];
+        var d = c.r - Math.sqrt(GH.dist2(x, z, c.x, c.z)) + wob;
+        if (d > best) best = d;
+      }
+      for (var t = 0; t < m.tunnels.length; t++) {
+        var tn = m.tunnels[t];
+        var d2 = tn.w - Math.sqrt(segDist2(x, z, tn.x1, tn.z1, tn.x2, tn.z2)) + wob * 0.5;
+        if (d2 > best) best = d2;
+      }
+      return best;
+    },
+    base: function (x, z, m) {
+      var open = this.open(x, z, m);
+      var floor = fbm(x * 0.05, z * 0.05, 102) * 0.9;
+      if (open > 1.5) return floor;
+      if (open < -1.5) return floor + this.wallH + fbm(x * 0.1, z * 0.1, 103) * 2.5;
+      return floor + (1 - (open + 1.5) / 3) * this.wallH;
+    },
+    solid: function (x, z, m) { return this.open(x, z, m) < 0; },
+    soft: function () { return 0; },
+    color: function (h, s, x, z, o) {
+      var n = fbm(x * 0.15, z * 0.15, 104);
+      var wall = sstep(2.0, 4.5, h);
+      o[0] = 0.28 + n * 0.08; o[1] = 0.24 + n * 0.06; o[2] = 0.3 + n * 0.08;
+      o[0] = o[0] * (1 - wall) + 0.2 * wall; o[1] = o[1] * (1 - wall) + 0.16 * wall; o[2] = o[2] * (1 - wall) + 0.2 * wall;
+      var glow = sstep(0.55, 0.75, fbm(x * 0.06, z * 0.06, 105)) * (1 - wall);
+      o[1] += glow * 0.25; o[2] += glow * 0.3;
+    },
+    surface: function () { return 'basalt'; }
+  };
+  T.BIOMES.sky = {
+    name: 'AETHER COURT', ground: 'snow', gravity: 14, built: true, voidBelow: -30,
+    water: { level: -16, color: 0xe8ecf6, opacity: 0.96, cloud: true },
+    macro: function (size, rnd, lay) {
+      var isl = [{ x: 0, z: 0, r: 58, h: 0 }];
+      lay.gates.forEach(function (g) { isl.push({ x: g.x, z: g.z, r: 26, h: 0 }); });
+      lay.nests.forEach(function (n) { isl.push({ x: n.x, z: n.z, r: 18, h: rnd() * 4 - 1 }); });
+      for (var i = 0; i < 12; i++) {
+        isl.push({ x: (rnd() - 0.5) * (size - 90), z: (rnd() - 0.5) * (size - 90), r: 20 + rnd() * 26, h: rnd() * 8 - 2 });
+      }
+      // bridges: nearest-neighbour spans
+      var br = [];
+      isl.forEach(function (a, i) {
+        var near = isl.map(function (b, j) { return { j: j, d: GH.dist2(a.x, a.z, b.x, b.z) }; })
+          .filter(function (e) { return e.j !== i; }).sort(function (p, q) { return p.d - q.d; }).slice(0, 2);
+        near.forEach(function (e) {
+          var b = isl[e.j];
+          if (Math.sqrt(e.d) - a.r - b.r < 90) br.push({ x1: a.x, z1: a.z, x2: b.x, z2: b.z, h1: a.h, h2: b.h });
+        });
+      });
+      return { islands: isl, bridges: br };
+    },
+    base: function (x, z, m) {
+      // islands: a plateau with a soft brim; bridges: narrow spans; else the void
+      var best = -1e9, bh = 0;
+      var wob = (fbm(x * 0.06, z * 0.06, 111) - 0.5) * 10;
+      for (var i = 0; i < m.islands.length; i++) {
+        var c = m.islands[i];
+        var d = c.r - Math.sqrt(GH.dist2(x, z, c.x, c.z)) + wob;
+        if (d > best) { best = d; bh = c.h; }
+      }
+      var top = bh + fbm(x * 0.04, z * 0.04, 112) * 2.2;
+      var h;
+      if (best > 6) h = top;
+      else if (best > -4) h = top - (1 - (best + 4) / 10) * 6;
+      else h = -48;
+      for (var b = 0; b < m.bridges.length; b++) {
+        var bg = m.bridges[b];
+        var d2 = segDist2(x, z, bg.x1, bg.z1, bg.x2, bg.z2);
+        if (d2 < 3.2 * 3.2) {
+          var vx = bg.x2 - bg.x1, vz = bg.z2 - bg.z1;
+          var t = GH.clamp(((x - bg.x1) * vx + (z - bg.z1) * vz) / (vx * vx + vz * vz || 1), 0, 1);
+          var by = bg.h1 + (bg.h2 - bg.h1) * t + 0.4;
+          if (by > h) h = by;
+        }
+      }
+      return h;
+    },
+    soft: function () { return 0; },
+    color: function (h, s, x, z, o) {
+      var n = fbm(x * 0.12, z * 0.12, 113);
+      o[0] = 0.78 + n * 0.1; o[1] = 0.8 + n * 0.1; o[2] = 0.86;
+      var gold = sstep(0.6, 0.8, fbm(x * 0.05, z * 0.05, 114)); o[0] += gold * 0.12; o[1] += gold * 0.06; o[2] -= gold * 0.2;
+      var edge = sstep(-2, -6, h); o[0] -= edge * 0.3; o[1] -= edge * 0.3; o[2] -= edge * 0.2;
+    },
+    surface: function (x, z, h) { return h < -30 ? 'void' : 'snow'; }
+  };
+
   // ---------------- the active field ----------------
   // pads: flat spots blended into the field so fixed installations sit true.
   function padWeight(p, x, z) {
@@ -211,6 +465,7 @@ GH.terrain = (function () {
     var biome = T.BIOMES[st.id] || T.BIOMES.wreck;
     var half = info.size / 2;
     var pads = [];
+    var macro = biome.macro ? biome.macro(info.size, zrng('macro:' + zoneId), lay) : null;
     var flat = false;       // whole map flat (authored floors)
     var amp = 1;            // amplitude scale
     if (info.dungeon) {
@@ -245,26 +500,42 @@ GH.terrain = (function () {
     }
     // pad heights sample the raw field once (deterministic)
     pads.forEach(function (p) {
-      p.y = flat ? 0 : biome.base(p.x, p.z) * amp;
+      p.y = flat ? 0 : (field_base_probe(p.x, p.z));
       if (zoneId === 'wreck' && p.w === undefined && p.r >= 20) p.y = Math.max(p.y, -0.4);
-      if (biome.water && p.y < biome.water.level + 0.9) p.y = biome.water.level + 0.9;
+      if (biome.water && !biome.water.cloud && p.y < biome.water.level + 0.9) p.y = biome.water.level + 0.9;
+      if (biome.voidBelow !== undefined && p.y < biome.voidBelow) p.y = 0;
+      if (biome.solid) p.y = Math.min(p.y, 1.2);
     });
+    function field_base_probe(x, z) {
+      var m = (info.dungeon && biome.built) ? null : macro;
+      return (m ? biome.base(x, z, m) : (biome.built ? (fbm(x * 0.03, z * 0.03, 5) * 2.2 + 0.4) : biome.base(x, z))) * amp;
+    }
 
     var field = {
       id: zoneId, biome: biome, half: half, size: info.size, pads: pads, flat: flat, amp: amp,
-      dungeon: info.dungeon, gravity: biome.gravity,
+      dungeon: info.dungeon, gravity: biome.gravity, macro: macro, track: null,
       water: (!info.dungeon || info.arch === 'depths' || info.arch === 'hive' || info.arch === 'crucible') ? biome.water : null
+    };
+    // built biomes keep their macro shapes only on the surface; their
+    // dungeons fall back to plain ground of the same palette
+    if (info.dungeon && biome.built) { field.macro = null; }
+    field.solid = function (x, z) {
+      return !!(field.macro && biome.solid && biome.solid(x, z, field.macro));
+    };
+    field.isVoid = function (x, z) {
+      return biome.voidBelow !== undefined && field.hTerrain(x, z) < biome.voidBelow;
     };
     field.raw = function (x, z) {
       if (flat) return 0;
-      var h = biome.base(x, z) * amp;
+      var h = (field.macro ? biome.base(x, z, field.macro)
+        : (biome.built ? (fbm(x * 0.03, z * 0.03, 5) * 2.2 + 0.4) : biome.base(x, z))) * amp;
       for (var i = 0; i < pads.length; i++) {
         var w = padWeight(pads[i], x, z);
         if (w > 0) h = h + (pads[i].y - h) * w;
       }
       return h;
     };
-    field.h = function (x, z) {
+    field.hTerrain = function (x, z) {
       var h = field.raw(x, z);
       // the rim: a mountain wall past the playable edge, so no map has a visible end
       var rinf = Math.max(Math.abs(x), Math.abs(z));
@@ -274,6 +545,15 @@ GH.terrain = (function () {
         h += sstep(start, half + 5, rinf) * (info.dungeon ? 12 : 16);
         var t = sstep(start, half + (info.dungeon ? 60 : 100), rinf);
         h += Math.pow(t, 1.5) * (info.dungeon ? 40 : 58) + t * ridged(x * 0.03, z * 0.03, 77) * 12;
+      }
+      return h;
+    };
+    // the race ribbon rides above the ground where its profile lifts it
+    field.h = function (x, z) {
+      var h = field.hTerrain(x, z);
+      if (field.track) {
+        var ts = T.trackSample(field.track, x, z);
+        if (ts.on && ts.y > h) h = ts.y;
       }
       return h;
     };
@@ -305,13 +585,18 @@ GH.terrain = (function () {
     return T.active.biome.surface(x, z, h);
   };
   T.soft = function (x, z) { return T.active ? T.active.biome.soft(x, z) : 0; };
+  T.solidAt = function (x, z) { return T.active ? T.active.solid(x, z) : false; };
+  T.voidAt = function (x, z) { return T.active ? T.active.isVoid(x, z) : false; };
+  T.dark = function () { return !!(T.active && T.active.biome.dark && !T.active.dungeon); };
   T.gravity = function () { return T.active ? T.active.gravity : 24; };
   T.waterLevel = function () { return T.active && T.active.water ? T.active.water.level : -999; };
 
   // ---------------- mesh ----------------
-  T.build = function (zoneId, info, lay) {
+  T.build = function (zoneId, info, lay, beforeMesh) {
     var field = T.makeField(zoneId, info, lay);
     T.active = field;
+    T.clearColliders();
+    if (beforeMesh) beforeMesh(field);
     var group = new THREE.Group();
     var margin = info.dungeon ? 70 : 140;
     var W = info.size + margin * 2;
@@ -326,7 +611,7 @@ GH.terrain = (function () {
     var cols = seg + 1;
     var hs = new Float32Array(pos.count);
     for (var hi = 0; hi < pos.count; hi++) {
-      hs[hi] = field.h(pos.getX(hi), pos.getZ(hi));
+      hs[hi] = field.hTerrain(pos.getX(hi), pos.getZ(hi));
       pos.setY(hi, hs[hi]);
     }
     var cell = W / seg;
@@ -361,7 +646,7 @@ GH.terrain = (function () {
       var wgeo = new THREE.PlaneGeometry(W, W, 1, 1);
       wgeo.rotateX(-Math.PI / 2);
       var wmat = new THREE.MeshBasicMaterial({
-        color: field.water.color, transparent: true, opacity: field.water.opacity, depthWrite: false
+        color: field.water.color, transparent: true, opacity: field.water.opacity, depthWrite: !!field.water.cloud
       });
       var wm = new THREE.Mesh(wgeo, wmat);
       wm.position.y = field.water.level;
@@ -460,41 +745,69 @@ GH.terrain = (function () {
   // groves / boulder fields / crystal gardens instead of an even sprinkle.
   T.PROP_SETS = {
     wreck: [
-      { kind: 'palm', n: 420, cluster: 0.55, seed: 101, band: [-1.2, 99] },
-      { kind: 'cactus', n: 520, cluster: 0.5, seed: 102, band: [0.5, 99] },
-      { kind: 'duneRock', n: 360, cluster: 0.45, seed: 103, band: [-1, 99] },
-      { kind: 'wreckRib', n: 44, cluster: 0.0, seed: 104, band: [-1.5, 99] },
+      { kind: 'palm', solid: 0.35, n: 420, cluster: 0.55, seed: 101, band: [-1.2, 99] },
+      { kind: 'cactus', solid: 0.3, n: 520, cluster: 0.5, seed: 102, band: [0.5, 99] },
+      { kind: 'duneRock', solid: 1.1, n: 360, cluster: 0.45, seed: 103, band: [-1, 99] },
+      { kind: 'wreckRib', solid: 1.6, n: 44, cluster: 0.0, seed: 104, band: [-1.5, 99] },
       { kind: 'bones', n: 130, cluster: 0.3, seed: 105, band: [0, 99] }
     ],
     glacier: [
-      { kind: 'pine', n: 1900, cluster: 0.55, seed: 201, band: [-99, 9] },
-      { kind: 'snowRock', n: 420, cluster: 0.4, seed: 202, band: [-99, 99] },
-      { kind: 'iceSpire', n: 220, cluster: 0.6, seed: 203, band: [-99, 4] },
-      { kind: 'deadTree', n: 160, cluster: 0.4, seed: 204, band: [3, 99] }
+      { kind: 'pine', solid: 0.4, n: 1900, cluster: 0.55, seed: 201, band: [-99, 9] },
+      { kind: 'snowRock', solid: 1.0, n: 420, cluster: 0.4, seed: 202, band: [-99, 99] },
+      { kind: 'iceSpire', solid: 0.6, n: 220, cluster: 0.6, seed: 203, band: [-99, 4] },
+      { kind: 'deadTree', solid: 0.3, n: 160, cluster: 0.4, seed: 204, band: [3, 99] }
     ],
     cloister: [
-      { kind: 'jungleTree', n: 1500, cluster: 0.45, seed: 301, band: [1.0, 99] },
+      { kind: 'jungleTree', solid: 0.45, n: 1500, cluster: 0.45, seed: 301, band: [1.0, 99] },
       { kind: 'fern', n: 1600, cluster: 0.35, seed: 302, band: [0.6, 99] },
-      { kind: 'vineCurtain', n: 240, cluster: 0.5, seed: 303, band: [1.2, 99] },
+      { kind: 'vineCurtain', solid: 0.4, n: 240, cluster: 0.5, seed: 303, band: [1.2, 99] },
       { kind: 'mushroom', n: 480, cluster: 0.5, seed: 304, band: [0.5, 6] },
-      { kind: 'mossRock', n: 320, cluster: 0.4, seed: 305, band: [0.8, 99] }
+      { kind: 'mossRock', solid: 0.9, n: 320, cluster: 0.4, seed: 305, band: [0.8, 99] }
     ],
     ember: [
-      { kind: 'basalt', n: 520, cluster: 0.55, seed: 401, band: [-0.2, 99] },
-      { kind: 'lavaRock', n: 520, cluster: 0.4, seed: 402, band: [-0.3, 99] },
-      { kind: 'charTree', n: 380, cluster: 0.5, seed: 403, band: [0.4, 99] },
-      { kind: 'ventStack', n: 110, cluster: 0.0, seed: 404, band: [-0.2, 6] }
+      { kind: 'basalt', solid: 1.3, n: 520, cluster: 0.55, seed: 401, band: [-0.2, 99] },
+      { kind: 'lavaRock', solid: 0.9, n: 520, cluster: 0.4, seed: 402, band: [-0.3, 99] },
+      { kind: 'charTree', solid: 0.3, n: 380, cluster: 0.5, seed: 403, band: [0.4, 99] },
+      { kind: 'ventStack', solid: 0.8, n: 110, cluster: 0.0, seed: 404, band: [-0.2, 6] }
     ],
     storm: [
-      { kind: 'slateSpire', n: 480, cluster: 0.5, seed: 501, band: [-99, 99] },
+      { kind: 'slateSpire', solid: 0.9, n: 480, cluster: 0.5, seed: 501, band: [-99, 99] },
       { kind: 'heather', n: 1100, cluster: 0.45, seed: 502, band: [-99, 99] },
       { kind: 'deadTree', n: 480, cluster: 0.45, seed: 503, band: [-99, 99] },
-      { kind: 'menhir', n: 64, cluster: 0.0, seed: 504, band: [-99, 99] }
+      { kind: 'menhir', solid: 0.9, n: 64, cluster: 0.0, seed: 504, band: [-99, 99] }
+    ],
+    hive: [
+      { kind: 'habVent', solid: 0.6, n: 260, cluster: 0.4, seed: 701, band: [-99, 99] },
+      { kind: 'cableMast', solid: 0.3, n: 140, cluster: 0.3, seed: 702, band: [-99, 99] },
+      { kind: 'scrapPile', solid: 0.9, n: 300, cluster: 0.5, seed: 703, band: [-99, 99] }
+    ],
+    ruins: [
+      { kind: 'brokenColumn', solid: 0.5, n: 420, cluster: 0.5, seed: 801, band: [0.1, 99] },
+      { kind: 'rubble', solid: 0.8, n: 420, cluster: 0.45, seed: 802, band: [-0.3, 99] },
+      { kind: 'jungleTree', solid: 0.45, n: 520, cluster: 0.55, seed: 803, band: [0.4, 99] },
+      { kind: 'fern', n: 700, cluster: 0.35, seed: 804, band: [0.2, 99] },
+      { kind: 'mossRock', solid: 0.9, n: 260, cluster: 0.4, seed: 805, band: [0.2, 99] }
+    ],
+    keep: [
+      { kind: 'brazier', solid: 0.4, n: 120, cluster: 0.0, seed: 901, band: [-0.5, 99] },
+      { kind: 'barrel', solid: 0.4, n: 260, cluster: 0.5, seed: 902, band: [-0.5, 99] },
+      { kind: 'deadTree', solid: 0.3, n: 300, cluster: 0.5, seed: 903, band: [-0.5, 99] },
+      { kind: 'heather', n: 500, cluster: 0.45, seed: 904, band: [-0.5, 99] }
+    ],
+    warrens: [
+      { kind: 'stalagmite', solid: 0.6, n: 700, cluster: 0.4, seed: 1001, band: [-99, 2.5] },
+      { kind: 'glowFungus', n: 900, cluster: 0.5, seed: 1002, band: [-99, 2.5] },
+      { kind: 'crystal', solid: 0.8, n: 300, cluster: 0.5, seed: 1003, band: [-99, 2.5] }
+    ],
+    sky: [
+      { kind: 'cloudPillar', solid: 0.7, n: 220, cluster: 0.45, seed: 1101, band: [-8, 99] },
+      { kind: 'aetherTree', solid: 0.4, n: 420, cluster: 0.5, seed: 1102, band: [-8, 99] },
+      { kind: 'skyLantern', n: 360, cluster: 0.4, seed: 1103, band: [-8, 99] }
     ],
     null: [
-      { kind: 'crystal', n: 720, cluster: 0.5, seed: 601, band: [-99, 99] },
+      { kind: 'crystal', solid: 0.8, n: 720, cluster: 0.5, seed: 601, band: [-99, 99] },
       { kind: 'floatShard', n: 460, cluster: 0.4, seed: 602, band: [-99, 99] },
-      { kind: 'monolith', n: 72, cluster: 0.0, seed: 603, band: [-1, 99] },
+      { kind: 'monolith', solid: 1.0, n: 72, cluster: 0.0, seed: 603, band: [-1, 99] },
       { kind: 'voidReed', n: 720, cluster: 0.5, seed: 604, band: [-6, 99] }
     ]
   };
@@ -568,10 +881,14 @@ GH.terrain = (function () {
         if (ps.cluster > 0 && fbm(x * 0.02, z * 0.02, ps.seed) < 0.38 + ps.cluster * 0.3) continue;
         var h = f.h(x, z);
         if (h < ps.band[0] || h > ps.band[1]) continue;
-        if (f.water && h < f.water.level + 0.3) continue;
+        if (f.water && !f.water.cloud && h < f.water.level + 0.3) continue;
+        if (f.isVoid(x, z) || f.solid(x, z)) continue;
         if (T.steepness(x, z) > 0.9) continue;
+        if (T.blockedAt(x, z, 1.5)) continue;
         if (avoid && avoid(x, z)) continue;
-        stamp(buckets, variants[Math.floor(rnd() * variants.length)], x, h - 0.05, z, rnd() * Math.PI * 2, 0.8 + rnd() * 0.5);
+        var sc = 0.8 + rnd() * 0.5;
+        stamp(buckets, variants[Math.floor(rnd() * variants.length)], x, h - 0.05, z, rnd() * Math.PI * 2, sc);
+        if (ps.solid) T.addCollider({ x: x, z: z, r: ps.solid * sc });
         count++;
         placed++;
       }
@@ -581,45 +898,82 @@ GH.terrain = (function () {
   };
 
   // ---------------- race track ribbon ----------------
-  // rw.path: closed centreline. Builds asphalt with curbs conforming to
-  // the field, plus tyre walls on the outside of every real corner.
-  T.buildTrack = function (parent, rw) {
+  // rw.path points carry elev (metres above the ground), bank (radians,
+  // positive = left edge high), gap (no asphalt: a jump) and boost. The
+  // ribbon rides field.hTerrain + elev; the field's h() then returns the
+  // ribbon height on it, so vehicles, rivals and pickups climb the hills,
+  // fly the gaps and lean into the banks.
+  T.setTrack = function (rw) {
     var f = T.active;
+    if (!f) return;
     var path = rw.path, n = path.length;
-    var w = (rw.width || 14) / 2;
-    var pos = [], col = [], nor = [];
-    var pts = [];
     for (var i = 0; i < n; i++) {
       var p = path[i], q = path[(i + 1) % n], r = path[(i - 1 + n) % n];
       var tx = q.x - r.x, tz = q.z - r.z;
       var tl = Math.sqrt(tx * tx + tz * tz) || 1;
       tx /= tl; tz /= tl;
-      var nx = tz, nz = -tx; // left normal
-      var y = (f ? f.h(p.x, p.z) : 0) + 0.2;
-      pts.push({ x: p.x, z: p.z, y: y, nx: nx, nz: nz, tx: tx, tz: tz });
-      p.y = y; p.nx = nx; p.nz = nz;
+      p.tx = tx; p.tz = tz; p.nx = tz; p.nz = -tx;
+      p.ground = f.hTerrain(p.x, p.z);
+      p.y = p.ground + 0.15 + (p.elev || 0);
     }
+    rw.width = rw.width || 14;
+    f.track = rw;
+  };
+
+  // nearest segment sample: {on, y, side, i, t, gap, boost}
+  var tsOut = { on: false, y: 0, side: 0, i: 0, t: 0, gap: false, boost: false, d: 0 };
+  T.trackSample = function (rw, x, z) {
+    var path = rw.path, n = path.length, best = 1e18, bi = 0, bt = 0;
+    for (var i = 0; i < n; i++) {
+      var a = path[i], b = path[(i + 1) % n];
+      var vx = b.x - a.x, vz = b.z - a.z, wx = x - a.x, wz = z - a.z;
+      var c2 = vx * vx + vz * vz || 1;
+      var t = GH.clamp((vx * wx + vz * wz) / c2, 0, 1);
+      var d2 = GH.dist2(x, z, a.x + vx * t, a.z + vz * t);
+      if (d2 < best) { best = d2; bi = i; bt = t; }
+    }
+    var A = path[bi], B = path[(bi + 1) % n];
+    var hw = (rw.width || 14) / 2;
+    var d = Math.sqrt(best);
+    // signed side: left of travel is positive
+    var px = A.x + (B.x - A.x) * bt, pz = A.z + (B.z - A.z) * bt;
+    var side = ((x - px) * A.nx + (z - pz) * A.nz);
+    var yc = A.y + (B.y - A.y) * bt;
+    var bank = (A.bank || 0) + ((B.bank || 0) - (A.bank || 0)) * bt;
+    tsOut.d = d; tsOut.i = bi; tsOut.t = bt; tsOut.side = side;
+    tsOut.gap = !!(A.gap || B.gap);
+    tsOut.boost = !!(A.boost && bt < 0.5) || !!(B.boost && bt >= 0.5);
+    tsOut.on = d <= hw && !tsOut.gap;
+    tsOut.y = yc + Math.tan(bank) * side;
+    return tsOut;
+  };
+
+  T.buildTrack = function (parent, rw) {
+    var f = T.active;
+    if (!f.track) T.setTrack(rw);
+    var path = rw.path, n = path.length;
+    var w = rw.width / 2;
+    var pos = [], col = [], nor = [];
     var bands = [-1, -0.83, -0.05, 0.05, 0.83, 1]; // curb | asphalt | centre | asphalt | curb
+    function edgeY(p, sfrac) { return p.y + Math.tan(p.bank || 0) * w * sfrac; }
     for (var i2 = 0; i2 < n; i2++) {
-      var a = pts[i2], b = pts[(i2 + 1) % n];
+      var a = path[i2], b = path[(i2 + 1) % n];
+      if (a.gap || b.gap) continue;
       for (var k = 0; k < bands.length - 1; k++) {
         var s0 = bands[k], s1 = bands[k + 1];
         var isCurb = k === 0 || k === 4;
         var isMid = k === 2;
         var cx, cy, cz;
-        if (isCurb) { var red = (i2 % 4) < 2; cx = red ? 0.8 : 0.9; cy = red ? 0.16 : 0.9; cz = red ? 0.12 : 0.88; }
+        if (a.boost && !isCurb) { cx = 1.0; cy = 0.55 + ((i2 % 2) ? 0.2 : 0); cz = 0.1; }
+        else if (isCurb) { var red = (i2 % 4) < 2; cx = red ? 0.8 : 0.9; cy = red ? 0.16 : 0.9; cz = red ? 0.12 : 0.88; }
         else if (isMid) { var wht = (i2 % 8) < 4; cx = wht ? 0.85 : 0.2; cy = wht ? 0.85 : 0.2; cz = wht ? 0.8 : 0.22; }
         else { var shade = 0.2 + ((i2 % 2) ? 0.02 : 0); cx = shade; cy = shade; cz = shade + 0.03; }
         var quad = [
-          [a.x + a.nx * w * s0, a.y, a.z + a.nz * w * s0],
-          [a.x + a.nx * w * s1, a.y, a.z + a.nz * w * s1],
-          [b.x + b.nx * w * s1, b.y, b.z + b.nz * w * s1],
-          [b.x + b.nx * w * s0, b.y, b.z + b.nz * w * s0]
+          [a.x + a.nx * w * s0, edgeY(a, s0), a.z + a.nz * w * s0],
+          [a.x + a.nx * w * s1, edgeY(a, s1), a.z + a.nz * w * s1],
+          [b.x + b.nx * w * s1, edgeY(b, s1), b.z + b.nz * w * s1],
+          [b.x + b.nx * w * s0, edgeY(b, s0), b.z + b.nz * w * s0]
         ];
-        // conform each corner to the field
-        for (var qi = 0; qi < 4; qi++) {
-          if (f) quad[qi][1] = f.h(quad[qi][0], quad[qi][2]) + 0.2;
-        }
         var tri = [0, 1, 2, 0, 2, 3];
         for (var ti = 0; ti < 6; ti++) {
           var v = quad[tri[ti]];
@@ -637,26 +991,40 @@ GH.terrain = (function () {
     mesh.frustumCulled = false;
     mesh.renderOrder = 1;
     parent.add(mesh);
-    // tyre walls where the line bends
+    // furniture: tyre walls on corners, pillars and rails under and along
+    // elevated sections, ramp lips before every gap
     var buckets = T.makeBuckets();
-    var walls = 0;
     for (var i3 = 0; i3 < n; i3 += 2) {
-      var c0 = pts[i3], c1 = pts[(i3 + 4) % n];
+      var c0 = path[i3], c1 = path[(i3 + 4) % n];
       var turn = Math.atan2(c0.tx * c1.tz - c0.tz * c1.tx, c0.tx * c1.tx + c0.tz * c1.tz);
-      if (Math.abs(turn) < 0.11) continue;
-      var side = turn > 0 ? -1 : 1; // outside of the bend
-      for (var j = 0; j < 2; j++) {
-        var pp = pts[(i3 + j) % n];
-        var bx = pp.x + pp.nx * (w + 1.1) * side, bz = pp.z + pp.nz * (w + 1.1) * side;
-        var tyre = GH.models.buildTyreWall((i3 + j) % 3 === 0);
-        tyre.position.set(bx, (f ? f.h(bx, bz) : 0), bz);
-        tyre.rotation.y = Math.atan2(pp.tx, pp.tz);
-        T.mergeInto(buckets, tyre);
-        walls++;
+      var elevated = (c0.elev || 0) > 1.5;
+      if (Math.abs(turn) >= 0.11 && !elevated && !c0.gap) {
+        var side = turn > 0 ? -1 : 1;
+        for (var j = 0; j < 2; j++) {
+          var pp = path[(i3 + j) % n];
+          if (pp.gap) continue;
+          var bx = pp.x + pp.nx * (w + 1.1) * side, bz = pp.z + pp.nz * (w + 1.1) * side;
+          var tyre = GH.models.buildTyreWall((i3 + j) % 3 === 0);
+          tyre.position.set(bx, f.hTerrain(bx, bz), bz);
+          tyre.rotation.y = Math.atan2(pp.tx, pp.tz);
+          T.mergeInto(buckets, tyre);
+        }
+      }
+      if (elevated && !c0.gap) {
+        // a pillar down to the ground and a rail on each edge
+        var pil = GH.models.buildTrackPillar(c0.y - c0.ground + 0.2);
+        pil.position.set(c0.x, c0.ground - 0.3, c0.z);
+        T.mergeInto(buckets, pil);
+        for (var sd = -1; sd <= 1; sd += 2) {
+          var rail = GH.models.buildRail(Math.sqrt(GH.dist2(c0.x, c0.z, path[(i3 + 2) % n].x, path[(i3 + 2) % n].z)) + 0.3);
+          var rx = c0.x + c0.nx * (w + 0.3) * sd, rz = c0.z + c0.nz * (w + 0.3) * sd;
+          rail.position.set(rx, edgeY(c0, sd) - 0.05, rz);
+          rail.rotation.y = Math.atan2(c0.tx, c0.tz);
+          T.mergeInto(buckets, rail);
+        }
       }
     }
     T.flushBuckets(buckets, parent);
-    rw.width = w * 2;
     return mesh;
   };
 

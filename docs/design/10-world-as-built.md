@@ -114,3 +114,41 @@ Depths, hive and crucible dungeons also carry the biome's water or lava plane.
 `GH.game.devZone(id)`, `GH.game.devSpeeder(on)`, `GH.game.devState()` drive the headless harness in
 the scratchpad (`test.js`, `race.js`, `track.js`): zone loads, screenshots, a scripted race, reverse
 and dune-jump checks, and a console-error sweep.
+
+---
+
+## Round two: built territories, collision, 3D circuits, more fauna
+
+**Collision.** Trees, rocks, spires, walls, towers and buildings register circle or box colliders
+in a spatial hash; the pilot, wingmate and every grounded enemy are pushed out each frame. Vehicles
+that hit one trigger the existing crash rule (speed and nitro dumped). Burrowers and flyers ignore it.
+
+**Five new territories** (expedition only; classic mode keeps its six stages). The travel graph now
+has eleven nodes: wreck N → hive, cloister N → ruins, ember S → keep, storm S → warrens, null N → sky,
+plus hive E ↔ ruins W and keep E ↔ warrens W.
+
+| Zone | Danger | Made of | Special rule |
+|---|---|---|---|
+| **SPIRE HIVE** | III | a street grid of stacked hab-blocks with window bands, terraces climbing to a six-tier spire with a beacon | blackout weather closes the fog in |
+| **FALLEN CITADEL** | II | colonnades, arches, wall fragments, a dome, plazas with a statue, drowned basins, jungle overgrowth | duststorm weather |
+| **BASTION KEEP** | III | an octagonal curtain wall with towers and gatehouses, a moat with bridges at the roads, a donjon, barracks in the wards | siege fog |
+| **DEEP WARRENS** | IV | cavern cities cut into solid rock, joined by tunnels; rock is impassable; hab-caves, stalagmites, glowing fungus | dark: lamps and fungus, gas-leak weather ignites pockets |
+| **AETHER COURT** | IV | islands hanging over a cloud floor, bridges between them, white towers, arches, the crown court | low gravity; stepping off an island drops you, then the wind returns you to your last footing at a 15% hull cost; gale weather shoves vehicles |
+
+**Structures** (`js/structures.js`) lay out before the ground mesh so the field flattens under them,
+then raise merged meshes with colliders. Dungeons of built zones use plain ground in the same palette.
+
+**3D circuits.** Every track carries a height profile, jump gaps, boost pads and banking. The ribbon
+rides the ground plus its profile; the field's height function returns the ribbon on it, so vehicles,
+rivals and pickups climb it, leave the ground at gap lips, land on the next section, and lean into
+banked corners (the hull rolls with the lateral slope). Elevated sections get pillars and rails.
+Boost pads push you to 135% top speed for 1.6 s. New circuits: SPIRE CIRCUIT (hive, an 18-unit
+elevated loop), CROWN RING (sky, two gaps). THUNDER RIDGE gained a 12-unit bridge and a jump,
+DUNE RUN a hill and a jump, ICEFALL a 14-unit descent, CALDERA a jump over the basin.
+
+**More fauna** (twenty new types): Beak Strider, Tide Leech, Howler (calls stalkers), Mandible
+Skitter, Bellow Toad, Cinder Hound, Slag Golem (ground slam), Rod Sentry and Ballista (rooted
+turrets), Eye Cluster (three-way spread), Masked Slinger, Hab Brute, Warden Knight, Grave Stalker,
+Carrion Kite, Glow Mite, Tunnel Maw, Fungal Shambler, Aether Ray, Cloud Wisp. New behaviours:
+slammer, turret, caller, latcher (snares on contact), spread volleys. Spawns search for open ground,
+never inside rock, a building, or over the sky.

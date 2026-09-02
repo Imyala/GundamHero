@@ -1332,12 +1332,12 @@ GH.models = (function () {
     return g;
   };
 
-  M.buildBurrower = function () {
+  M.buildBurrower = function (color) {
     var g = new THREE.Group();
     var body = new THREE.Group();
     var segs = [0.5, 0.42, 0.34];
     for (var i = 0; i < segs.length; i++) {
-      var s = ico(segs[i], i % 2 ? 0xb08a5a : 0x9a7648);
+      var s = ico(segs[i], i % 2 ? (color || 0xb08a5a) : (color ? 0x3a3040 : 0x9a7648));
       s.position.set(0, 0.55 + i * 0.1, -i * 0.7);
       body.add(s);
     }
@@ -1356,9 +1356,9 @@ GH.models = (function () {
     return g;
   };
 
-  M.buildStalker = function () {
+  M.buildStalker = function (color) {
     var g = new THREE.Group();
-    var c = 0xe8ecf4;
+    var c = color || 0xe8ecf4;
     var body = box(0.5, 0.42, 1.1, c); body.position.y = 0.7; g.add(body);
     var neck = box(0.3, 0.3, 0.4, c); neck.position.set(0, 0.85, 0.65); neck.rotation.x = -0.5; g.add(neck);
     var head = box(0.3, 0.26, 0.5, 0xd0d8e8); head.position.set(0, 1.0, 0.95); g.add(head);
@@ -1375,9 +1375,9 @@ GH.models = (function () {
     return g;
   };
 
-  M.buildFrostWisp = function () {
+  M.buildFrostWisp = function (color) {
     var g = new THREE.Group();
-    var core = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), mat(0xc0f0ff, { emissive: 0x2060a0 }));
+    var core = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), mat(color || 0xc0f0ff, { emissive: 0x2060a0 }));
     core.position.y = 1.0; g.add(core);
     for (var i = 0; i < 5; i++) {
       var ic = cone(0.06, 0.5, 0xa0e0ff, 4, { transparent: true, opacity: 0.85 });
@@ -1413,9 +1413,9 @@ GH.models = (function () {
     return g;
   };
 
-  M.buildBloat = function () {
+  M.buildBloat = function (color) {
     var g = new THREE.Group();
-    var sac = new THREE.Mesh(new THREE.SphereGeometry(0.72, 7, 6), mat(0x8a9a48, { emissive: 0x2a3a10 }));
+    var sac = new THREE.Mesh(new THREE.SphereGeometry(0.72, 7, 6), mat(color || 0x8a9a48, { emissive: 0x2a3a10 }));
     sac.position.y = 0.9; g.add(sac);
     for (var i = 0; i < 6; i++) {
       var wart = ico(0.14, 0xc0d060);
@@ -1502,6 +1502,296 @@ GH.models = (function () {
       leg.position.set(Math.cos(a) * 0.3, 0.25, Math.sin(a) * 0.3); leg.rotation.z = Math.cos(a) * 0.4; leg.rotation.x = -Math.sin(a) * 0.4; g.add(leg);
     }
     blobShadow(g, 0.9);
+    return g;
+  };
+
+    // ---- props for the built territories ----
+  M.biomeProps.habVent = function (rnd) {
+    var g = new THREE.Group();
+    var h = R(rnd, 1.2, 2.6);
+    var st = cyl(0.5, 0.6, h, 0x3a3f4c, 6); st.position.y = h / 2; g.add(st);
+    var cap = cyl(0.8, 0.5, 0.4, 0x2a2e38, 6); cap.position.y = h + 0.2; g.add(cap);
+    var glow = box(0.3, 0.3, 0.3, 0xffb050); glow.position.y = h * 0.5; glow.position.z = 0.5; g.add(glow);
+    return g;
+  };
+  M.biomeProps.cableMast = function (rnd) {
+    var g = new THREE.Group();
+    var h = R(rnd, 5, 9);
+    var m = box(0.3, h, 0.3, 0x4a4f5c); m.position.y = h / 2; g.add(m);
+    var arm = box(2.6, 0.2, 0.2, 0x4a4f5c); arm.position.y = h - 0.6; g.add(arm);
+    var lamp = box(0.35, 0.35, 0.35, 0x60c8ff); lamp.position.set(1.2, h - 0.9, 0); g.add(lamp);
+    return g;
+  };
+  M.biomeProps.scrapPile = function (rnd) {
+    var g = new THREE.Group();
+    for (var i = 0; i < 5; i++) {
+      var b = box(R(rnd, 0.4, 1.2), R(rnd, 0.3, 0.9), R(rnd, 0.4, 1.2), i % 2 ? 0x5a4a3a : 0x4a4f5c);
+      b.position.set(R(rnd, -1, 1), 0.3 + i * 0.15, R(rnd, -1, 1)); b.rotation.set(rnd(), rnd(), rnd() * 0.3); g.add(b);
+    }
+    return g;
+  };
+  M.biomeProps.brokenColumn = function (rnd) {
+    var g = new THREE.Group();
+    var h = R(rnd, 1, 4.5);
+    var c = cyl(0.55, 0.65, h, 0x8a8a84, 7); c.position.y = h / 2; c.rotation.z = R(rnd, -0.08, 0.08); g.add(c);
+    var drum = cyl(0.55, 0.55, 0.6, 0x7a7a74, 7); drum.position.set(R(rnd, 0.8, 1.6), 0.3, R(rnd, -0.6, 0.6)); drum.rotation.x = Math.PI / 2; g.add(drum);
+    return g;
+  };
+  M.biomeProps.rubble = function (rnd) {
+    var g = new THREE.Group();
+    for (var i = 0; i < 6; i++) {
+      var b = box(R(rnd, 0.4, 1.3), R(rnd, 0.3, 0.8), R(rnd, 0.4, 1.3), i % 2 ? 0x7e7e78 : 0x6a6a64);
+      b.position.set(R(rnd, -1.2, 1.2), 0.25 + i * 0.1, R(rnd, -1.2, 1.2)); b.rotation.set(rnd() * 0.4, rnd() * 3, rnd() * 0.4); g.add(b);
+    }
+    var moss = box(1.2, 0.15, 1.2, 0x4a8a3a); moss.position.y = 0.95; g.add(moss);
+    return g;
+  };
+  M.biomeProps.brazier = function (rnd) {
+    var g = new THREE.Group();
+    var st = cyl(0.25, 0.4, 1.4, 0x3a3a40, 6); st.position.y = 0.7; g.add(st);
+    var bowl = cyl(0.7, 0.4, 0.5, 0x4a4a50, 8); bowl.position.y = 1.6; g.add(bowl);
+    var fire = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.9, 5), mat(0xff8030, { emissive: 0xff5010 })); fire.position.y = 2.2; g.add(fire);
+    return g;
+  };
+  M.biomeProps.barrel = function (rnd) {
+    var g = new THREE.Group();
+    var n = 1 + Math.floor(rnd() * 3);
+    for (var i = 0; i < n; i++) {
+      var b = cyl(0.45, 0.5, 1.0, 0x6a4a2a, 8); b.position.set(i * 1.0, 0.5, (i % 2) * 0.5); g.add(b);
+      var band = cyl(0.52, 0.52, 0.12, 0x3a3a40, 8); band.position.copy(b.position); g.add(band);
+    }
+    return g;
+  };
+  M.biomeProps.stalagmite = function (rnd) {
+    var g = new THREE.Group();
+    for (var i = 0; i < 3; i++) {
+      var h = R(rnd, 0.8, 3.2);
+      var c = cone(R(rnd, 0.25, 0.5), h, i % 2 ? 0x3a3040 : 0x4a3a50, 6);
+      c.position.set(R(rnd, -0.7, 0.7), h / 2, R(rnd, -0.7, 0.7)); g.add(c);
+    }
+    return g;
+  };
+  M.biomeProps.glowFungus = function (rnd) {
+    var g = new THREE.Group();
+    var n = 3 + Math.floor(rnd() * 4);
+    for (var i = 0; i < n; i++) {
+      var h = R(rnd, 0.3, 1.1);
+      var st = cyl(0.06, 0.08, h, 0xc0c8d0, 5); st.position.set(R(rnd, -0.6, 0.6), h / 2, R(rnd, -0.6, 0.6)); g.add(st);
+      var cap = new THREE.Mesh(new THREE.SphereGeometry(R(rnd, 0.15, 0.32), 6, 4), mat(i % 2 ? 0x40e0c0 : 0x80a0ff, { emissive: 0x208070 }));
+      cap.position.set(st.position.x, h, st.position.z); g.add(cap);
+    }
+    return g;
+  };
+  M.biomeProps.cloudPillar = function (rnd) {
+    var g = new THREE.Group();
+    var h = R(rnd, 2.5, 6);
+    var p = cyl(0.5, 0.7, h, 0xf0f0f4, 8); p.position.y = h / 2; g.add(p);
+    var cap = cyl(0.8, 0.6, 0.4, 0xe0b050, 8); cap.position.y = h + 0.2; g.add(cap);
+    return g;
+  };
+  M.biomeProps.aetherTree = function (rnd) {
+    var g = new THREE.Group();
+    var h = R(rnd, 2.6, 4.4);
+    var trunk = cyl(0.14, 0.24, h, 0xd0c8e8, 6); trunk.position.y = h / 2; g.add(trunk);
+    for (var i = 0; i < 3; i++) {
+      var c = ico(R(rnd, 0.7, 1.2), i % 2 ? 0xe8b0e0 : 0xf4d0f0);
+      c.scale.y = 0.6; c.position.set(R(rnd, -0.6, 0.6), h - 0.2 + R(rnd, -0.2, 0.5), R(rnd, -0.6, 0.6)); g.add(c);
+    }
+    return g;
+  };
+  M.biomeProps.skyLantern = function (rnd) {
+    var g = new THREE.Group();
+    var h = R(rnd, 1.5, 3.2);
+    var pole = box(0.12, h, 0.12, 0xe0b050); pole.position.y = h / 2; g.add(pole);
+    var lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), mat(0xfff0a0, { emissive: 0xffd040 })); lamp.position.y = h + 0.3; g.add(lamp);
+    return g;
+  };
+
+  // track furniture for elevated sections
+  M.buildTrackPillar = function (h) {
+    var g = new THREE.Group();
+    var p = box(1.6, h, 1.6, 0x3a3f4c); p.position.y = h / 2; g.add(p);
+    var foot = box(2.6, 0.6, 2.6, 0x2a2e38); foot.position.y = 0.3; g.add(foot);
+    return g;
+  };
+  M.buildRail = function (len) {
+    var g = new THREE.Group();
+    var r = box(0.25, 0.25, len, 0xd0d4dc); r.position.y = 0.9; g.add(r);
+    var post = box(0.25, 0.9, 0.25, 0x8a8e98); post.position.y = 0.45; g.add(post);
+    return g;
+  };
+
+  // ---------------------------------------------------------------
+  // More native fauna (silhouettes first: beaks, mandibles, masks, rays)
+  // ---------------------------------------------------------------
+  M.buildBeakStrider = function (color) {
+    var g = new THREE.Group();
+    var c = color || 0xb0885a;
+    var body = ico(0.5, c); body.scale.set(0.8, 0.7, 1.2); body.position.y = 1.9; g.add(body);
+    var neck = box(0.22, 0.7, 0.22, c); neck.position.set(0, 2.4, 0.5); neck.rotation.x = -0.6; g.add(neck);
+    var head = box(0.36, 0.3, 0.4, c); head.position.set(0, 2.75, 0.85); g.add(head);
+    var beak = cone(0.14, 0.8, 0x50381e, 4); beak.rotation.x = Math.PI / 2; beak.position.set(0, 2.7, 1.35); g.add(beak);
+    var eye = box(0.4, 0.06, 0.05, 0xffd040); eye.position.set(0, 2.85, 1.0); g.add(eye);
+    var legs = {};
+    ['legL', 'legR'].forEach(function (k, i) {
+      var thigh = box(0.14, 1.0, 0.14, 0x50381e); thigh.position.set(i ? 0.28 : -0.28, 1.2, 0); g.add(thigh);
+      var shin = box(0.1, 0.9, 0.1, 0x50381e); shin.position.set(i ? 0.28 : -0.28, 0.45, 0.1); g.add(shin);
+      legs[k] = thigh;
+    });
+    legs.armL = box(0.01, 0.01, 0.01, c); legs.armR = box(0.01, 0.01, 0.01, c); g.add(legs.armL, legs.armR);
+    g.userData.limbs = legs;
+    blobShadow(g, 1.4);
+    return g;
+  };
+  M.buildLeech = function (color) {
+    var g = new THREE.Group();
+    var c = color || 0x4a6a5a;
+    for (var i = 0; i < 4; i++) {
+      var seg = ico(0.34 - i * 0.05, i % 2 ? c : 0x3a5a4a); seg.scale.y = 0.7; seg.position.set(0, 0.32, -i * 0.5); g.add(seg);
+    }
+    var mouth = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.08, 4, 8), mat(0xe04040)); mouth.position.set(0, 0.35, 0.35); g.add(mouth);
+    g.userData.core = mouth;
+    blobShadow(g, 1.0);
+    return g;
+  };
+  M.buildHowler = function () {
+    var g = new THREE.Group();
+    var c = 0xd8dce8;
+    var body = box(0.7, 0.6, 1.4, c); body.position.y = 0.95; g.add(body);
+    var mane = ico(0.6, 0xb0b8c8); mane.position.set(0, 1.25, 0.6); g.add(mane);
+    var head = box(0.36, 0.34, 0.6, c); head.position.set(0, 1.35, 1.05); head.rotation.x = -0.4; g.add(head);
+    var eye = box(0.28, 0.06, 0.05, 0x60c0ff); eye.position.set(0, 1.45, 1.3); g.add(eye);
+    var legs = {};
+    ['legL', 'legR', 'armL', 'armR'].forEach(function (k, i) {
+      var l = box(0.16, 0.7, 0.16, 0x9aa8c0); l.position.set(i % 2 ? 0.3 : -0.3, 0.35, i < 2 ? 0.5 : -0.5); g.add(l); legs[k] = l;
+    });
+    g.userData.limbs = legs;
+    blobShadow(g, 1.6);
+    return g;
+  };
+  M.buildSkitter = function () {
+    var g = new THREE.Group();
+    var body = ico(0.45, 0x5a3a6a); body.scale.y = 0.6; body.position.y = 0.55; g.add(body);
+    var head = box(0.3, 0.26, 0.34, 0x4a2a5a); head.position.set(0, 0.55, 0.55); g.add(head);
+    var mL = box(0.06, 0.06, 0.5, 0xe0d0c0); mL.position.set(-0.14, 0.5, 0.85); mL.rotation.y = 0.5; g.add(mL);
+    var mR = box(0.06, 0.06, 0.5, 0xe0d0c0); mR.position.set(0.14, 0.5, 0.85); mR.rotation.y = -0.5; g.add(mR);
+    var eye = box(0.24, 0.05, 0.05, 0xff8040); eye.position.set(0, 0.62, 0.72); g.add(eye);
+    for (var i = 0; i < 6; i++) {
+      var leg = box(0.06, 0.6, 0.06, 0x3a2a4a);
+      var side = i % 2 ? 1 : -1;
+      leg.position.set(side * 0.5, 0.3, (Math.floor(i / 2) - 1) * 0.35); leg.rotation.z = side * 0.9; g.add(leg);
+    }
+    blobShadow(g, 1.1);
+    return g;
+  };
+  M.buildToad = function () {
+    var g = new THREE.Group();
+    var body = ico(0.7, 0x6a8a3a); body.scale.set(1.1, 0.7, 1.0); body.position.y = 0.6; g.add(body);
+    var throat = ico(0.45, 0xc0d080); throat.scale.y = 0.6; throat.position.set(0, 0.45, 0.55); g.add(throat);
+    var eyeL = ico(0.16, 0xffd040); eyeL.position.set(-0.3, 1.05, 0.4); g.add(eyeL);
+    var eyeR = ico(0.16, 0xffd040); eyeR.position.set(0.3, 1.05, 0.4); g.add(eyeR);
+    for (var i = 0; i < 4; i++) {
+      var leg = box(0.16, 0.35, 0.3, 0x4a6a2a); leg.position.set(i % 2 ? 0.6 : -0.6, 0.18, i < 2 ? 0.4 : -0.4); g.add(leg);
+    }
+    g.userData.core = throat;
+    blobShadow(g, 1.5);
+    return g;
+  };
+  M.buildHound = function (color) {
+    var g = new THREE.Group();
+    var c = color || 0x4a2a20;
+    var body = box(0.4, 0.4, 1.0, c); body.position.y = 0.6; g.add(body);
+    var head = box(0.3, 0.28, 0.45, c); head.position.set(0, 0.72, 0.7); g.add(head);
+    var jaw = box(0.26, 0.08, 0.4, 0xff6020); jaw.position.set(0, 0.6, 0.72); g.add(jaw);
+    var eye = box(0.24, 0.05, 0.05, 0xffb020); eye.position.set(0, 0.8, 0.9); g.add(eye);
+    var legs = {};
+    ['legL', 'legR', 'armL', 'armR'].forEach(function (k, i) {
+      var l = box(0.12, 0.5, 0.12, 0x301810); l.position.set(i % 2 ? 0.18 : -0.18, 0.25, i < 2 ? 0.35 : -0.35); g.add(l); legs[k] = l;
+    });
+    g.userData.limbs = legs;
+    blobShadow(g, 1.1);
+    return g;
+  };
+  M.buildGolem = function (color, glow) {
+    var g = new THREE.Group();
+    var c = color || 0x3a2a28;
+    var torso = box(1.2, 1.1, 0.8, c); torso.position.y = 1.5; g.add(torso);
+    var core = box(0.5, 0.5, 0.2, glow || 0xff6020); core.position.set(0, 1.5, 0.42); g.add(core);
+    var head = box(0.5, 0.45, 0.5, c); head.position.y = 2.3; g.add(head);
+    var eye = box(0.34, 0.08, 0.05, glow || 0xff6020); eye.position.set(0, 2.32, 0.27); g.add(eye);
+    var legs = {};
+    ['legL', 'legR'].forEach(function (k, i) { var l = box(0.4, 1.0, 0.45, c); l.position.set(i ? 0.38 : -0.38, 0.5, 0); g.add(l); legs[k] = l; });
+    ['armL', 'armR'].forEach(function (k, i) { var a = box(0.4, 1.3, 0.4, c); a.position.set(i ? 0.95 : -0.95, 1.4, 0); g.add(a); legs[k] = a; });
+    g.userData.limbs = legs;
+    g.userData.core = core;
+    blobShadow(g, 2.2);
+    return g;
+  };
+  M.buildTurret = function (kind) {
+    var g = new THREE.Group();
+    if (kind === 'ballista') {
+      var base = box(1.6, 0.6, 1.6, 0x5a4a3a); base.position.y = 0.3; g.add(base);
+      var post = box(0.3, 1.2, 0.3, 0x4a3a2a); post.position.y = 1.2; g.add(post);
+      var bow = box(2.4, 0.15, 0.15, 0x6a5a4a); bow.position.set(0, 1.7, 0.3); g.add(bow);
+      var rail = box(0.2, 0.2, 1.6, 0x4a3a2a); rail.position.set(0, 1.7, 0); g.add(rail);
+      g.userData.core = rail;
+    } else {
+      var base2 = cyl(0.9, 1.1, 0.5, 0x3a3f4c, 8); base2.position.y = 0.25; g.add(base2);
+      var rod = cyl(0.18, 0.22, 2.4, 0x5a5f6c, 6); rod.position.y = 1.7; g.add(rod);
+      var tip = new THREE.Mesh(new THREE.OctahedronGeometry(0.4), mat(0x80c0ff, { emissive: 0x4080ff })); tip.position.y = 3.1; g.add(tip);
+      var ring = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.05, 4, 10), mat(0x9ab0ff, { emissive: 0x3050a0 })); ring.position.y = 2.2; ring.rotation.x = Math.PI / 2; g.add(ring);
+      g.userData.core = tip; g.userData.ring = ring;
+    }
+    blobShadow(g, 1.6);
+    return g;
+  };
+  M.buildEyeCluster = function () {
+    var g = new THREE.Group();
+    var core = ico(0.4, 0x3a2a50); core.position.y = 1.1; g.add(core);
+    for (var i = 0; i < 5; i++) {
+      var a = (i / 5) * Math.PI * 2;
+      var eye = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 5), mat(0xe0d0ff, { emissive: 0x8060c0 }));
+      eye.position.set(Math.cos(a) * 0.5, 1.1 + Math.sin(a * 2) * 0.2, Math.sin(a) * 0.5); g.add(eye);
+      var pupil = box(0.08, 0.08, 0.08, 0x200030); pupil.position.set(Math.cos(a) * 0.66, eye.position.y, Math.sin(a) * 0.66); g.add(pupil);
+    }
+    g.userData.core = core;
+    blobShadow(g, 1.0);
+    return g;
+  };
+  M.buildSlinger = function () {
+    var g = new THREE.Group();
+    var body = ico(0.4, 0x5a6a4a); body.scale.y = 0.8; body.position.y = 1.5; g.add(body);
+    var mask = box(0.5, 0.36, 0.2, 0x8a8a90); mask.position.set(0, 1.62, 0.36); g.add(mask);
+    var lens = box(0.12, 0.12, 0.06, 0xff4040); lens.position.set(0.12, 1.66, 0.48); g.add(lens);
+    var gun = box(0.14, 0.14, 0.9, 0x2a2a30); gun.position.set(0.45, 1.4, 0.4); g.add(gun);
+    var legs = {};
+    ['legL', 'legR'].forEach(function (k, i) {
+      var l = box(0.1, 1.1, 0.1, 0x8a8a90); l.position.set(i ? 0.3 : -0.3, 0.55, 0); g.add(l); legs[k] = l;
+      var foot = box(0.3, 0.1, 0.5, 0x6a6a70); foot.position.set(i ? 0.3 : -0.3, 0.05, 0.1); g.add(foot);
+    });
+    legs.armL = box(0.01, 0.01, 0.01, 0x5a6a4a); legs.armR = gun;
+    g.userData.limbs = legs;
+    blobShadow(g, 1.2);
+    return g;
+  };
+  M.buildKnight = function () {
+    var g = M.buildHusk(1.25, 0x7a7a86);
+    var shield = box(0.1, 0.9, 0.7, 0x8a2a2a); shield.position.set(-0.55, 1.15, 0.2); g.add(shield);
+    var plume = box(0.08, 0.4, 0.3, 0xb02a2a); plume.position.set(0, 2.05, -0.05); g.add(plume);
+    var sword = box(0.08, 1.2, 0.12, 0xd0d4dc); sword.position.set(0.55, 1.4, 0.2); sword.rotation.x = -0.5; g.add(sword);
+    return g;
+  };
+  M.buildRay = function () {
+    var g = new THREE.Group();
+    var body = ico(0.5, 0xe8e0f8); body.scale.set(1.1, 0.35, 1.3); body.position.y = 1.0; g.add(body);
+    var wings = [];
+    [-1, 1].forEach(function (s) {
+      var w = box(1.8, 0.06, 1.1, 0xd0c0f0); w.position.set(s * 1.1, 1.0, -0.1); g.add(w); wings.push(w);
+    });
+    var tail = box(0.08, 0.08, 1.6, 0xd0c0f0); tail.position.set(0, 1.0, -1.3); g.add(tail);
+    var eye = box(0.3, 0.05, 0.05, 0x60c0ff); eye.position.set(0, 1.1, 0.6); g.add(eye);
+    g.userData.wings = wings;
+    blobShadow(g, 1.8);
     return g;
   };
 

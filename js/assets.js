@@ -183,7 +183,7 @@ GH.assets = (function () {
     ['sand', 'snow', 'moss', 'basalt', 'slate', 'void'].forEach(function (k) {
       A.groundTex[k] = texFromCanvas(groundCanvas(k), 1, true);
     });
-    GH.stages.forEach(function (st) {
+    GH.stages.concat(GH.extraZones || []).forEach(function (st) {
       A.stageTex[st.id] = {
         floor: texFromCanvas(cobbleCanvas(128, st.floor.base, st.floor.mortar, st.floor.dark), 20, true),
         wall: texFromCanvas(wallCanvas(128, st.wall.base, st.wall.top)),

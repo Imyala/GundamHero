@@ -459,6 +459,19 @@ GH.game = (function () {
   // =================================================================
   // ENEMIES
   // =================================================================
+  // the nearest spot a body can stand: not in rock, not in a wall, not over the sky
+  function openSpot(x, z, r) {
+    var T = GH.terrain;
+    var ok = function (px, pz) { return !T.solidAt(px, pz) && !T.voidAt(px, pz) && !T.blockedAt(px, pz, r || 0.6); };
+    if (ok(x, z)) return { x: x, z: z };
+    for (var i = 0; i < 16; i++) {
+      var a = Math.random() * Math.PI * 2, d = 3 + i * 2.2;
+      var px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+      if (Math.abs(px) < GH.world.BOUNDS.x - 4 && Math.abs(pz) < GH.world.BOUNDS.z - 4 && ok(px, pz)) return { x: px, z: pz };
+    }
+    return null;
+  }
+
   function spawnEnemy(typeId, atX, atZ) {
     if (enemies.length > 110) return null;
     var def = GH.enemyDefs[typeId];
@@ -470,6 +483,11 @@ GH.game = (function () {
       var r = GH.rand(18, 24);
       x = GH.clamp(player.x + Math.cos(a) * r, -ARENA_R, ARENA_R);
       z = GH.clamp(player.z + Math.sin(a) * r, -ARENA_R, ARENA_R);
+    }
+    if (expActive && GH.terrain.active) {
+      var spot = openSpot(x, z, def.radius);
+      if (!spot) return null;
+      x = spot.x; z = spot.z;
     }
     mesh.position.set(x, 0 + gy(x, z), z);
     scene.add(mesh);
@@ -655,8 +673,9 @@ GH.game = (function () {
           wreck: 'bulwark_fragment', glacier: 'glacier_core', cloister: 'harvest_coil',
           ember: 'cinder_heart', storm: 'stormcap', null: 'null_lens'
         };
-        if (GH.progress.grantArtifact(lairArtifacts[e.lairZone])) {
-          queueAnnounce('ARTIFACT — ' + GH.progress.artifactById(lairArtifacts[e.lairZone]).name.toUpperCase(), 28);
+        var lairArt = lairArtifacts[e.lairZone];
+        if (lairArt && GH.progress.grantArtifact(lairArt)) {
+          queueAnnounce('ARTIFACT — ' + GH.progress.artifactById(lairArt).name.toUpperCase(), 28);
         }
         // the depths pay like every other dungeon: cleared + ascension
         if (dungeonState) {
@@ -895,18 +914,39 @@ GH.game = (function () {
         if (dist > def.keepDist + 1) { mx = nx; mz = nz; }
         else if (dist < def.keepDist - 2) { mx = -nx; mz = -nz; }
         e.shootCd -= dt;
-        if (e.burstLeft > 0) {
-          e.burstT -= dt;
-          if (e.burstT <= 0) {
-            e.burstT = 0.14; e.burstLeft--;
-            spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage * 0.7, def.shotElement);
-          }
-        } else if (e.shootCd <= 0 && dist < 22) {
-          e.shootCd = def.shootInterval;
-          if (def.burst) { e.burstLeft = def.burst; e.burstT = 0; }
-          else spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage * 0.9, def.shotElement);
-        }
+        rangedFire(e, def, nx, nz, dist, dt, 22);
         if (def.name === 'Storm Sentinel') e.hgt = 0.6 + Math.sin(e.anim * 0.5) * 0.25;
+      } else if (def.behavior === 'turret') {
+        mx = 0; mz = 0; spd = 0;
+        rangedFire(e, def, nx, nz, dist, dt, 28);
+      } else if (def.behavior === 'caller') {
+        if (dist > def.keepDist + 1) { mx = nx; mz = nz; }
+        else if (dist < def.keepDist - 2) { mx = -nx; mz = -nz; }
+        e.summonT -= dt;
+        if (e.summonT <= 0 && dist < 26) {
+          e.summonT = def.callInterval || 8;
+          e.popT = 0.3;
+          GH.audio.zap();
+          for (var cc2 = 0; cc2 < (def.callCount || 2); cc2++) {
+            var called = spawnEnemy(def.calls || 'husk', e.x + GH.rand(-3, 3), e.z + GH.rand(-3, 3));
+            if (called) { called.aggro = true; called.event = true; }
+          }
+        }
+      } else if (def.behavior === 'latcher') {
+        mx = nx; mz = nz;
+      } else if (def.behavior === 'slammer') {
+        if (e.telegraphing > 0) {
+          e.telegraphing -= dt; spd = 0; mx = 0; mz = 0;
+          if (e.telegraphing <= 0) { shake = Math.min(0.5, shake + 0.2); GH.audio.explode(); }
+        } else {
+          mx = nx; mz = nz;
+          e.abilityT -= dt;
+          if (e.abilityT <= 0 && dist < 6.5) {
+            e.abilityT = def.slamInterval || 4.5;
+            e.telegraphing = 0.9;
+            spawnTelegraph(e.x + nx * 2.4, e.z + nz * 2.4, 3.0, 0.9, e.damage * 1.4);
+          }
+        }
       } else if (def.behavior === 'burrower') {
         if (e.buried) {
           // tunnelling: fast and unstoppable, a plume of sand marks the line
@@ -1105,6 +1145,13 @@ GH.game = (function () {
           e.x = ePreX;
           e.z = ePreZ;
         }
+        if (!e.buried && !(e.hgt > 1.6) && GH.terrain.colliderCount()) {
+          var er = GH.terrain.resolve(e.x, e.z, def.radius);
+          if (er.hit) { e.x = er.x; e.z = er.z; }
+        }
+        if (!(e.hgt > 1.6) && GH.terrain.voidAt(e.x, e.z)) {
+          e.dead = true; scene.remove(e.mesh); continue;
+        }
       } else {
         e.x = GH.clamp(e.x, -ARENA_R - 3, ARENA_R + 3);
         e.z = GH.clamp(e.z, -ARENA_R - 3, ARENA_R + 3);
@@ -1163,12 +1210,34 @@ GH.game = (function () {
         if (GH.dist2(e.x, e.z, player.x, player.z) < Math.pow(def.radius + 0.8, 2)) {
           e.attackCd = e.modFrenzied ? 0.75 : 1.1;
           playerDamage(e.damage, e, 'kinetic');
+          if (def.behavior === 'latcher') { player.snareT = Math.max(player.snareT || 0, 0.45); e.attackCd = 0.6; }
         } else if (mate && !mate.down &&
           GH.dist2(e.x, e.z, mate.x, mate.z) < Math.pow(def.radius + 0.8, 2)) {
           e.attackCd = 1.1;
           wingmateDamage(e.damage);
         }
       }
+    }
+  }
+
+  // ranged fire shared by sentries and turrets: bursts, spreads, single shots
+  function rangedFire(e, def, nx, nz, dist, dt, range) {
+    e.shootCd -= dt;
+    var volley = function (mult) {
+      var n = def.spread || 1;
+      for (var k = 0; k < n; k++) {
+        var off = n > 1 ? (k - (n - 1) / 2) * 0.28 : 0;
+        var a = Math.atan2(nx, nz) + off;
+        spawnEnemyShot(e.x, 1, e.z, Math.sin(a), Math.cos(a), def.shotSpeed, e.damage * mult, def.shotElement);
+      }
+    };
+    if (e.burstLeft > 0) {
+      e.burstT -= dt;
+      if (e.burstT <= 0) { e.burstT = 0.14; e.burstLeft--; volley(0.7); }
+    } else if (e.shootCd <= 0 && dist < range) {
+      e.shootCd = def.shootInterval;
+      if (def.burst && def.burst > 1) { e.burstLeft = def.burst; e.burstT = 0; }
+      else volley(0.9);
     }
   }
 
@@ -2929,15 +2998,39 @@ GH.game = (function () {
     // gravity works along the slope: climbs bleed speed, descents lend it
     if (!d.air && T.active) {
       d.spd -= slope * 15 * dt;
-      d.spd = GH.clamp(d.spd, -top * 0.22, top * 1.08);
+      d.spd = GH.clamp(d.spd, -top * 0.22, top * (d.boostT > 0 ? 1.35 : 1.08));
       // sheer rock is a wall
       if (slope > 1.0 && soft < 0.5 && d.spd > 3) d.spd = 3;
+    }
+    var gNow = T.h(player.x, player.z);
+    // the ground fell away (a cliff, a ramp end, the edge of an island)
+    if (!d.air && d.groundY !== undefined && d.groundY - gNow > 1.2 && Math.abs(d.fwd) > 1.5) {
+      d.air = true; d.hgt = d.groundY - gNow; d.absY = d.groundY; d.vy = 0;
+    }
+    // boost pads on the asphalt
+    d.boostCd = Math.max(0, (d.boostCd || 0) - dt);
+    d.boostT = Math.max(0, (d.boostT || 0) - dt);
+    if (T.active && T.active.track && !d.air) {
+      var tsb = T.trackSample(T.active.track, player.x, player.z);
+      if (tsb.on && tsb.boost && d.boostCd <= 0) {
+        d.boostCd = 1.4; d.boostT = 1.6;
+        d.spd = Math.min(top * 1.35, Math.max(d.spd, top * 0.6) + 14);
+        d.nitro = Math.min(1, d.nitro + 0.2);
+        announce('BOOST', 16);
+        spawnBurst(player.x, 0.4, player.z, 0xffa020, 10);
+        GH.audio.dash();
+      }
+    }
+    // a gale over the sky court shoves anything on skids
+    if (weatherNow && weatherNow.id === 'gale' && !d.air) {
+      player.velX += Math.sin(runTime * 0.6) * 9 * dt;
+      player.velZ += Math.cos(runTime * 0.45) * 9 * dt;
     }
     // soft ground on a steep face: blast over it with momentum, or bog down
     var steepSoft = !d.air && soft > 0.5 && slope > 0.26;
     if (steepSoft) {
       if (d.fwd > top * 0.58) {
-        d.air = true; d.hgt = 0.02;
+        d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02;
         d.vy = Math.max(5, d.fwd * slope * 1.05);
         if (d.jumpMsgT <= 0) { d.jumpMsgT = 6; announce(surf === 'snow' ? 'DRIFT JUMP' : 'DUNE JUMP', 18); }
         GH.audio.dash();
@@ -2947,7 +3040,7 @@ GH.game = (function () {
     }
     // the crest: leave the ground when it falls away under speed
     if (!d.air && T.active && slope < -0.42 && d.fwd > top * 0.7) {
-      d.air = true; d.hgt = 0.02; d.vy = 0.5;
+      d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02; d.vy = 0.5;
     }
     d.jumpMsgT = Math.max(0, d.jumpMsgT - dt);
     if (d.bog > 0) {
@@ -2967,7 +3060,8 @@ GH.game = (function () {
     // airborne: ballistic, barely steerable, and it lands hard
     if (d.air) {
       d.vy -= T.gravity() * dt;
-      d.hgt += d.vy * dt;
+      d.absY += d.vy * dt;
+      d.hgt = d.absY - gNow;
       if (d.hgt <= 0) {
         d.air = false; d.hgt = 0;
         var impact = Math.min(0.5, Math.abs(d.vy) * 0.03);
@@ -3024,6 +3118,7 @@ GH.game = (function () {
     }
     // air time pays too
     if (d.air && d.hgt > 1.5) d.nitro = Math.min(1, d.nitro + 0.12 * dt);
+    d.groundY = gNow;
   }
 
   // =================================================================
@@ -3162,6 +3257,29 @@ GH.game = (function () {
           player.z = preMoveZ;
         }
       }
+      // trees, walls and buildings are solid
+      if (GH.terrain.colliderCount()) {
+        var rs = GH.terrain.resolve(player.x, player.z, player.speederOn ? 0.9 : 0.6);
+        if (rs.hit) { player.x = rs.x; player.z = rs.z; }
+      }
+      // the sky court: step off an island and you fall until the wind hands you back
+      if (GH.terrain.active && GH.terrain.active.biome.voidBelow !== undefined) {
+        var overVoid = GH.terrain.voidAt(player.x, player.z);
+        var airborne = player.speederOn && player.drive && player.drive.air;
+        if (!overVoid) { player.safeX = player.x; player.safeZ = player.z; player.fallT = 0; }
+        else if (!airborne) {
+          player.fallT = (player.fallT || 0) + dt;
+          if (player.fallT > 0.35) {
+            player.fallT = 0;
+            playerDamage(Math.round(player.stats.maxHP * 0.15) + player.stats.armor, null, 'kinetic');
+            player.x = player.safeX || 0; player.z = player.safeZ || 0;
+            if (player.drive) { player.drive.spd = 0; player.drive.air = false; player.drive.hgt = 0; }
+            player.velX = 0; player.velZ = 0;
+            announce('FELL INTO THE SKY — CAUGHT BY THE WIND', 22);
+            shake = Math.min(0.6, shake + 0.4);
+          }
+        }
+      }
     } else {
       player.x = GH.clamp(player.x, -ARENA_R, ARENA_R);
       player.z = GH.clamp(player.z, -ARENA_R, ARENA_R);
@@ -3220,6 +3338,11 @@ GH.game = (function () {
         slipSign = latDot > 0 ? 1 : -1;
       }
       var leanT = dr ? GH.clamp(-slipSign * dr.slip * 0.045, -0.55, 0.55) : 0;
+      // and leans with a banked road (lateral slope under the skids)
+      if (dr && !dr.air) {
+        var latSl = GH.terrain.slope(player.x, player.z, Math.cos(dr.heading), -Math.sin(dr.heading));
+        leanT += GH.clamp(latSl * 0.9, -0.5, 0.5);
+      }
       sm.rotation.z = GH.lerp(sm.rotation.z, leanT, dt * 7);
       sm.position.y = gy(player.x, player.z) + 0.12 + (dr ? dr.hgt : 0) + Math.sin(runTime * 6) * 0.06; // hover bob
       // pitch the hull with the ground it rides (and the arc it flies)
@@ -3456,6 +3579,11 @@ GH.game = (function () {
       hemi.color.setHex(0x8a94b4);
       hemi.groundColor.setHex(0x2e3246);
       sun.color.setHex(0xc0cce4);
+    } else if (GH.terrain.dark()) {
+      // the undercity: lamps and fungus, not sky
+      scene.background = new THREE.Color(0x06040a);
+      scene.fog.color.setHex(0x120e18);
+      scene.fog.near = 12; scene.fog.far = 52;
     } else {
       // open ground: let the hills and the rim show before the haze takes them
       scene.fog.near = 30; scene.fog.far = 98;
@@ -3727,6 +3855,7 @@ GH.game = (function () {
   // carrying=true adds the matter screens (they refuse carried cargo).
   function zoneBlockedAt(x, z, carrying) {
     if (!worldH || !zoneNow) return false;
+    if (GH.terrain.solidAt(x, z)) return true;
     if (worldH.layout.maze &&
       GH.dungeons.mazeBlocked(worldH.layout.maze, zoneNow.size, x, z)) return true;
     if (worldH.layout.halls &&
@@ -4746,7 +4875,8 @@ GH.game = (function () {
     var sz = function (z) { return (z + GH.world.BOUNDS.z) / (GH.world.BOUNDS.z * 2) * H2; };
     ctx.clearRect(0, 0, W2, H2);
     // this zone's map, tinted by biome (dungeons run near-black)
-    var tints = { glacier: '#1c3346', wreck: '#33301f', cloister: '#20321f', ember: '#3a2117', storm: '#211f38', null: '#2c1733' };
+    var tints = { glacier: '#1c3346', wreck: '#33301f', cloister: '#20321f', ember: '#3a2117', storm: '#211f38', null: '#2c1733',
+      hive: '#262832', ruins: '#26321f', keep: '#2a2c36', warrens: '#1a1220', sky: '#2a3a5a' };
     ctx.fillStyle = zoneNow && zoneNow.dungeon ? '#0b0b12' : (tints[zoneNow ? zoneNow.parent : 'wreck'] || '#222');
     ctx.fillRect(0, 0, W2, H2);
     // faint quarter grid: gives the dots a sense of distance
@@ -5057,7 +5187,9 @@ GH.game = (function () {
     weatherT = 2.5;
     if (weatherNow) {
       queueAnnounce('WEATHER FRONT — ' + weatherNow.name, 22);
-      if (weatherNow.id === 'whiteout') { scene.fog.near = 7; scene.fog.far = 30; }
+      if (weatherNow.id === 'whiteout' || weatherNow.id === 'blackout' || weatherNow.id === 'duststorm' || weatherNow.id === 'siegefog') {
+        scene.fog.near = 7; scene.fog.far = 30;
+      }
       if (weatherNow.id === 'nullwind') spawnNullEddies();
     }
   }
@@ -5065,7 +5197,7 @@ GH.game = (function () {
   function updateWeather(dt) {
     if (!weatherNow) return;
     weatherT -= dt;
-    if (weatherNow.id === 'ashfall') {
+    if (weatherNow.id === 'ashfall' || weatherNow.id === 'gasleak') {
       if (weatherT <= 0) {
         weatherT = GH.rand(2.0, 3.2);
         var ax = player.x + GH.rand(-9, 9), az = player.z + GH.rand(-9, 9);
@@ -5753,6 +5885,10 @@ GH.game = (function () {
     }
 
     // pose
+    if (expActive && GH.terrain.colliderCount()) {
+      var mrs = GH.terrain.resolve(mate.x, mate.z, 0.6);
+      if (mrs.hit) { mate.x = mrs.x; mate.z = mrs.z; }
+    }
     mate.mesh.position.set(mate.x, 0 + gy(mate.x, mate.z), mate.z);
     mate.mesh.rotation.y = mate.facing;
     var parts = mate.mesh.userData.parts;
@@ -5835,7 +5971,7 @@ GH.game = (function () {
     shake = Math.max(0, shake - dt * 1.4);
     // higher and farther back, with the pilot sitting low in frame so
     // the world ahead gets the screen space
-    var pgy = player ? gy(tx, tz) : 0;
+    var pgy = player ? gy(tx, tz) + (player.speederOn && player.drive ? player.drive.hgt * 0.6 : 0) : 0;
     camGround += (pgy - camGround) * Math.min(1, dt * 5);
     camera.position.set(tx + sx, camGround + 18 * camZoom, tz + 14.5 * camZoom + sz);
     camera.lookAt(tx + sx, camGround, tz - 1.6 + sz);
@@ -5899,7 +6035,7 @@ GH.game = (function () {
         el['dh-nitro-fill'].classList.toggle('dh-burning', dvd.nitroT > 0);
         // one status word under the speedo: what the ground is doing to you
         var dstat = dvd.bog > 0.5 ? (player.speederOn && GH.terrain.surface(player.x, player.z) === 'snow' ? 'SNOWBOUND — REVERSE' : 'BOGGED — REVERSE')
-          : dvd.air ? 'AIR' : dvd.offTrack ? 'OFF TRACK' : (dvd.drift && dvd.slip > 1.2) ? 'DRIFT' : '';
+          : dvd.boostT > 0 ? 'BOOST' : dvd.air ? 'AIR' : dvd.offTrack ? 'OFF TRACK' : (dvd.drift && dvd.slip > 1.2) ? 'DRIFT' : '';
         el['dh-drift'].textContent = dstat;
         el['dh-drift'].classList.toggle('hidden', !dstat);
       }
@@ -6620,6 +6756,15 @@ GH.game = (function () {
     loadZone(zoneId, curZone);
     player.x = 0; player.z = 0;
     if (zoneNow && zoneNow.dungeon) { player.z = GH.world.BOUNDS.z - 30; }
+    else if (worldH && worldH.layout.gates.length) {
+      // arrive as a traveller would: just inside the first travel gate
+      var g0 = worldH.layout.gates[0];
+      var ina = Math.atan2(-g0.x, -g0.z);
+      player.x = g0.x + Math.sin(ina) * 10; player.z = g0.z + Math.cos(ina) * 10;
+    }
+    var sp0 = openSpot(player.x, player.z, 0.8);
+    if (sp0) { player.x = sp0.x; player.z = sp0.z; }
+    camGround = gy(player.x, player.z);
     return true;
   };
   G.devSpeeder = function (on) {

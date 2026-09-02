@@ -13,12 +13,17 @@ GH.world = (function () {
 
   // travel graph: which side of each territory carries the gate to whom
   var GATE_SIDES = {
-    wreck: { glacier: 'W', cloister: 'E' },
+    wreck: { glacier: 'W', cloister: 'E', hive: 'N' },
     glacier: { wreck: 'E', ember: 'S' },
-    cloister: { wreck: 'W', storm: 'S' },
-    ember: { glacier: 'N', null: 'E' },
-    storm: { cloister: 'N', null: 'W' },
-    null: { ember: 'W', storm: 'E' }
+    cloister: { wreck: 'W', storm: 'S', ruins: 'N' },
+    ember: { glacier: 'N', null: 'E', keep: 'S' },
+    storm: { cloister: 'N', null: 'W', warrens: 'S' },
+    null: { ember: 'W', storm: 'E', sky: 'N' },
+    hive: { wreck: 'S', ruins: 'E' },
+    ruins: { cloister: 'S', hive: 'W' },
+    keep: { ember: 'N', warrens: 'E' },
+    warrens: { keep: 'W', storm: 'N' },
+    sky: { null: 'S' }
   };
 
   W.ZONES = [
@@ -27,7 +32,13 @@ GH.world = (function () {
     { id: 'cloister', danger: 2 },
     { id: 'ember', danger: 3 },
     { id: 'storm', danger: 3 },
-    { id: 'null', danger: 4 }
+    { id: 'null', danger: 4 },
+    // built territories
+    { id: 'hive', danger: 3 },      // the spire hive: a city stacked to the sky
+    { id: 'ruins', danger: 2 },     // the fallen citadel
+    { id: 'keep', danger: 3 },      // the bastion keep
+    { id: 'warrens', danger: 4 },   // the undercity
+    { id: 'sky', danger: 4 }        // the aether court
   ];
 
   // fixed hub features (live in the wreck zone only)
@@ -82,8 +93,9 @@ GH.world = (function () {
       var dg = GH.dungeons.parseId(zoneId);
       if (dg) zoneId = dg.zone;
     }
-    for (var i = 0; i < GH.stages.length; i++) {
-      if (GH.stages[i].id === zoneId) return GH.stages[i];
+    var all = GH.allStages ? GH.allStages() : GH.stages;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].id === zoneId) return all[i];
     }
     return GH.stages[0];
   };
@@ -324,7 +336,12 @@ GH.world = (function () {
     cloister: { id: 'sporebloom', name: 'SPOREBLOOM', desc: 'kills shed extra sparks' },
     ember: { id: 'ashfall', name: 'ASHFALL', desc: 'burning cinders rain from the sky' },
     storm: { id: 'stormsurge', name: 'STORM SURGE', desc: 'the sky hunts anything that moves' },
-    null: { id: 'nullwind', name: 'NULL WIND', desc: 'drifting eddies ground your weapons' }
+    null: { id: 'nullwind', name: 'NULL WIND', desc: 'drifting eddies ground your weapons' },
+    hive: { id: 'blackout', name: 'BLACKOUT', desc: 'the spire goes dark; the streets close in' },
+    ruins: { id: 'duststorm', name: 'DUSTSTORM', desc: 'grit in every joint; the dead city hides itself' },
+    keep: { id: 'siegefog', name: 'SIEGE FOG', desc: 'the wards vanish into the fog' },
+    warrens: { id: 'gasleak', name: 'GAS LEAK', desc: 'pockets of vapour ignite around you' },
+    sky: { id: 'gale', name: 'GALE', desc: 'the wind shoves anything on skids' }
   };
 
   W.weatherToday = function () {
@@ -375,10 +392,17 @@ GH.world = (function () {
     var st = W.stageFor(zoneId);
     var tex = GH.assets.stageTex[st.id];
 
-    // ground: a real height field with the zone's biome, sealed by a rim
-    var terrain = GH.terrain.build(zoneId, info, lay);
+    // ground: a real height field with the zone's biome, sealed by a rim.
+    // Built territories lay their districts first so the field flattens
+    // under them, then raise walls and towers with colliders.
+    var srnd = zrng('struct:' + zoneId);
+    var terrain = GH.terrain.build(zoneId, info, lay, function (field) {
+      lay.structures = GH.structures.layout(field, lay, srnd);
+    });
     group.add(terrain);
     var gy = function (x, z) { return GH.terrain.h(x, z); };
+    if (lay.raceway) GH.terrain.setTrack(lay.raceway);
+    GH.structures.build(group, lay.structures);
 
     // dungeon perimeter: a tight rock collar so the depths read enclosed
     if (info.dungeon) {
@@ -543,7 +567,7 @@ GH.world = (function () {
       var lampMatA = GH.assets.basic(0x60c8ff, { transparent: true, opacity: 0.85 });
       var lampMatB = GH.assets.basic(0xffd050, { transparent: true, opacity: 0.85 });
       var lampGeo = new THREE.OctahedronGeometry(0.4);
-      // the asphalt itself: curbs, centre line, tyre walls on the corners
+      // the asphalt itself: hills, banks, jumps, rails, curbs, tyre walls
       GH.terrain.buildTrack(group, rw);
       var postEvery = Math.max(2, Math.floor(rw.path.length / 36));
       for (var tp = 0; tp < rw.path.length; tp += postEvery) {

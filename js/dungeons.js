@@ -21,7 +21,12 @@ GH.dungeons = (function () {
     cloister: ['bastion', 'convoy', 'hive'],
     ember: ['fluxways', 'crucible', 'gauntlet'],
     storm: ['raceway', 'fluxways', 'convoy'],
-    null: ['halls', 'crucible', 'heist']
+    null: ['halls', 'crucible', 'heist'],
+    hive: ['heist', 'raceway', 'bastion'],
+    ruins: ['labyrinth', 'hive', 'convoy'],
+    keep: ['bastion', 'crucible', 'gauntlet'],
+    warrens: ['labyrinth', 'halls', 'heist'],
+    sky: ['raceway', 'gauntlet', 'crucible']
   };
 
   D.ARCHETYPES = {
@@ -76,7 +81,12 @@ GH.dungeons = (function () {
     cloister: { name: 'THE SEED ORB', kind: 'orb' },
     ember: { name: 'THE ANCIENT FORGE', kind: 'forge' },
     storm: { name: 'THE SPIRE CAPACITOR', kind: 'capacitor' },
-    null: { name: 'THE VOID ARCHIVE', kind: 'archive' }
+    null: { name: 'THE VOID ARCHIVE', kind: 'archive' },
+    hive: { name: 'THE SPIRE REACTOR', kind: 'capacitor' },
+    ruins: { name: 'THE CITADEL HEART', kind: 'crystal' },
+    keep: { name: 'THE WARDEN ENGINE', kind: 'mech' },
+    warrens: { name: 'THE DEEP FORGE', kind: 'forge' },
+    sky: { name: 'THE CROWN ORB', kind: 'orb' }
   };
 
   // tier scaling: unbounded — every ascension compounds the garrison
@@ -220,23 +230,57 @@ GH.dungeons = (function () {
   // unit space (x right, z south). Point 0 sits by the south entry so the
   // grid lines up with the exit gate. A closed Catmull-Rom spline turns
   // the corners into real racing lines: sweepers, esses, hairpins.
+  // Each circuit also carries a height profile (t along the lap in 0..1 ->
+  // metres above the ground), jump gaps (t ranges with no asphalt), boost
+  // pads (t) and how hard its corners bank. The kart-racer lesson: a lap
+  // should climb, drop, leap and lean, never just turn.
   var TRACKS = {
     wreck: { name: 'DUNE RUN', pts: [
       [0, 0.92], [0.45, 0.9], [0.85, 0.55], [0.62, 0.15], [0.9, -0.35], [0.55, -0.88],
-      [0.05, -0.72], [-0.4, -0.92], [-0.86, -0.5], [-0.55, -0.05], [-0.88, 0.45], [-0.45, 0.88]] },
+      [0.05, -0.72], [-0.4, -0.92], [-0.86, -0.5], [-0.55, -0.05], [-0.88, 0.45], [-0.45, 0.88]],
+      profile: [[0, 0], [0.18, 0], [0.26, 7], [0.32, 7], [0.36, 0], [0.5, 0], [0.56, 5], [0.585, 5], [0.62, 0], [0.8, 2], [0.9, 0], [1, 0]],
+      gaps: [[0.585, 0.615]], boosts: [0.12, 0.55, 0.74], bank: 0.35 },
     storm: { name: 'THUNDER RIDGE', pts: [
       [0, 0.92], [0.55, 0.9], [0.9, 0.5], [0.5, 0.3], [0.15, 0.5], [-0.2, 0.2], [0.25, -0.1],
       [0.75, -0.3], [0.85, -0.78], [0.3, -0.92], [-0.3, -0.75], [-0.82, -0.88], [-0.92, -0.3],
-      [-0.55, 0.0], [-0.9, 0.45], [-0.55, 0.88]] },
+      [-0.55, 0.0], [-0.9, 0.45], [-0.55, 0.88]],
+      profile: [[0, 0], [0.1, 0], [0.2, 12], [0.42, 12], [0.5, 0], [0.62, 0], [0.7, 4], [0.72, 4], [0.76, 0], [1, 0]],
+      gaps: [[0.72, 0.745]], boosts: [0.15, 0.48, 0.9], bank: 0.45 },
     ember: { name: 'CALDERA LOOP', pts: [
       [0, 0.92], [0.6, 0.85], [0.92, 0.3], [0.7, -0.2], [0.9, -0.7], [0.35, -0.92],
-      [-0.1, -0.6], [-0.5, -0.9], [-0.92, -0.5], [-0.7, 0.0], [-0.92, 0.5], [-0.5, 0.88]] },
+      [-0.1, -0.6], [-0.5, -0.9], [-0.92, -0.5], [-0.7, 0.0], [-0.92, 0.5], [-0.5, 0.88]],
+      profile: [[0, 0], [0.3, 0], [0.38, 6], [0.44, 6], [0.5, 0], [0.62, 0], [0.66, 5], [0.68, 5], [0.72, 0], [1, 0]],
+      gaps: [[0.68, 0.705]], boosts: [0.35, 0.65], bank: 0.4 },
     glacier: { name: 'ICEFALL', pts: [
       [0, 0.92], [0.5, 0.88], [0.9, 0.6], [0.85, 0.05], [0.4, -0.2], [0.8, -0.6], [0.4, -0.92],
-      [-0.2, -0.75], [-0.75, -0.9], [-0.9, -0.35], [-0.5, 0.05], [-0.9, 0.5], [-0.5, 0.9]] },
+      [-0.2, -0.75], [-0.75, -0.9], [-0.9, -0.35], [-0.5, 0.05], [-0.9, 0.5], [-0.5, 0.9]],
+      profile: [[0, 0], [0.15, 14], [0.3, 14], [0.4, 0], [0.7, 0], [0.78, 8], [0.85, 0], [1, 0]],
+      gaps: [], boosts: [0.42, 0.86], bank: 0.3 },
+    hive: { name: 'SPIRE CIRCUIT', pts: [
+      [0, 0.92], [0.5, 0.9], [0.9, 0.55], [0.55, 0.2], [0.9, -0.2], [0.6, -0.9], [0.0, -0.6],
+      [-0.6, -0.9], [-0.9, -0.2], [-0.55, 0.2], [-0.9, 0.55], [-0.5, 0.9]],
+      profile: [[0, 0], [0.08, 0], [0.16, 18], [0.5, 18], [0.58, 0], [0.7, 0], [0.75, 6], [0.77, 6], [0.8, 0], [1, 0]],
+      gaps: [[0.77, 0.795]], boosts: [0.2, 0.55, 0.9], bank: 0.5 },
+    sky: { name: 'CROWN RING', pts: [
+      [0, 0.92], [0.6, 0.86], [0.92, 0.3], [0.86, -0.4], [0.4, -0.92], [-0.2, -0.86],
+      [-0.7, -0.9], [-0.92, -0.3], [-0.6, 0.2], [-0.9, 0.6], [-0.4, 0.92]],
+      profile: [[0, 0], [0.1, 0], [0.2, 10], [0.3, 10], [0.34, 0], [0.5, 6], [0.55, 6], [0.6, 0], [0.8, 16], [0.9, 0], [1, 0]],
+      gaps: [[0.3, 0.335], [0.55, 0.585]], boosts: [0.15, 0.48, 0.78], bank: 0.4 },
     def: { name: 'RING', pts: [
-      [0, 0.9], [0.64, 0.64], [0.9, 0], [0.64, -0.64], [0, -0.9], [-0.64, -0.64], [-0.9, 0], [-0.64, 0.64]] }
+      [0, 0.9], [0.64, 0.64], [0.9, 0], [0.64, -0.64], [0, -0.9], [-0.64, -0.64], [-0.9, 0], [-0.64, 0.64]],
+      profile: [[0, 0], [0.4, 5], [0.6, 5], [0.7, 0], [1, 0]], gaps: [], boosts: [0.5], bank: 0.3 }
   };
+  function profileAt(prof, t) {
+    for (var i = 0; i < prof.length - 1; i++) {
+      var a = prof[i], b = prof[i + 1];
+      if (t >= a[0] && t <= b[0]) {
+        var f = (t - a[0]) / Math.max(0.0001, b[0] - a[0]);
+        f = f * f * (3 - 2 * f);
+        return a[1] + (b[1] - a[1]) * f;
+      }
+    }
+    return 0;
+  }
 
   function catmullClosed(pts, samples) {
     var n = pts.length, out = [];
@@ -257,6 +301,19 @@ GH.dungeons = (function () {
     var k = size * 0.42;
     var ctrl = tpl.pts.map(function (p) { return { x: p[0] * k, z: p[1] * k }; });
     var path = catmullClosed(ctrl, 160);
+    var n = path.length;
+    for (var i = 0; i < n; i++) {
+      var t = i / n;
+      var p = path[i];
+      p.elev = profileAt(tpl.profile || [[0, 0], [1, 0]], t);
+      p.gap = (tpl.gaps || []).some(function (gp) { return t >= gp[0] && t < gp[1]; });
+      p.boost = (tpl.boosts || []).some(function (bt) { return Math.abs(t - bt) < 0.012; });
+      // banking follows the corner: the outer edge rises
+      var q = path[(i + 3) % n], r = path[(i - 3 + n) % n];
+      var t1x = q.x - p.x, t1z = q.z - p.z, t0x = p.x - r.x, t0z = p.z - r.z;
+      var turn = Math.atan2(t0x * t1z - t0z * t1x, t0x * t1x + t0z * t1z);
+      p.bank = GH.clamp(turn * 2.2, -1, 1) * (tpl.bank || 0.3);
+    }
     // the ring runs clockwise as authored; rivals and gates follow index order
     return { path: path, gates: 8, laps: 3, r: k, width: 14, name: tpl.name };
   };

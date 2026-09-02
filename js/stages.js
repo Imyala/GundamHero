@@ -13,6 +13,8 @@ GH.stages = [
       var t = [{ id: 'husk', w: 10 }];
       if (w >= 2) t.push({ id: 'shardling', w: 6 + w });
       if (w >= 3) t.push({ id: 'scarab', w: 4 });
+      if (w >= 3) t.push({ id: 'beakstrider', w: 3 });
+      if (w >= 4) t.push({ id: 'tideleech', w: 3 });
       if (w >= 4) t.push({ id: 'spiker', w: 4 });
       if (w >= 5) t.push({ id: 'burrower', w: 3 });
       if (w >= 6) t.push({ id: 'brute', w: 2 + w * 0.2 });
@@ -33,6 +35,7 @@ GH.stages = [
       var t = [{ id: 'husk', w: 8 }, { id: 'shardling', w: 6 + w }];
       if (w >= 2) t.push({ id: 'stalker', w: 6 });
       if (w >= 3) t.push({ id: 'frostwisp', w: 5 });
+      if (w >= 5) t.push({ id: 'howler', w: 2 });
       if (w >= 4) t.push({ id: 'orb', w: 4 });
       if (w >= 6) t.push({ id: 'spiker', w: 4 });
       if (w >= 7) t.push({ id: 'brute', w: 2 + w * 0.25 });
@@ -55,6 +58,8 @@ GH.stages = [
       if (w >= 3) t.push({ id: 'shardling', w: 5 });
       if (w >= 4) t.push({ id: 'creeper', w: 5 });
       if (w >= 5) t.push({ id: 'bloat', w: 4 });
+      if (w >= 3) t.push({ id: 'skitter', w: 5 });
+      if (w >= 6) t.push({ id: 'bellowtoad', w: 3 });
       if (w >= 7) t.push({ id: 'orb', w: 3 });
       if (w >= 8) t.push({ id: 'brute', w: 3 + w * 0.25 });
       return t;
@@ -73,6 +78,8 @@ GH.stages = [
     roster: function (w) {
       var t = [{ id: 'husk', w: 6 }, { id: 'cinder', w: 6 + w * 0.5 }];
       if (w >= 2) t.push({ id: 'crawler', w: 6 });
+      if (w >= 2) t.push({ id: 'cinderhound', w: 6 });
+      if (w >= 6) t.push({ id: 'slaggolem', w: 2 });
       if (w >= 3) t.push({ id: 'orb', w: 4 });
       if (w >= 4) t.push({ id: 'drake', w: 4 });
       if (w >= 5) t.push({ id: 'shardling', w: 5 });
@@ -94,6 +101,7 @@ GH.stages = [
     roster: function (w) {
       var t = [{ id: 'husk', w: 5 }, { id: 'volt', w: 6 + w * 0.5 }];
       if (w >= 2) t.push({ id: 'sentinel', w: 5 });
+      if (w >= 5) t.push({ id: 'rodsentry', w: 2 });
       if (w >= 3) t.push({ id: 'orb', w: 4 });
       if (w >= 4) t.push({ id: 'drake', w: 4 });
       if (w >= 4) t.push({ id: 'shardling', w: 6 });
@@ -119,6 +127,7 @@ GH.stages = [
       ];
       if (w >= 2) t.push({ id: 'phantom', w: 6 });
       if (w >= 3) t.push({ id: 'nullshard', w: 6 });
+      if (w >= 4) t.push({ id: 'eyecluster', w: 4 });
       if (w >= 3) t.push({ id: 'orb', w: 4 });
       if (w >= 4) t.push({ id: 'spiker', w: 5 });
       if (w >= 5) t.push({ id: 'brute', w: 5 + w * 0.35 });
@@ -129,6 +138,103 @@ GH.stages = [
     hpMult: 4.2, dmgMult: 2.1
   }
 ];
+
+// Expedition-only territories: built places rather than biomes. They
+// never appear in the classic stage ladder, but every world system
+// (textures, weather, dungeons, rosters) reads them like a stage.
+GH.extraZones = [
+  {
+    id: 'hive', hazard: null, name: 'SPIRE HIVE', sub: 'Territory', biome: 'hive city — stacked hab-blocks under a mile-high spire',
+    floor: { base: 0x5a5e6c, dark: '#14161c', mortar: '#2a2e38' },
+    sky: ['#6a5040', '#2a2430', '#0a0a10'],
+    fog: 0x3a3440, hemiSky: 0xb09080, hemiGround: 0x1c1c26, sun: 0xffd0a0,
+    wall: { base: '#4a4f5c', top: '#1a1c24' },
+    props: ['pillar'],
+    roster: function (w) {
+      var t = [{ id: 'husk', w: 6 }, { id: 'slinger', w: 7 }];
+      if (w >= 2) t.push({ id: 'crawler', w: 4 });
+      if (w >= 3) t.push({ id: 'shardling', w: 5 });
+      if (w >= 4) t.push({ id: 'habbrute', w: 3 });
+      if (w >= 5) t.push({ id: 'drake', w: 3 });
+      if (w >= 6) t.push({ id: 'rodsentry', w: 2 });
+      return t;
+    },
+    tint: 0x7a7e8c, unlocks: 'strix', hpMult: 3.0, dmgMult: 1.7
+  },
+  {
+    id: 'ruins', hazard: 'vines', name: 'FALLEN CITADEL', sub: 'Territory', biome: 'drowned ruins — colonnades, arches, a dead city under moss',
+    floor: { base: 0x6a7a58, dark: '#1c2410', mortar: '#3a4424' },
+    sky: ['#c8d8c0', '#6a8a70', '#1a2a20'],
+    fog: 0x8aa090, hemiSky: 0xd0e0c8, hemiGround: 0x2a3a2a, sun: 0xfff4d8,
+    wall: { base: '#7a7a74', top: '#2a3020' },
+    props: ['pillar', 'tree'],
+    roster: function (w) {
+      var t = [{ id: 'husk', w: 6 }, { id: 'gravestalker', w: 6 }];
+      if (w >= 2) t.push({ id: 'lurker', w: 4 });
+      if (w >= 3) t.push({ id: 'carrionkite', w: 4 });
+      if (w >= 4) t.push({ id: 'orb', w: 3 });
+      if (w >= 5) t.push({ id: 'slaggolem', w: 2 });
+      if (w >= 6) t.push({ id: 'phantom', w: 3 });
+      return t;
+    },
+    tint: 0x90a888, unlocks: 'viper', hpMult: 2.0, dmgMult: 1.4
+  },
+  {
+    id: 'keep', hazard: null, name: 'BASTION KEEP', sub: 'Territory', biome: 'walled keep — curtain wall, moat, donjon, a garrison in the wards',
+    floor: { base: 0x7a7a80, dark: '#1c1c22', mortar: '#3a3a44' },
+    sky: ['#b8c0d0', '#5a6a80', '#1a2030'],
+    fog: 0x7a8494, hemiSky: 0xc8d0e0, hemiGround: 0x2a2e3a, sun: 0xfff0e0,
+    wall: { base: '#6a6a72', top: '#2a2a30' },
+    props: ['pillar'],
+    roster: function (w) {
+      var t = [{ id: 'husk', w: 6 }, { id: 'wardenknight', w: 6 }];
+      if (w >= 2) t.push({ id: 'ballista', w: 2 });
+      if (w >= 3) t.push({ id: 'stalker', w: 4 });
+      if (w >= 4) t.push({ id: 'tideleech', w: 3 });
+      if (w >= 5) t.push({ id: 'brute', w: 3 });
+      if (w >= 6) t.push({ id: 'drake', w: 3 });
+      return t;
+    },
+    tint: 0x9098a8, unlocks: 'titan', hpMult: 3.2, dmgMult: 1.8
+  },
+  {
+    id: 'warrens', hazard: 'rifts', name: 'DEEP WARRENS', sub: 'Territory', biome: 'undercity — cave cities cut into rock, joined by tunnels',
+    floor: { base: 0x4a3a50, dark: '#0a080e', mortar: '#1e1826' },
+    sky: ['#1a1420', '#0a080e', '#000000'],
+    fog: 0x120e18, hemiSky: 0x9a8ab8, hemiGround: 0x1c1626, sun: 0xb0a8d0,
+    wall: { base: '#3a3040', top: '#0a080e' },
+    props: ['crystal'],
+    roster: function (w) {
+      var t = [{ id: 'glowmite', w: 8 }, { id: 'husk', w: 4 }];
+      if (w >= 2) t.push({ id: 'tunnelmaw', w: 3 });
+      if (w >= 3) t.push({ id: 'bellowtoad', w: 4 });
+      if (w >= 4) t.push({ id: 'fungalshambler', w: 3 });
+      if (w >= 5) t.push({ id: 'phantom', w: 3 });
+      if (w >= 6) t.push({ id: 'creeper', w: 4 });
+      return t;
+    },
+    tint: 0x6a5a80, unlocks: 'morrow', hpMult: 4.0, dmgMult: 2.0
+  },
+  {
+    id: 'sky', hazard: 'lightning', name: 'AETHER COURT', sub: 'Territory', biome: 'a kingdom in the sky — islands, bridges, the court of the crown',
+    floor: { base: 0xe8e8f0, dark: '#5a5a70', mortar: '#a0a0b8' },
+    sky: ['#ffffff', '#8ac0ff', '#3060c0'],
+    fog: 0xd8e4ff, hemiSky: 0xffffff, hemiGround: 0x6080b0, sun: 0xfff8e0,
+    wall: { base: '#f0f0f4', top: '#8090b0' },
+    props: ['pillar'],
+    roster: function (w) {
+      var t = [{ id: 'cloudwisp', w: 7 }, { id: 'aetherray', w: 5 }];
+      if (w >= 2) t.push({ id: 'shardling', w: 4 });
+      if (w >= 3) t.push({ id: 'sentinel', w: 4 });
+      if (w >= 4) t.push({ id: 'wardenknight', w: 3 });
+      if (w >= 5) t.push({ id: 'eyecluster', w: 3 });
+      if (w >= 6) t.push({ id: 'phantom', w: 3 });
+      return t;
+    },
+    tint: 0xc8d0f0, unlocks: 'hexen', hpMult: 4.2, dmgMult: 2.1
+  }
+];
+GH.allStages = function () { return GH.stages.concat(GH.extraZones); };
 
 // Wave plan for a stage: timers, spawn rates, set-piece waves.
 // Wave 10: warden midboss. Wave 16: OVERRUN spike. Wave 18: carapace midboss.

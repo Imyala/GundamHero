@@ -100,6 +100,108 @@ GH.enemyDefs = {
     behavior: 'ranged', shootInterval: 2.0, shotSpeed: 13, keepDist: 9, shotElement: 'void'
   },
 
+  // ---- more fauna: beaks, leeches, callers, golems, turrets, masks ----
+  beakstrider: {
+    name: 'Beak Strider',        // dune coast: tall runner, brutal charge
+    hp: 60, speed: 4.6, damage: 14, radius: 0.6, xp: 4, mass: 1.4,
+    behavior: 'dasher', dashInterval: 3.6, dashSpeed: 24, dashTime: 0.5
+  },
+  tideleech: {
+    name: 'Tide Leech',          // shallows: latches on and bleeds you
+    hp: 26, speed: 4.4, damage: 6, radius: 0.45, xp: 2, mass: 0.5,
+    behavior: 'latcher'
+  },
+  howler: {
+    name: 'Howler',              // frost range: keeps its distance and calls the pack
+    hp: 90, speed: 3.6, damage: 10, radius: 0.75, xp: 7, mass: 2,
+    behavior: 'caller', keepDist: 11, callInterval: 8, calls: 'stalker', callCount: 2
+  },
+  skitter: {
+    name: 'Mandible Skitter',    // rain canopy: fast, climbs onto you
+    hp: 34, speed: 5.6, damage: 9, radius: 0.5, xp: 3, mass: 0.7,
+    behavior: 'latcher'
+  },
+  bellowtoad: {
+    name: 'Bellow Toad',         // canopy and warrens: lobs heavy spit
+    hp: 84, speed: 2.0, damage: 16, radius: 0.85, xp: 5, mass: 2.4,
+    behavior: 'ranged', shootInterval: 3.0, shotSpeed: 8, keepDist: 9, shotElement: 'void'
+  },
+  cinderhound: {
+    name: 'Cinder Hound',        // cinder wastes: pack chaser
+    hp: 30, speed: 5.4, damage: 9, radius: 0.5, xp: 2, mass: 0.7,
+    behavior: 'chase'
+  },
+  slaggolem: {
+    name: 'Slag Golem',          // cinder wastes and ruins: slow, slams the ground
+    hp: 220, speed: 1.9, damage: 22, radius: 1.1, xp: 10, mass: 6,
+    behavior: 'slammer', slamInterval: 4.5, armorMult: 0.7
+  },
+  rodsentry: {
+    name: 'Rod Sentry',          // highlands: rooted arc turret
+    hp: 140, speed: 0, damage: 10, radius: 0.8, xp: 6, mass: 8,
+    behavior: 'turret', shootInterval: 2.6, shotSpeed: 15, burst: 3, shotElement: 'shock'
+  },
+  eyecluster: {
+    name: 'Eye Cluster',         // void: three-way spread shots
+    hp: 48, speed: 2.6, damage: 8, radius: 0.55, xp: 4, mass: 0.9,
+    behavior: 'ranged', shootInterval: 2.4, shotSpeed: 12, keepDist: 10, shotElement: 'void', spread: 3
+  },
+  slinger: {
+    name: 'Masked Slinger',      // hive: mechanical legs, a mask, a gun, no courage
+    hp: 56, speed: 3.4, damage: 9, radius: 0.55, xp: 4, mass: 1,
+    behavior: 'ranged', shootInterval: 2.2, shotSpeed: 16, keepDist: 13, burst: 2
+  },
+  habbrute: {
+    name: 'Hab Brute',           // hive: the big one
+    hp: 170, speed: 2.3, damage: 18, radius: 1.0, xp: 7, mass: 3.5,
+    behavior: 'chase'
+  },
+  wardenknight: {
+    name: 'Warden Knight',       // keep: shielded, lunges
+    hp: 120, speed: 3.2, damage: 16, radius: 0.7, xp: 7, mass: 2.5,
+    behavior: 'dasher', dashInterval: 3.4, dashSpeed: 17, dashTime: 0.4, armorMult: 0.5
+  },
+  ballista: {
+    name: 'Ballista',            // keep: rooted bolt thrower
+    hp: 160, speed: 0, damage: 22, radius: 0.9, xp: 6, mass: 8,
+    behavior: 'turret', shootInterval: 3.2, shotSpeed: 20, burst: 1
+  },
+  gravestalker: {
+    name: 'Grave Stalker',       // ruins: pale pack hunter
+    hp: 50, speed: 5.0, damage: 12, radius: 0.55, xp: 4, mass: 1,
+    behavior: 'dasher', dashInterval: 3.0, dashSpeed: 19, dashTime: 0.38
+  },
+  carrionkite: {
+    name: 'Carrion Kite',        // ruins: flyer
+    hp: 60, speed: 5.2, damage: 11, radius: 0.65, xp: 4, mass: 1.3,
+    behavior: 'flyer', shootInterval: 2.6, shotSpeed: 13
+  },
+  glowmite: {
+    name: 'Glow Mite',           // warrens: swarm
+    hp: 12, speed: 6.2, damage: 5, radius: 0.4, xp: 1, mass: 0.5,
+    behavior: 'chase'
+  },
+  tunnelmaw: {
+    name: 'Tunnel Maw',          // warrens: burrower
+    hp: 90, speed: 7.0, damage: 20, radius: 0.8, xp: 7, mass: 2.5,
+    behavior: 'burrower', surfaceTime: 2.4
+  },
+  fungalshambler: {
+    name: 'Fungal Shambler',     // warrens: spore sac
+    hp: 110, speed: 1.8, damage: 10, radius: 0.85, xp: 5, mass: 2.4,
+    behavior: 'chase', deathCloud: true
+  },
+  aetherray: {
+    name: 'Aether Ray',          // sky: wide-winged glider
+    hp: 66, speed: 5.8, damage: 12, radius: 0.75, xp: 5, mass: 1.4,
+    behavior: 'flyer', shootInterval: 2.2, shotSpeed: 14
+  },
+  cloudwisp: {
+    name: 'Cloud Wisp',          // sky: arc shots
+    hp: 32, speed: 3.2, damage: 8, radius: 0.45, xp: 2, mass: 0.6,
+    behavior: 'ranged', shootInterval: 2.2, shotSpeed: 12, keepDist: 8, shotElement: 'shock'
+  },
+
   // ---- midbosses ----
   warden: {
     name: 'RUST WARDEN', boss: true, mid: true,
@@ -161,6 +263,26 @@ GH.enemyBuilders = {
   sentinel: function () { return GH.models.buildSentinel(); },
   phantom: function () { return GH.models.buildPhantom(); },
   nullshard: function () { return GH.models.buildNullShard(); },
+  beakstrider: function () { return GH.models.buildBeakStrider(); },
+  tideleech: function () { return GH.models.buildLeech(); },
+  howler: function () { return GH.models.buildHowler(); },
+  skitter: function () { return GH.models.buildSkitter(); },
+  bellowtoad: function () { return GH.models.buildToad(); },
+  cinderhound: function () { return GH.models.buildHound(); },
+  slaggolem: function (zone) { return zone === 'ruins' ? GH.models.buildGolem(0x6a6a64, 0x60c0a0) : GH.models.buildGolem(); },
+  rodsentry: function () { return GH.models.buildTurret('rod'); },
+  eyecluster: function () { return GH.models.buildEyeCluster(); },
+  slinger: function () { return GH.models.buildSlinger(); },
+  habbrute: function () { return GH.models.buildHusk(1.7, 0x4a4f5c); },
+  wardenknight: function () { return GH.models.buildKnight(); },
+  ballista: function () { return GH.models.buildTurret('ballista'); },
+  gravestalker: function () { return GH.models.buildStalker(0x9a9aa0); },
+  carrionkite: function () { return GH.models.buildDrake('ruins'); },
+  glowmite: function () { return GH.models.buildShardling(0x60e0c0); },
+  tunnelmaw: function () { return GH.models.buildBurrower(0x5a4a70); },
+  fungalshambler: function () { return GH.models.buildBloat(0x6a5a8a); },
+  aetherray: function () { return GH.models.buildRay(); },
+  cloudwisp: function () { return GH.models.buildFrostWisp(0xe8e0ff); },
   creeper: function () { return GH.models.buildCreeper(); },
   cinder: function () { return GH.models.buildCinder(); },
   volt: function () { return GH.models.buildVolt(); },

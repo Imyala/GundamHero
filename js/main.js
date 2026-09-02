@@ -1035,7 +1035,7 @@
     for (var k in (w.dgTier || {})) { cleared++; totalTiers += w.dgTier[k]; }
     document.getElementById('map-head').innerHTML =
       'NESTS CLEANSED <b>' + Object.keys(w.nests).length + '/' + GH.world.totalNests() + '</b>' +
-      ' · DUNGEONS ASCENDED <b>' + cleared + '/24</b>' +
+      ' · DUNGEONS ASCENDED <b>' + cleared + '/' + (GH.world.ZONES.length * 4) + '</b>' +
       ' · TOTAL TIERS CLIMBED <b>' + totalTiers + '</b>' +
       (harrow ? ' · <span class="mp-harrow">THE HARROW: ' + GH.world.stageFor(harrow.zone).name + '</span>' : '');
     var wrap = document.getElementById('map-zones');
