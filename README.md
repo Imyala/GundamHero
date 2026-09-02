@@ -46,12 +46,22 @@ python3 -m http.server
 
 Then visit `http://localhost:8000`.
 
+## Design Bible
+
+The target design (a Gun Metal style transforming mech game with NFS Underground handling in vehicle
+form and Sacred/WoW build depth) lives in [`docs/design/`](docs/design/00-overview.md). The research
+it is distilled from (Gun Metal, Granvir, Vital Shell, NFS Underground, Armagetron, Sacred Gold, WoW,
+Mobile Suit Gundam, Evangelion, Gurren Lagann) is in [`docs/research/`](docs/research/README.md).
+Note: the code currently calls the game **HERO FRAME**; the design docs explain the gap and the roadmap.
+
 ## Project Structure
 
 - `/js` — game logic and systems
 - `/css` — UI and presentation styles
 - `/lib` — third-party runtime libraries
 - `/dist` — bundled output
+- `/docs/design` — design bible (10 documents)
+- `/docs/research` — raw research reports
 
 ## Roadmap Ideas
 
