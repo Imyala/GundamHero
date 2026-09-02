@@ -2,7 +2,11 @@
 // Everything is generated at runtime on canvases; no binary assets.
 GH.assets = (function () {
   var A = {};
-  A.PSX_SNAP = 96; // vertex snap grid (lower = wobblier). 0 disables.
+  A.PSX_SNAP = 1; // 1 = snap verts to the real render pixel grid; 0 disables.
+  // the snap grid tracks the render target: snapping to a coarser grid than
+  // the framebuffer made every mesh lurch several pixels as the camera moved
+  A.snap = { value: new THREE.Vector2(320, 180) };
+  A.setSnap = function (w, h) { A.snap.value.set(Math.max(1, w / 2), Math.max(1, h / 2)); };
 
   function makeCanvas(size) {
     var c = document.createElement('canvas');
@@ -135,9 +139,50 @@ GH.assets = (function () {
     return t;
   }
 
+  // ---- biome ground detail: tiling noise sheets, one per surface ----
+  function groundCanvas(kind) {
+    var S = 128;
+    var c = makeCanvas(S), ctx = c.getContext('2d');
+    var base = { sand: '#d8c08a', snow: '#f0f4fa', moss: '#5a7a3a', basalt: '#3a3234', slate: '#6a6e80', void: '#9a92aa' }[kind] || '#888';
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, S, S);
+    var img = ctx.getImageData(0, 0, S, S), d = img.data;
+    for (var y = 0; y < S; y++) {
+      for (var x = 0; x < S; x++) {
+        var i = (y * S + x) * 4;
+        var n = (Math.random() - 0.5) * 22;
+        if (kind === 'sand') {
+          // wind ripples: soft diagonal bands
+          n += Math.sin((x * 0.7 + y * 0.35) * 0.55) * 14;
+        } else if (kind === 'snow') {
+          n *= 0.5;
+          n += Math.sin(x * 0.4) * Math.sin(y * 0.37) * 5;
+        } else if (kind === 'moss') {
+          n += (Math.random() < 0.08 ? 26 : 0) - 6;
+        } else if (kind === 'basalt') {
+          // cracked plates: dark seams on a grid, warm speckle
+          if ((x % 32) < 2 || (y % 32) < 2) n -= 30;
+          if (Math.random() < 0.03) { d[i] += 40; }
+        } else if (kind === 'slate') {
+          n += ((y % 16) < 2 ? -22 : 0) + Math.sin(x * 0.9) * 4;
+        } else if (kind === 'void') {
+          if ((x % 16) === 0 || (y % 16) === 0) n -= 26;
+          if (Math.random() < 0.02) { d[i + 2] += 60; }
+        }
+        d[i] += n; d[i + 1] += n; d[i + 2] += n;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+
   A.init = function () {
     A._mats = {};
     A.stageTex = {};
+    A.groundTex = {};
+    ['sand', 'snow', 'moss', 'basalt', 'slate', 'void'].forEach(function (k) {
+      A.groundTex[k] = texFromCanvas(groundCanvas(k), 1, true);
+    });
     GH.stages.forEach(function (st) {
       A.stageTex[st.id] = {
         floor: texFromCanvas(cobbleCanvas(128, st.floor.base, st.floor.mortar, st.floor.dark), 20, true),
@@ -186,11 +231,11 @@ GH.assets = (function () {
   function psxPatch(mat) {
     if (!A.PSX_SNAP) return mat;
     mat.onBeforeCompile = function (shader) {
-      shader.vertexShader = shader.vertexShader.replace(
+      shader.uniforms.uSnap = A.snap;
+      shader.vertexShader = 'uniform vec2 uSnap;\n' + shader.vertexShader.replace(
         '#include <project_vertex>',
         '#include <project_vertex>\n' +
-        'gl_Position.xy = floor(gl_Position.xy / gl_Position.w * ' + A.PSX_SNAP.toFixed(1) +
-        ') / ' + A.PSX_SNAP.toFixed(1) + ' * gl_Position.w;'
+        'gl_Position.xy = floor(gl_Position.xy / gl_Position.w * uSnap) / uSnap * gl_Position.w;'
       );
     };
     return mat;

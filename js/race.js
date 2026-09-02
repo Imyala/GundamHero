@@ -60,12 +60,13 @@ GH.race = (function () {
   function startDuel() {
     var C = GH.world.DUEL_PIT;
     PIT.cx = C.x; PIT.cz = C.z;
+    PIT.y = GH.terrain.h(C.x, C.z);
     // pit floor + boundary glow
     var floor = new THREE.Mesh(
       new THREE.PlaneGeometry(PIT.half * 2 + 1, PIT.half * 2 + 1),
       new THREE.MeshBasicMaterial({ color: 0x101820, transparent: true, opacity: 0.85 }));
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(PIT.cx, 0.05, PIT.cz);
+    floor.position.set(PIT.cx, PIT.y + 0.05, PIT.cz);
     ctx.scene.add(floor);
     extras.push(floor);
     for (var s = 0; s < 4; s++) {
@@ -73,7 +74,7 @@ GH.race = (function () {
         s < 2 ? PIT.half * 2 : 0.2, 1.1, s < 2 ? 0.2 : PIT.half * 2),
         new THREE.MeshBasicMaterial({ color: 0x60c8ff, transparent: true, opacity: 0.5 }));
       edge.position.set(
-        PIT.cx + (s === 2 ? -PIT.half : s === 3 ? PIT.half : 0), 0.55,
+        PIT.cx + (s === 2 ? -PIT.half : s === 3 ? PIT.half : 0), PIT.y + 0.55,
         PIT.cz + (s === 0 ? -PIT.half : s === 1 ? PIT.half : 0));
       ctx.scene.add(edge);
       extras.push(edge);
@@ -96,7 +97,7 @@ GH.race = (function () {
         mesh: i === 0 ? ctx.speeder : makeRiderMesh(i)
       });
       riders[i].mesh.visible = true;
-      riders[i].mesh.position.set(riders[i].x, 0.1, riders[i].z);
+      riders[i].mesh.position.set(riders[i].x, GH.terrain.h(riders[i].x, riders[i].z) + 0.1, riders[i].z);
     }
   }
 
@@ -110,7 +111,7 @@ GH.race = (function () {
         new THREE.MeshBasicMaterial({
           color: TRAIL_COLORS[r.idx], transparent: true, opacity: 0.65
         }));
-      mesh.position.set((x1 + r.x) / 2, 0.5, (z1 + r.z) / 2);
+      mesh.position.set((x1 + r.x) / 2, GH.terrain.h((x1 + r.x) / 2, (z1 + r.z) / 2) + 0.5, (z1 + r.z) / 2);
       mesh.rotation.y = Math.atan2(dx, dz);
       ctx.scene.add(mesh);
       var wall = { x1: x1, z1: z1, x2: r.x, z2: r.z, mesh: mesh, owner: r.idx };
@@ -200,7 +201,7 @@ GH.race = (function () {
 
       if (duelHits(r.x, r.z, i, true)) { eliminate(r); continue; }
 
-      r.mesh.position.set(r.x, 0.12 + Math.sin(raceT * 6 + i) * 0.05, r.z);
+      r.mesh.position.set(r.x, GH.terrain.h(r.x, r.z) + 0.12 + Math.sin(raceT * 6 + i) * 0.05, r.z);
       r.mesh.rotation.y = r.heading;
       if (r.mesh.userData.flames) {
         r.mesh.userData.flames.forEach(function (fl) { fl.visible = true; fl.scale.y = 1.4; });
@@ -308,7 +309,7 @@ GH.race = (function () {
         }
       }
 
-      r.mesh.position.set(r.x, 0.14 + Math.sin(raceT * 5 + i) * 0.06, r.z);
+      r.mesh.position.set(r.x, GH.terrain.h(r.x, r.z) + 0.14 + Math.sin(raceT * 5 + i) * 0.06, r.z);
       r.mesh.rotation.y = r.heading;
       r.mesh.rotation.z = 0;
       if (r.mesh.userData.flames) {

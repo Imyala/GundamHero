@@ -40,7 +40,9 @@
 
   function resize() {
     var w = window.innerWidth, h = window.innerHeight;
-    renderer.setSize(Math.max(2, Math.floor(w / PIXEL_SCALE)), Math.max(2, Math.floor(h / PIXEL_SCALE)), false);
+    var rw = Math.max(2, Math.floor(w / PIXEL_SCALE)), rh = Math.max(2, Math.floor(h / PIXEL_SCALE));
+    renderer.setSize(rw, rh, false);
+    GH.assets.setSnap(rw, rh);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     var cam = GH.game.camera();

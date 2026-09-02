@@ -43,6 +43,63 @@ GH.enemyDefs = {
     behavior: 'ranged', shootInterval: 2.0, shotSpeed: 12, keepDist: 8, shotElement: 'shock'
   },
 
+  // ---- zone-native hostiles: each territory fields its own fauna ----
+  scarab: {
+    name: 'Dune Scarab',         // dune coast: armoured, slow, shrugs off hits
+    hp: 80, speed: 2.8, damage: 12, radius: 0.7, xp: 4, mass: 2.5,
+    behavior: 'chase', armorMult: 0.6
+  },
+  burrower: {
+    name: 'Sand Maw',            // dune coast: tunnels under you, erupts to bite
+    hp: 70, speed: 7.5, damage: 18, radius: 0.75, xp: 6, mass: 2,
+    behavior: 'burrower', surfaceTime: 2.6
+  },
+  stalker: {
+    name: 'Frost Stalker',       // frost range: pack hunter, pounces
+    hp: 44, speed: 5.0, damage: 11, radius: 0.55, xp: 3, mass: 1,
+    behavior: 'dasher', dashInterval: 3.2, dashSpeed: 19, dashTime: 0.38
+  },
+  frostwisp: {
+    name: 'Rime Wisp',           // frost range: chilling shots slow the frame
+    hp: 30, speed: 3.0, damage: 7, radius: 0.45, xp: 2, mass: 0.6,
+    behavior: 'ranged', shootInterval: 2.3, shotSpeed: 11, keepDist: 8, shotElement: 'frost'
+  },
+  lurker: {
+    name: 'Vine Lurker',         // rain canopy: hides as a bush, snares, lunges
+    hp: 58, speed: 6.2, damage: 15, radius: 0.6, xp: 4, mass: 1.3,
+    behavior: 'ambusher', dashInterval: 3.5, dashSpeed: 15, dashTime: 0.45
+  },
+  bloat: {
+    name: 'Spore Bloat',         // rain canopy: slow sac, bursts into a chilling cloud
+    hp: 95, speed: 1.7, damage: 9, radius: 0.8, xp: 4, mass: 2.2,
+    behavior: 'chase', deathCloud: true
+  },
+  crawler: {
+    name: 'Magma Crawler',       // cinder wastes: leaves a burning trail behind it
+    hp: 50, speed: 3.9, damage: 10, radius: 0.6, xp: 3, mass: 1.2,
+    behavior: 'chase', trailBurn: true
+  },
+  drake: {
+    name: 'Drake',               // cinder wastes / highlands: circles overhead, dives
+    hp: 72, speed: 5.4, damage: 13, radius: 0.7, xp: 5, mass: 1.5,
+    behavior: 'flyer', shootInterval: 2.4, shotSpeed: 14
+  },
+  sentinel: {
+    name: 'Storm Sentinel',      // highlands: floating obelisk, three-shot arc bursts
+    hp: 64, speed: 2.4, damage: 9, radius: 0.6, xp: 4, mass: 1.5,
+    behavior: 'ranged', shootInterval: 3.0, shotSpeed: 13, keepDist: 10, shotElement: 'shock', burst: 3
+  },
+  phantom: {
+    name: 'Void Phantom',        // void sanctum: blinks out, reappears at your back
+    hp: 52, speed: 3.4, damage: 14, radius: 0.55, xp: 5, mass: 1,
+    behavior: 'phantom', blinkInterval: 3.4
+  },
+  nullshard: {
+    name: 'Null Shard',          // void sanctum: crystalline skirmisher
+    hp: 36, speed: 3.0, damage: 8, radius: 0.5, xp: 3, mass: 0.8,
+    behavior: 'ranged', shootInterval: 2.0, shotSpeed: 13, keepDist: 9, shotElement: 'void'
+  },
+
   // ---- midbosses ----
   warden: {
     name: 'RUST WARDEN', boss: true, mid: true,
@@ -84,12 +141,26 @@ GH.enemyDefs = {
     hp: 5600, speed: 2.2, damage: 38, radius: 1.5, xp: 140, mass: 20, behavior: 'corrupt' }
 };
 
+// builders receive the zone id so common fauna wears local colours
+var HUSK_TINT = { wreck: 0xb0a080, glacier: 0xc8d4e0, cloister: 0x6a7a48, ember: 0x5a3a30, storm: 0x6a6e80, null: 0x9a94a8 };
+var BRUTE_TINT = { wreck: 0x8a7a58, glacier: 0x8aa0b8, cloister: 0x4a5a30, ember: 0x3a2420, storm: 0x4a4e60, null: 0x6a6478 };
 GH.enemyBuilders = {
-  husk: function () { return GH.models.buildHusk(1); },
+  husk: function (zone) { return GH.models.buildHusk(1, HUSK_TINT[zone] || 0x9a9a92); },
   shardling: function () { return GH.models.buildShardling(); },
   orb: function () { return GH.models.buildOrb(); },
   spiker: function () { return GH.models.buildSpiker(); },
-  brute: function () { return GH.models.buildHusk(1.7, 0x7a736a); },
+  brute: function (zone) { return GH.models.buildHusk(1.7, BRUTE_TINT[zone] || 0x7a736a); },
+  scarab: function () { return GH.models.buildScarab(); },
+  burrower: function () { return GH.models.buildBurrower(); },
+  stalker: function () { return GH.models.buildStalker(); },
+  frostwisp: function () { return GH.models.buildFrostWisp(); },
+  lurker: function () { return GH.models.buildLurker(); },
+  bloat: function () { return GH.models.buildBloat(); },
+  crawler: function () { return GH.models.buildCrawler(); },
+  drake: function (zone) { return GH.models.buildDrake(zone); },
+  sentinel: function () { return GH.models.buildSentinel(); },
+  phantom: function () { return GH.models.buildPhantom(); },
+  nullshard: function () { return GH.models.buildNullShard(); },
   creeper: function () { return GH.models.buildCreeper(); },
   cinder: function () { return GH.models.buildCinder(); },
   volt: function () { return GH.models.buildVolt(); },

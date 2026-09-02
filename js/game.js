@@ -103,6 +103,9 @@ GH.game = (function () {
 
   var raycaster = new THREE.Raycaster();
   var groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  // terrain height under a point (0 in the flat arenas)
+  function gy(x, z) { return GH.terrain.h(x, z); }
+  var camGround = 0; // smoothed ground height under the camera target
   var tmpV3 = new THREE.Vector3();
 
   // =================================================================
@@ -119,8 +122,8 @@ GH.game = (function () {
 
     hemi = new THREE.HemisphereLight(0xbfe8ff, 0x24485a, 0.95);
     scene.add(hemi);
-    sun = new THREE.DirectionalLight(0xfff4d8, 0.85);
-    sun.position.set(8, 20, 6);
+    sun = new THREE.DirectionalLight(0xfff4d8, 0.9);
+    sun.position.set(14, 13, 9); // low enough that slopes shade
     scene.add(sun);
 
     floor = new THREE.Mesh(
@@ -192,7 +195,7 @@ GH.game = (function () {
       spawn: function (x, y, z, text, cls, size) {
         var n = pool[idx]; idx = (idx + 1) % pool.length;
         n.life = 0.75;
-        n.wx = x + GH.rand(-0.4, 0.4); n.wy = y; n.wz = z;
+        n.wx = x + GH.rand(-0.4, 0.4); n.wy = y + gy(x, z); n.wz = z;
         n.vy = 2.6;
         n.el.textContent = text;
         n.el.className = 'dmg-num' + (cls ? ' ' + cls : '');
@@ -459,7 +462,7 @@ GH.game = (function () {
   function spawnEnemy(typeId, atX, atZ) {
     if (enemies.length > 110) return null;
     var def = GH.enemyDefs[typeId];
-    var mesh = def.corrupt ? GH.buildCorrupt(typeId) : GH.enemyBuilders[typeId]();
+    var mesh = def.corrupt ? GH.buildCorrupt(typeId) : GH.enemyBuilders[typeId](stage ? stage.id : null);
     var x, z;
     if (atX !== undefined) { x = atX; z = atZ; }
     else {
@@ -468,7 +471,7 @@ GH.game = (function () {
       x = GH.clamp(player.x + Math.cos(a) * r, -ARENA_R, ARENA_R);
       z = GH.clamp(player.z + Math.sin(a) * r, -ARENA_R, ARENA_R);
     }
-    mesh.position.set(x, 0, z);
+    mesh.position.set(x, 0 + gy(x, z), z);
     scene.add(mesh);
     var hpMult = def.boss ? Math.max(1, wavePlan.hpMult * 0.55) : wavePlan.hpMult;
     if (def.boss && GH.devWeakBoss) hpMult *= 0.03;
@@ -492,8 +495,15 @@ GH.game = (function () {
       // territorial AI (expedition): guard home ground until provoked
       homeX: x, homeZ: z,
       aggro: !expActive, // arena waves stay all-out; the Reach is territorial
-      wanderT: 0, wanderA: Math.random() * Math.PI * 2
+      wanderT: 0, wanderA: Math.random() * Math.PI * 2,
+      // zone-native behaviours
+      hgt: 0, buried: def.behavior === 'burrower', emergeT: 0, surfaceT: 0,
+      phased: 0, blinkT: def.blinkInterval || 0, sprung: false, trailT: 0,
+      burstLeft: 0, burstT: 0, orbitA: Math.random() * Math.PI * 2, diveT: 0
     };
+    if (e.buried && mesh.userData.body) { mesh.userData.body.visible = false; }
+    if (def.behavior === 'ambusher' && mesh.userData.body) { mesh.userData.body.visible = false; }
+    if (def.behavior === 'flyer') e.hgt = 3.0;
     // elites: from wave 6, one in ten spawns carries a modifier
     if (!def.boss && atX === undefined && waveNum >= 6 && Math.random() < 0.10) {
       var mods2 = ['blazing', 'shielded', 'swift', 'volatile', 'vampiric'];
@@ -527,7 +537,10 @@ GH.game = (function () {
   function damageEnemy(e, raw, opts) {
     if (e.dead || G.state !== 'play') return;
     opts = opts || {};
+    if (e.phased > 0) return; // blinked out — nothing to hit
     var dmg = raw;
+    if (e.def.armorMult) dmg *= e.def.armorMult;
+    if (e.buried) dmg *= 0.3;
     var crit = false;
     var inst = opts.inst;
     if (opts.canCrit !== false) {
@@ -603,7 +616,7 @@ GH.game = (function () {
         if (e.mesh.parent) e.mesh.parent.remove(e.mesh);
         // swap the structure for its dead husk
         var deadNest = GH.models.buildNest(true);
-        deadNest.position.set(e.x, 0, e.z);
+        deadNest.position.set(e.x, 0 + gy(e.x, e.z), e.z);
         worldH.group.add(deadNest);
         var cc = cleanseCount();
         queueAnnounce('NEST BROKEN — ' + cc.dead + '/' + cc.total + ' CLEANSED', 24);
@@ -690,6 +703,12 @@ GH.game = (function () {
       effects.push({ kind: 'patch', x: e.x, z: e.z, t: 3, radius: 1.3, dps: 5,
         mesh: groundDisc(e.x, e.z, 1.3, 0xff5020, 0.3) });
     }
+    if (e.def.deathCloud) {
+      // a chilling spore cloud: slow poison that saps the servos
+      effects.push({ kind: 'patch', x: e.x, z: e.z, t: 4.5, radius: 1.9, dps: 3, chill: true,
+        mesh: groundDisc(e.x, e.z, 1.9, 0x80c040, 0.3) });
+      spawnBurst(e.x, 0.8, e.z, 0xa0e060, 12);
+    }
     if (e.elite === 'volatile' || e.modVolatile) {
       // detonates on death — respect the ARC ward
       spawnBurst(e.x, 1, e.z, 0xff40a0, 14);
@@ -736,7 +755,7 @@ GH.game = (function () {
   }
 
   function addAt(mesh, x, z) {
-    mesh.position.set(x, 0, z);
+    mesh.position.set(x, 0 + gy(x, z), z);
     scene.add(mesh);
     return mesh;
   }
@@ -745,7 +764,7 @@ GH.game = (function () {
     var m = new THREE.Mesh(new THREE.CircleGeometry(r, 16),
       new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: opacity, depthWrite: false }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(x, 0.04, z);
+    m.position.set(x, 0.04 + gy(x, z), z);
     scene.add(m);
     return m;
   }
@@ -799,7 +818,7 @@ GH.game = (function () {
       if (def.behavior === 'static') continue;
       if (e.stun > 0) {
         e.stun -= dt;
-        e.mesh.position.set(e.x, Math.sin(runTime * 30) * 0.03, e.z);
+        e.mesh.position.set(e.x, gy(e.x, e.z) + Math.sin(runTime * 30) * 0.03, e.z);
         continue;
       }
       var spd = def.speed * (e.slowT > 0 ? 0.6 : 1) * (weekly ? weekly.mods.espd : 1) *
@@ -822,6 +841,11 @@ GH.game = (function () {
       // They wake when you close in (or wound them), give chase, and
       // walk home when you leave their hunting range. Event spawns
       // (sieges, defenses, summons, guardians) never stand down.
+      if (expActive && !def.boss && !e.event && def.behavior === 'ambusher' && !e.sprung) {
+        // a lurker is scenery until you are on top of it
+        if (dist < 6.5 || e.hp < e.maxHp) e.aggro = true;
+        if (!e.aggro) continue;
+      }
       if (expActive && !def.boss && !e.event) {
         var aggroR = def.behavior === 'ranged' ? 16 : 11;
         if (!e.aggro) {
@@ -853,7 +877,7 @@ GH.game = (function () {
           nx = mx; nz = mz;
           e.x += (mx * spd) * dt;
           e.z += (mz * spd) * dt;
-          e.mesh.position.set(e.x, 0, e.z);
+          e.mesh.position.set(e.x, 0 + gy(e.x, e.z), e.z);
           e.mesh.rotation.y = Math.atan2(nx, nz);
           var idleLimbs = e.mesh.userData.limbs;
           if (idleLimbs) {
@@ -871,10 +895,111 @@ GH.game = (function () {
         if (dist > def.keepDist + 1) { mx = nx; mz = nz; }
         else if (dist < def.keepDist - 2) { mx = -nx; mz = -nz; }
         e.shootCd -= dt;
-        if (e.shootCd <= 0 && dist < 22) {
+        if (e.burstLeft > 0) {
+          e.burstT -= dt;
+          if (e.burstT <= 0) {
+            e.burstT = 0.14; e.burstLeft--;
+            spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage * 0.7, def.shotElement);
+          }
+        } else if (e.shootCd <= 0 && dist < 22) {
           e.shootCd = def.shootInterval;
-          spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage * 0.9, def.shotElement);
+          if (def.burst) { e.burstLeft = def.burst; e.burstT = 0; }
+          else spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage * 0.9, def.shotElement);
         }
+        if (def.name === 'Storm Sentinel') e.hgt = 0.6 + Math.sin(e.anim * 0.5) * 0.25;
+      } else if (def.behavior === 'burrower') {
+        if (e.buried) {
+          // tunnelling: fast and unstoppable, a plume of sand marks the line
+          mx = nx; mz = nz; spd = def.speed;
+          if (e.mesh.userData.plume) e.mesh.userData.plume.visible = true;
+          if (dist < 3.4 && e.emergeT <= 0) {
+            e.emergeT = 0.55;
+            spawnTelegraph(e.x, e.z, 2.2, 0.55, e.damage);
+          }
+          if (e.emergeT > 0) {
+            spd = 0; mx = 0; mz = 0;
+            e.emergeT -= dt;
+            if (e.emergeT <= 0) {
+              e.buried = false; e.surfaceT = def.surfaceTime || 2.5;
+              if (e.mesh.userData.body) e.mesh.userData.body.visible = true;
+              if (e.mesh.userData.plume) e.mesh.userData.plume.visible = false;
+              e.popT = 0.25;
+              spawnBurst(e.x, 0.4, e.z, 0xd8c090, 14);
+              GH.audio.explode();
+            }
+          }
+        } else {
+          mx = nx; mz = nz; spd = def.speed * 0.28;
+          e.surfaceT -= dt;
+          if (e.surfaceT <= 0) {
+            e.buried = true;
+            if (e.mesh.userData.body) e.mesh.userData.body.visible = false;
+            spawnBurst(e.x, 0.3, e.z, 0xd8c090, 8);
+          }
+        }
+      } else if (def.behavior === 'flyer') {
+        e.orbitA += dt * 0.9;
+        if (e.diveT > 0) {
+          e.diveT -= dt;
+          mx = nx; mz = nz; spd = def.speed * 1.9;
+          e.hgt += (0.7 - e.hgt) * Math.min(1, dt * 6);
+        } else {
+          var ox2 = tgtP.x + Math.sin(e.orbitA) * 7.5, oz2 = tgtP.z + Math.cos(e.orbitA) * 7.5;
+          var oa = GH.angleTo(e.x, e.z, ox2, oz2);
+          mx = Math.sin(oa); mz = Math.cos(oa);
+          e.hgt += (3.2 + Math.sin(e.anim) * 0.3 - e.hgt) * Math.min(1, dt * 3);
+          e.shootCd -= dt;
+          if (e.shootCd <= 0 && dist < 14) {
+            e.shootCd = def.shootInterval;
+            e.diveT = 0.7;
+            GH.audio.dash();
+          }
+        }
+        if (e.mesh.userData.wings) {
+          var wf = Math.sin(e.anim * 2.5) * 0.6;
+          e.mesh.userData.wings[0].rotation.z = wf;
+          e.mesh.userData.wings[1].rotation.z = -wf;
+        }
+      } else if (def.behavior === 'ambusher') {
+        if (!e.sprung) {
+          mx = 0; mz = 0; spd = 0;
+          if (dist < 6.5 || e.hp < e.maxHp) {
+            e.sprung = true;
+            if (e.mesh.userData.body) e.mesh.userData.body.visible = true;
+            if (e.mesh.userData.cover) e.mesh.userData.cover.visible = false;
+            e.popT = 0.25;
+            spawnBurst(e.x, 0.6, e.z, 0x60c040, 10);
+            GH.audio.hit();
+            if (dist < 4.2 && tgtP === player) { player.snareT = 0.9; announce('SNARED', 16); }
+            e.dashing = def.dashTime; e.dashDirX = nx; e.dashDirZ = nz;
+          }
+        } else if (e.dashing > 0) {
+          e.dashing -= dt; spd = def.dashSpeed; mx = e.dashDirX; mz = e.dashDirZ;
+        } else {
+          mx = nx; mz = nz;
+          e.dashCd -= dt;
+          if (e.dashCd <= 0 && dist < 9) {
+            e.dashCd = def.dashInterval; e.dashing = def.dashTime; e.dashDirX = nx; e.dashDirZ = nz;
+          }
+        }
+      } else if (def.behavior === 'phantom') {
+        if (e.phased > 0) {
+          e.phased -= dt; spd = 0; mx = 0; mz = 0;
+          if (e.phased <= 0) {
+            var pa2 = Math.random() * Math.PI * 2;
+            e.x = tgtP.x + Math.sin(pa2) * 4.2; e.z = tgtP.z + Math.cos(pa2) * 4.2;
+            e.mesh.visible = true; e.popT = 0.2;
+            spawnBurst(e.x, 1, e.z, 0xc080ff, 10);
+          }
+        } else {
+          mx = nx; mz = nz;
+          e.blinkT -= dt;
+          if (e.blinkT <= 0 && dist > 5) {
+            e.blinkT = def.blinkInterval; e.phased = 0.7; e.mesh.visible = false;
+            spawnBurst(e.x, 1, e.z, 0xc080ff, 8);
+          }
+        }
+        e.hgt = 0.5 + Math.sin(e.anim * 0.7) * 0.2;
       } else if (def.behavior === 'dasher') {
         if (e.dashing > 0) {
           e.dashing -= dt;
@@ -936,7 +1061,7 @@ GH.game = (function () {
           spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage);
         }
         // hover pose
-        e.mesh.position.y = 0.12 + Math.sin(runTime * 6 + e.anim) * 0.05;
+        e.mesh.position.y = gy(e.x, e.z) + 0.12 + Math.sin(runTime * 6 + e.anim) * 0.05;
         if (e.mesh.userData.flames) {
           e.mesh.userData.flames.forEach(function (fl) { fl.visible = true; fl.scale.y = 1.4; });
         }
@@ -958,8 +1083,18 @@ GH.game = (function () {
       }
 
       var ePreX = e.x, ePreZ = e.z;
+      if (e.buried) { sepX = 0; sepZ = 0; } // tunnels pass under the crowd
       e.x += (mx * spd + sepX * 4 + e.vx) * dt;
       e.z += (mz * spd + sepZ * 4 + e.vz) * dt;
+      // a burning trail behind the magma crawler
+      if (def.trailBurn && e.aggro && spd > 0) {
+        e.trailT -= dt;
+        if (e.trailT <= 0) {
+          e.trailT = 0.55;
+          effects.push({ kind: 'patch', x: e.x, z: e.z, t: 2.2, radius: 0.9, dps: 4,
+            mesh: groundDisc(e.x, e.z, 0.9, 0xff5020, 0.28) });
+        }
+      }
       e.vx *= Math.pow(0.02, dt);
       e.vz *= Math.pow(0.02, dt);
       if (expActive) {
@@ -988,7 +1123,7 @@ GH.game = (function () {
         }
       }
 
-      e.mesh.position.set(e.x, 0, e.z);
+      e.mesh.position.set(e.x, gy(e.x, e.z) + (e.hgt || 0), e.z);
       e.mesh.rotation.y = Math.atan2(nx, nz);
 
       // animation
@@ -1024,7 +1159,7 @@ GH.game = (function () {
 
       // contact damage (whichever pilot is in reach)
       e.attackCd -= dt;
-      if (e.attackCd <= 0) {
+      if (e.attackCd <= 0 && !e.buried && e.phased <= 0 && !(def.behavior === 'flyer' && e.hgt > 1.6)) {
         if (GH.dist2(e.x, e.z, player.x, player.z) < Math.pow(def.radius + 0.8, 2)) {
           e.attackCd = e.modFrenzied ? 0.75 : 1.1;
           playerDamage(e.damage, e, 'kinetic');
@@ -1167,7 +1302,7 @@ GH.game = (function () {
     }));
     m.rotation.x = -Math.PI / 2;
     m.rotation.z = -angle;
-    m.position.set(x + Math.sin(angle) * len / 2, 0.05, z + Math.cos(angle) * len / 2);
+    m.position.set(x + Math.sin(angle) * len / 2, 0.05 + gy(x, z), z + Math.cos(angle) * len / 2);
     scene.add(m);
     effects.push({ kind: 'lineTele', mesh: m, t: delay, x: x, z: z, angle: angle, len: len, width: width, damage: dmg });
   }
@@ -1244,7 +1379,7 @@ GH.game = (function () {
         : GH.rand(-w.spread, w.spread) * 0.5;
       var a = aimAngle + off;
       var m = projMesh(w.size, color);
-      m.position.set(originX, 1.2, originZ);
+      m.position.set(originX, 1.2 + gy(originX, originZ), originZ);
       scene.add(m);
       projectiles.push({
         mesh: m, x: originX, z: originZ,
@@ -1262,7 +1397,7 @@ GH.game = (function () {
 
   function spawnFlash(x, y, z) {
     var s = poolGet('flash');
-    s.position.set(x, y, z);
+    s.position.set(x, y + gy(x, z), z);
     s.scale.setScalar(GH.rand(0.7, 1.1));
     scene.add(s);
     effects.push({ kind: 'sprite', mesh: s, t: 0.07, total: 0.07 });
@@ -1316,7 +1451,7 @@ GH.game = (function () {
       var rw = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.2, 24),
         new THREE.MeshBasicMaterial({ color: 0x80d0ff, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
       rw.rotation.x = -Math.PI / 2;
-      rw.position.set(player.x, 0.35, player.z);
+      rw.position.set(player.x, 0.35 + gy(player.x, player.z), player.z);
       scene.add(rw);
       GH.audio.zap();
       effects.push({
@@ -1331,7 +1466,7 @@ GH.game = (function () {
         var vm = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.1, 4, 14),
           GH.assets.basic(0xc0a0ff, { transparent: true, opacity: 0.8 }));
         vm.rotation.x = Math.PI / 2;
-        vm.position.set(tgt3.x, 0.4, tgt3.z);
+        vm.position.set(tgt3.x, 0.4 + gy(tgt3.x, tgt3.z), tgt3.z);
         scene.add(vm);
         GH.audio.shoot();
         effects.push({
@@ -1397,7 +1532,7 @@ GH.game = (function () {
       if (e) setTarget(e);
     }
     if (reticle && target) {
-      reticle.position.set(target.x, 0.12, target.z);
+      reticle.position.set(target.x, 0.12 + gy(target.x, target.z), target.z);
       reticle.rotation.z += 0.02;
     }
   }
@@ -1487,7 +1622,7 @@ GH.game = (function () {
       var m = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.9, 24),
         new THREE.MeshBasicMaterial({ color: 0xffb050, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
       m.rotation.x = -Math.PI / 2;
-      m.position.set(player.x, 0.3, player.z);
+      m.position.set(player.x, 0.3 + gy(player.x, player.z), player.z);
       scene.add(m);
       effects.push({ kind: 'boom', mesh: m, t: 0.3, total: 0.3, grow: 6 });
       for (var si2 = 0; si2 < enemies.length; si2++) {
@@ -1658,7 +1793,7 @@ GH.game = (function () {
         damageEnemy(e, dmg, { inst: inst, noRes: true });
         var m = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.45, 6, 6),
           GH.assets.basic(0xfff2c0, { transparent: true, opacity: 0.7 }));
-        m.position.set(e.x, 3, e.z);
+        m.position.set(e.x, 3 + gy(e.x, e.z), e.z);
         scene.add(m);
         effects.push({ kind: 'fade', mesh: m, t: 0.25, total: 0.25 });
         hit++;
@@ -1675,7 +1810,7 @@ GH.game = (function () {
     var m = new THREE.Mesh(new THREE.RingGeometry(0.4, 1.0, 24),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(player.x, 0.3, player.z);
+    m.position.set(player.x, 0.3 + gy(player.x, player.z), player.z);
     scene.add(m);
     effects.push({ kind: 'boom', mesh: m, t: 0.35, total: 0.35, grow: 8 });
     var dmg = weaponDamage(inst) * 1.5;
@@ -1703,7 +1838,7 @@ GH.game = (function () {
       color: 0xfff0c0, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide
     }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(a2.x, 0.35, a2.z);
+    m.position.set(a2.x, 0.35 + gy(a2.x, a2.z), a2.z);
     scene.add(m);
     effects.push({ kind: 'fade', mesh: m, t: 0.18, total: 0.18 });
     // kick the swing animation (windup + cut, see poseMeleeSwing);
@@ -1734,7 +1869,7 @@ GH.game = (function () {
     if (w.wave) {
       var wm = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 0.16),
         GH.assets.basic(w.wave.color, { transparent: true, opacity: 0.85 }));
-      wm.position.set(a2.x, 1.2, a2.z);
+      wm.position.set(a2.x, 1.2 + gy(a2.x, a2.z), a2.z);
       wm.rotation.y = aim;
       scene.add(wm);
       projectiles.push({
@@ -1772,7 +1907,7 @@ GH.game = (function () {
     var m = new THREE.Mesh(new THREE.RingGeometry(range - 0.25, range, 22),
       new THREE.MeshBasicMaterial({ color: 0xc04060, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(a2.x, 0.3, a2.z);
+    m.position.set(a2.x, 0.3 + gy(a2.x, a2.z), a2.z);
     scene.add(m);
     effects.push({ kind: 'fade', mesh: m, t: 0.22, total: 0.22 });
   }
@@ -1879,7 +2014,7 @@ GH.game = (function () {
     var w = inst.w;
     var m = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.18, 8),
       GH.assets.mat(0xc8b040, { emissive: 0x604010 }));
-    m.position.set(player.x, 0.1, player.z);
+    m.position.set(player.x, 0.1 + gy(player.x, player.z), player.z);
     scene.add(m);
     mines.push({ mesh: m, x: player.x, z: player.z, life: w.life, damage: weaponDamage(inst), aoe: w.aoe, inst: inst });
   }
@@ -1911,7 +2046,7 @@ GH.game = (function () {
     if (dmg > 0) G.hitStop(0.03);
     var m = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.6, 8, 6),
       new THREE.MeshBasicMaterial({ color: 0xffc060, transparent: true, opacity: 0.7 }));
-    m.position.set(x, 0.8, z);
+    m.position.set(x, 0.8 + gy(x, z), z);
     scene.add(m);
     effects.push({ kind: 'boom', mesh: m, t: 0.25, total: 0.25, grow: radius });
     var scorch = groundDisc(x, z, radius * 0.7, 0x181410, 0.35);
@@ -1949,7 +2084,7 @@ GH.game = (function () {
       var a = inst.angle + (k / w.count) * Math.PI * 2;
       var bx = player.x + Math.sin(a) * w.radius;
       var bz = player.z + Math.cos(a) * w.radius;
-      blade.position.set(bx, 1.0, bz);
+      blade.position.set(bx, 1.0 + gy(bx, bz), bz);
       blade.rotation.y = a + Math.PI / 2;
       for (var j = 0; j < enemies.length; j++) {
         var e = enemies[j];
@@ -1983,7 +2118,7 @@ GH.game = (function () {
     droneAngle += dt * 1.6;
     droneMesh.position.set(
       player.x + Math.sin(droneAngle) * 3.2,
-      3.0 + Math.sin(runTime * 2) * 0.2,
+      gy(player.x, player.z) + 3.0 + Math.sin(runTime * 2) * 0.2,
       player.z + Math.cos(droneAngle) * 3.2
     );
     droneMesh.rotation.y += dt * 3;
@@ -2020,7 +2155,7 @@ GH.game = (function () {
       }
       p2.x += p2.dirX * p2.speed * dt;
       p2.z += p2.dirZ * p2.speed * dt;
-      p2.mesh.position.set(p2.x, 1.2, p2.z);
+      p2.mesh.position.set(p2.x, 1.2 + gy(p2.x, p2.z), p2.z);
       p2.mesh.rotation.y = Math.atan2(p2.dirX, p2.dirZ);
       if (!p2.flat) p2.mesh.rotation.x = Math.PI / 2;
 
@@ -2061,10 +2196,11 @@ GH.game = (function () {
       p2.life -= dt;
       p2.x += p2.dirX * p2.speed * dt;
       p2.z += p2.dirZ * p2.speed * dt;
-      p2.mesh.position.set(p2.x, p2.y, p2.z);
+      p2.mesh.position.set(p2.x, p2.y + gy(p2.x, p2.z), p2.z);
       var dead = p2.life <= 0;
       if (!dead && GH.dist2(p2.x, p2.z, player.x, player.z) < 0.8 * 0.8) {
         playerDamage(p2.damage, null, 'ballistic');
+        if (p2.elem === 'frost') { player.chillT = 1.6; announce('CHILLED', 14); }
         dead = true;
       }
       if (!dead && mate && !mate.down &&
@@ -2080,12 +2216,12 @@ GH.game = (function () {
   }
 
   function spawnEnemyShot(x, y, z, dirX, dirZ, speed, dmg, elem) {
-    var color = elem === 'shock' ? 0x90d0ff : 0xff4060;
+    var color = elem === 'shock' ? 0x90d0ff : elem === 'frost' ? 0xd8f8ff : elem === 'void' ? 0xc060ff : 0xff4060;
     var m = poolGet('sphere', color);
-    m.scale.setScalar(0.22);
-    m.position.set(x, y, z);
+    m.scale.setScalar(elem === 'void' ? 0.3 : 0.22);
+    m.position.set(x, y + gy(x, z), z);
     scene.add(m);
-    enemyShots.push({ mesh: m, x: x, y: y, z: z, dirX: dirX, dirZ: dirZ, speed: speed, damage: dmg, life: 4.5 });
+    enemyShots.push({ mesh: m, x: x, y: y, z: z, dirX: dirX, dirZ: dirZ, speed: speed, damage: dmg, life: 4.5, elem: elem });
   }
 
   // =================================================================
@@ -2105,7 +2241,7 @@ GH.game = (function () {
     else if (type === 'cipher') mesh = GH.models.buildCipher();
     else if (type === 'cache') mesh = GH.models.buildCache();
     else mesh = GH.models.buildCoin();
-    mesh.position.set(x, 0.5, z);
+    mesh.position.set(x, 0.5 + gy(x, z), z);
     scene.add(mesh);
     pickups.push({ type: type, mesh: mesh, x: x, z: z, vx: GH.rand(-2, 2), vz: GH.rand(-2, 2), t: Math.random() * 10 });
   }
@@ -2179,7 +2315,7 @@ GH.game = (function () {
         pk.x += ((px2 - pk.x) / d) * pull * dt;
         pk.z += ((pz2 - pk.z) / d) * pull * dt;
       }
-      pk.mesh.position.set(pk.x, 0.5 + Math.sin(pk.t * 3) * 0.12, pk.z);
+      pk.mesh.position.set(pk.x, gy(pk.x, pk.z) + 0.5 + Math.sin(pk.t * 3) * 0.12, pk.z);
       pk.mesh.rotation.y += dt * 2.5;
       if (pk.mesh.userData.spin) pk.mesh.userData.spin.rotation.y += dt * 3;
       if (d2 < 0.75 * 0.75) {
@@ -2196,7 +2332,7 @@ GH.game = (function () {
     for (var i = 0; i < n; i++) {
       var m = poolGet('box', color);
       m.scale.setScalar(0.14);
-      m.position.set(x, y, z);
+      m.position.set(x, y + gy(x, z), z);
       scene.add(m);
       effects.push({
         kind: 'shard', mesh: m, t: GH.rand(0.3, 0.6),
@@ -2213,7 +2349,7 @@ GH.game = (function () {
       if (fx.kind === 'shard') {
         fx.vy -= 18 * dt;
         fx.mesh.position.x += fx.vx * dt;
-        fx.mesh.position.y = Math.max(0.05, fx.mesh.position.y + fx.vy * dt);
+        fx.mesh.position.y = Math.max(gy(fx.mesh.position.x, fx.mesh.position.z) + 0.05, fx.mesh.position.y + fx.vy * dt);
         fx.mesh.position.z += fx.vz * dt;
         fx.mesh.rotation.x += dt * 8;
         fx.mesh.rotation.y += dt * 8;
@@ -2271,7 +2407,7 @@ GH.game = (function () {
         var tt = 1 - fx.t / fx.total;
         var px = GH.lerp(fx.x0, fx.x1, tt);
         var pz = GH.lerp(fx.z0, fx.z1, tt);
-        fx.mesh.position.set(px, 1 + Math.sin(tt * Math.PI) * 7, pz);
+        fx.mesh.position.set(px, gy(px, pz) + 1 + Math.sin(tt * Math.PI) * 7, pz);
         if (fx.t <= 0) {
           scene.remove(fx.disc);
           explode(fx.x1, fx.z1, fx.aoe, fx.damage, { inst: fx.inst });
@@ -2281,6 +2417,7 @@ GH.game = (function () {
         if (GH.dist2(fx.x, fx.z, player.x, player.z) < fx.radius * fx.radius) {
           fx.tick = (fx.tick || 0) - dt;
           if (fx.tick <= 0) { fx.tick = 0.5; playerDamage(fx.dps * 0.5 + player.stats.armor, null, 'arc'); }
+          if (fx.chill) player.chillT = Math.max(player.chillT || 0, 0.6);
         }
       } else if (fx.kind === 'friendPatch') {
         // artifact trails: scorch the swarm, never the pilot
@@ -2339,7 +2476,8 @@ GH.game = (function () {
             }
           }
           if (fx.kind === 'boltStrike') {
-            drawLightning(fx.x, 14, fx.z, fx.x, 0.3, fx.z);
+            var by = gy(fx.x, fx.z);
+            drawLightning(fx.x, by + 14, fx.z, fx.x, by + 0.3, fx.z);
             GH.audio.zap();
             shake = Math.min(0.5, shake + 0.15);
           } else {
@@ -2669,7 +2807,7 @@ GH.game = (function () {
       var m = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.9, 24),
         new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
       m.rotation.x = -Math.PI / 2;
-      m.position.set(player.x, 0.3, player.z);
+      m.position.set(player.x, 0.3 + gy(player.x, player.z), player.z);
       scene.add(m);
       effects.push({ kind: 'boom', mesh: m, t: 0.3, total: 0.3, grow: 6 });
       for (var i = 0; i < enemies.length; i++) {
@@ -2736,19 +2874,23 @@ GH.game = (function () {
     return a + d;
   }
 
+  // a fresh drivetrain: heading picks up the frame's facing, tank empty
+  function freshDrive() {
+    return {
+      heading: player.facing || 0, spd: 0, nitro: 0, nitroT: 0,
+      slip: 0, fwd: 0, top: 1, drift: false, crashCd: 0,
+      skidT: 0, streakT: 0, score: 0,
+      air: false, hgt: 0, vy: 0, bog: 0, bogMsg: false, offTrack: false, jumpMsgT: 0
+    };
+  }
+
   function updateDrive(dt, input, spd, onIce) {
     var d = player.drive;
-    if (!d) {
-      d = player.drive = {
-        heading: player.facing || 0, spd: 0, nitro: 0, nitroT: 0,
-        slip: 0, fwd: 0, top: 1, drift: false, crashCd: 0,
-        skidT: 0, streakT: 0, score: 0
-      };
-    }
+    if (!d || d.bog === undefined) d = player.drive = freshDrive();
     player.dashTime = 0; // no frame-dash on the throttle
     var top = spd * 3.3;
     // the bottle: SHIFT burns while there's charge
-    var wantNitro = !!input.special && d.nitro > 0.03;
+    var wantNitro = !!input.special && d.nitro > 0.03 && !d.air;
     if (wantNitro) {
       d.nitro = Math.max(0, d.nitro - 0.38 * dt);
       d.nitroT = 0.12;
@@ -2758,32 +2900,113 @@ GH.game = (function () {
     var nitroOn = d.nitroT > 0;
     if (nitroOn) top *= 1.5;
     var hasInput = player.moveX !== 0 || player.moveZ !== 0;
-    d.drift = !!input.boostHeld && d.spd > top * 0.2;
+    d.drift = !!input.boostHeld && d.spd > top * 0.2 && !d.air;
+    var T = GH.terrain;
+    var fx0 = Math.sin(d.heading), fz0 = Math.cos(d.heading);
+    // the ground ahead: how steep, how soft, what it is
+    var slope = T.active ? T.slope(player.x, player.z, fx0, fz0) : 0;
+    var soft = T.active ? T.soft(player.x, player.z) : 0;
+    var surf = T.active ? T.surface(player.x, player.z) : null;
+    var authority = d.air ? 0.25 : 1;
     if (hasInput) {
       var want = Math.atan2(player.moveX, player.moveZ);
-      var speedFrac = GH.clamp(d.spd / Math.max(0.01, top), 0, 1);
+      var speedFrac = GH.clamp(Math.abs(d.spd) / Math.max(0.01, top), 0, 1);
       // grip narrows the wheel at speed; a drift throws it wide open
-      var turn = (d.drift ? 3.8 : 2.6 - speedFrac * 1.1) * dt;
+      var turn = (d.drift ? 3.8 : 2.6 - speedFrac * 1.1) * dt * authority;
       d.heading = approachAngle(d.heading, want, turn);
       var dot = Math.sin(d.heading) * player.moveX + Math.cos(d.heading) * player.moveZ;
-      if (dot < -0.55 && d.spd > 4) {
+      if (dot < -0.55 && d.spd > 1.5) {
         d.spd = Math.max(0, d.spd - 34 * dt); // stand on the brakes
-      } else {
+      } else if (dot < -0.55) {
+        d.spd = Math.max(-top * 0.22, d.spd - 14 * dt); // reverse gear
+      } else if (!d.air) {
         d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * dt);
       }
     } else {
-      d.spd = Math.max(0, d.spd - (d.drift ? 6 : 12) * dt);
+      d.spd = d.spd > 0 ? Math.max(0, d.spd - (d.drift ? 6 : 12) * dt) : Math.min(0, d.spd + 12 * dt);
     }
     if (d.drift) d.spd = Math.max(0, d.spd - 3.5 * dt); // the slide scrubs speed
+    // gravity works along the slope: climbs bleed speed, descents lend it
+    if (!d.air && T.active) {
+      d.spd -= slope * 15 * dt;
+      d.spd = GH.clamp(d.spd, -top * 0.22, top * 1.08);
+      // sheer rock is a wall
+      if (slope > 1.0 && soft < 0.5 && d.spd > 3) d.spd = 3;
+    }
+    // soft ground on a steep face: blast over it with momentum, or bog down
+    var steepSoft = !d.air && soft > 0.5 && slope > 0.26;
+    if (steepSoft) {
+      if (d.fwd > top * 0.58) {
+        d.air = true; d.hgt = 0.02;
+        d.vy = Math.max(5, d.fwd * slope * 1.05);
+        if (d.jumpMsgT <= 0) { d.jumpMsgT = 6; announce(surf === 'snow' ? 'DRIFT JUMP' : 'DUNE JUMP', 18); }
+        GH.audio.dash();
+      } else if (d.fwd < top * 0.48 && d.spd > 0) {
+        d.bog = Math.min(1, d.bog + dt * 2.6);
+      }
+    }
+    // the crest: leave the ground when it falls away under speed
+    if (!d.air && T.active && slope < -0.42 && d.fwd > top * 0.7) {
+      d.air = true; d.hgt = 0.02; d.vy = 0.5;
+    }
+    d.jumpMsgT = Math.max(0, d.jumpMsgT - dt);
+    if (d.bog > 0) {
+      // dug in: forward is a crawl, reversing digs you out
+      if (d.spd > 0) d.spd = Math.min(d.spd, top * 0.1);
+      if (d.spd < 0) d.bog = Math.max(0, d.bog - dt * 1.6);
+      if (!steepSoft) d.bog = Math.max(0, d.bog - dt * 0.7);
+      if (d.bog > 0.5 && !d.bogMsg) {
+        d.bogMsg = true;
+        announce((surf === 'snow' ? 'SNOWBOUND' : 'BOGGED DOWN') + ' — REVERSE TO DIG OUT', 20);
+        GH.audio.hit();
+      }
+      if (Math.random() < 0.5) {
+        spawnBurst(player.x - fx0 * 1.2, 0.2, player.z - fz0 * 1.2, surf === 'snow' ? 0xf0f4ff : 0xd8c090, 2);
+      }
+    } else d.bogMsg = false;
+    // airborne: ballistic, barely steerable, and it lands hard
+    if (d.air) {
+      d.vy -= T.gravity() * dt;
+      d.hgt += d.vy * dt;
+      if (d.hgt <= 0) {
+        d.air = false; d.hgt = 0;
+        var impact = Math.min(0.5, Math.abs(d.vy) * 0.03);
+        shake = Math.min(0.6, shake + impact);
+        spawnBurst(player.x, 0.2, player.z, surf === 'snow' ? 0xf0f4ff : 0xd8c090, 8);
+        if (d.vy < -14) { d.spd *= 0.8; announce('HARD LANDING', 16); }
+        d.vy = 0;
+        GH.audio.hit();
+      }
+    }
+    // water and lava under the skids: hydroplane, scald
+    if (surf === 'water') { onIce = true; d.spd = Math.min(d.spd, top * 0.7); }
+    if (surf === 'lava') {
+      player.lavaT = (player.lavaT || 0) - dt;
+      if (player.lavaT <= 0) {
+        player.lavaT = 0.5;
+        playerDamage(5 + (zoneNow ? zoneNow.danger * 3 : 3), null, 'arc');
+        spawnBurst(player.x, 0.3, player.z, 0xff6020, 5);
+      }
+    }
+    // races: leaving the asphalt costs speed
+    d.offTrack = false;
+    if (dungeonState && dungeonState.race && worldH && worldH.layout.raceway && !d.air) {
+      var rwL = worldH.layout.raceway;
+      if (T.trackDistance(rwL, player.x, player.z) > (rwL.width || 14) * 0.5 + 1.2) {
+        d.offTrack = true;
+        d.spd -= d.spd * 1.1 * dt;
+      }
+    }
     // decompose velocity: forward chases the throttle, lateral bleeds by grip
-    var fx = Math.sin(d.heading), fz = Math.cos(d.heading);
+    var fx = fx0, fz = fz0;
     var fwd = player.velX * fx + player.velZ * fz;
     var latX = player.velX - fx * fwd, latZ = player.velZ - fz * fwd;
     var grip = d.drift ? 1.5 : (onIce ? 2.4 : 7.5);
+    if (d.air) grip = 0.6;
     var gk = Math.min(1, grip * dt);
     latX -= latX * gk;
     latZ -= latZ * gk;
-    fwd += (d.spd - fwd) * Math.min(1, 9 * dt);
+    fwd += (d.spd - fwd) * Math.min(1, (d.air ? 1.5 : 9) * dt);
     player.velX = fx * fwd + latX;
     player.velZ = fz * fwd + latZ;
     d.slip = Math.sqrt(latX * latX + latZ * latZ);
@@ -2799,6 +3022,8 @@ GH.game = (function () {
         dungeonState.race.style = (dungeonState.race.style || 0) + styleGain;
       }
     }
+    // air time pays too
+    if (d.air && d.hgt > 1.5) d.nitro = Math.min(1, d.nitro + 0.12 * dt);
   }
 
   // =================================================================
@@ -2807,6 +3032,8 @@ GH.game = (function () {
   function updatePlayer(dt, input) {
     var s = player.stats;
     G._mouseNDC = input.mouseNDC;
+    // the aim plane follows the ground under the frame
+    groundPlane.constant = -gy(player.x, player.z);
 
     // T: fold between frame and skimmer form — a true combat transform.
     // Skimmer: 2.6x speed, ram hits, its own strafe cannons, +25% damage taken.
@@ -2851,6 +3078,24 @@ GH.game = (function () {
     // hazards underfoot: vines snare, ice steals traction
     if (inHazard('vines', player.x, player.z)) spd *= 0.65;
     var onIce = !!inHazard('ice', player.x, player.z);
+    // the ground itself: frozen lakes, ponds, mud, lava
+    var surf = GH.terrain.surface(player.x, player.z);
+    if (surf === 'ice') onIce = true;
+    if (surf === 'water') spd *= 0.62;
+    if (surf === 'mud') spd *= 0.8;
+    if (surf === 'lava') {
+      player.lavaT = (player.lavaT || 0) - dt;
+      if (player.lavaT <= 0) {
+        player.lavaT = 0.5;
+        playerDamage(5 + (zoneNow ? zoneNow.danger * 3 : 3), null, 'arc');
+        spawnBurst(player.x, 0.3, player.z, 0xff6020, 5);
+      }
+    } else if (surf === 'water' && (player.moveX || player.moveZ) && Math.random() < 0.3) {
+      spawnBurst(player.x, 0.1, player.z, 0x9ad8e8, 1);
+    }
+    // status: chilled by rime shots and spore clouds, snared by lurkers
+    if (player.chillT > 0) { player.chillT -= dt; spd *= 0.6; }
+    if (player.snareT > 0) { player.snareT -= dt; spd *= 0.05; }
 
     var preMoveX = player.x, preMoveZ = player.z; // for maze wall resolution
     if (player.speederOn) {
@@ -2890,6 +3135,13 @@ GH.game = (function () {
       } else {
         player.velX = wantX;
         player.velZ = wantZ;
+      }
+      // hills: climbing costs stride, descending lends it, cliffs stop you
+      if (GH.terrain.active && (player.velX || player.velZ)) {
+        var sl = GH.terrain.slope(player.x, player.z, player.velX, player.velZ);
+        if (sl > 1.15) { player.velX = 0; player.velZ = 0; }
+        else if (sl > 0) { var kUp = 1 - Math.min(0.8, sl) * 0.55; player.velX *= kUp; player.velZ *= kUp; }
+        else { var kDn = 1 + Math.min(0.25, -sl * 0.3); player.velX *= kDn; player.velZ *= kDn; }
       }
       player.x += player.velX * dt;
       player.z += player.velZ * dt;
@@ -2938,7 +3190,7 @@ GH.game = (function () {
       var fwdFrac = dr ? GH.clamp(dr.fwd / Math.max(0.01, dr.top), 0, 1) : 0;
       // wall check: the hull expected to travel but barely moved — a crash.
       // NFSU2's harshest rule kept: the wall takes your speed AND your bottle.
-      if (dr && dr.crashCd <= 0) {
+      if (dr && dr.crashCd <= 0 && !dr.air && dr.bog <= 0) {
         var expX = player.velX * dt, expZ = player.velZ * dt;
         var exp2 = expX * expX + expZ * expZ;
         var actX = player.x - preMoveX, actZ = player.z - preMoveZ;
@@ -2957,7 +3209,7 @@ GH.game = (function () {
           GH.audio.hit();
         }
       }
-      sm.position.set(player.x, 0, player.z);
+      sm.position.set(player.x, 0 + gy(player.x, player.z), player.z);
       var movingS = dr ? dr.fwd > 0.6 : false;
       player.speederHeading = dr ? dr.heading : player.facing;
       sm.rotation.y = player.speederHeading;
@@ -2969,7 +3221,11 @@ GH.game = (function () {
       }
       var leanT = dr ? GH.clamp(-slipSign * dr.slip * 0.045, -0.55, 0.55) : 0;
       sm.rotation.z = GH.lerp(sm.rotation.z, leanT, dt * 7);
-      sm.position.y = 0.12 + Math.sin(runTime * 6) * 0.06; // hover bob
+      sm.position.y = gy(player.x, player.z) + 0.12 + (dr ? dr.hgt : 0) + Math.sin(runTime * 6) * 0.06; // hover bob
+      // pitch the hull with the ground it rides (and the arc it flies)
+      var pitchT = dr && dr.air ? GH.clamp(-dr.vy * 0.04, -0.5, 0.5)
+        : GH.clamp(-GH.terrain.slope(player.x, player.z, Math.sin(dr.heading), Math.cos(dr.heading)) * 0.8, -0.5, 0.5);
+      sm.rotation.x = GH.lerp(sm.rotation.x, pitchT, dt * 6);
       var nitroLive = dr && dr.nitroT > 0;
       if (sm.userData.flames) {
         sm.userData.flames.forEach(function (fl) {
@@ -2990,7 +3246,7 @@ GH.game = (function () {
             stm.scale.set(0.06, 0.06, 1.6 + dr.fwd * 0.09);
             stm.position.set(
               player.x + Math.sin(va) * aheadOff + Math.cos(va) * sideOff,
-              GH.rand(0.5, 3),
+              gy(player.x, player.z) + GH.rand(0.5, 3),
               player.z + Math.cos(va) * aheadOff - Math.sin(va) * sideOff);
             stm.rotation.set(0, va, 0);
             scene.add(stm);
@@ -3011,7 +3267,7 @@ GH.game = (function () {
               skm.scale.set(0.5, 0.03, 1.9);
               skm.position.set(
                 player.x + Math.cos(ha) * 0.8 * sk - Math.sin(ha) * 1.1,
-                0.04,
+                gy(player.x, player.z) + 0.04,
                 player.z - Math.sin(ha) * 0.8 * sk - Math.cos(ha) * 1.1);
               skm.rotation.set(0, Math.atan2(player.velX, player.velZ), 0);
               scene.add(skm);
@@ -3048,7 +3304,7 @@ GH.game = (function () {
       sm.visible = !(player.hurtCd > 0 && Math.floor(runTime * 24) % 2 === 0);
       return;
     }
-    player.mesh.position.set(player.x, 0, player.z);
+    player.mesh.position.set(player.x, 0 + gy(player.x, player.z), player.z);
     player.mesh.rotation.y = player.facing;
     var parts = player.mesh.userData.parts;
     var moving = player.moveX !== 0 || player.moveZ !== 0;
@@ -3196,12 +3452,13 @@ GH.game = (function () {
     if (info.dungeon) {
       scene.background = new THREE.Color(0x07080e);
       scene.fog.color.setHex(0x0d1018);
-      scene.fog.near = 14; scene.fog.far = 70;
-      hemi.color.setHex(0x6a7494);
-      hemi.groundColor.setHex(0x232636);
-      sun.color.setHex(0xa8b4cc);
+      scene.fog.near = 18; scene.fog.far = 84;
+      hemi.color.setHex(0x8a94b4);
+      hemi.groundColor.setHex(0x2e3246);
+      sun.color.setHex(0xc0cce4);
     } else {
-      scene.fog.near = 18; scene.fog.far = 52;
+      // open ground: let the hills and the rim show before the haze takes them
+      scene.fog.near = 30; scene.fog.far = 98;
     }
   }
 
@@ -3234,7 +3491,11 @@ GH.game = (function () {
 
     curZone = zoneId;
     var w = GH.meta.data.world;
+    GH.terrain.clear();
+    GH.atmos.clear(scene);
     worldH = GH.world.buildZone(scene, zoneId, w.nests, w.lairsDown, w.vaults);
+    GH.atmos.set(scene, zoneId, !!worldH.info.dungeon);
+    camGround = player ? gy(player.x, player.z) : 0;
     zoneNow = worldH.info;
     interactables = GH.world.interactables(worldH.layout, zoneId);
     stage = GH.world.stageFor(zoneId);
@@ -3261,17 +3522,18 @@ GH.game = (function () {
     // the day's phenomena, where they belong
     if (harrowSpot && harrowSpot.zone === zoneId) {
       harrowTotem = GH.models.buildHarrowTotem();
-      harrowTotem.position.set(harrowSpot.x, 0, harrowSpot.z);
+      harrowTotem.position.set(harrowSpot.x, 0 + gy(harrowSpot.x, harrowSpot.z), harrowSpot.z);
       scene.add(harrowTotem);
     }
     if (w.wreck && (w.wreck.zone || 'wreck') === zoneId) {
       wreckMesh = GH.models.buildWreckSite();
-      wreckMesh.position.set(w.wreck.x, 0, w.wreck.z);
+      wreckMesh.position.set(w.wreck.x, 0 + gy(w.wreck.x, w.wreck.z), w.wreck.z);
       scene.add(wreckMesh);
     }
     // dungeon setup: garrison + the archetype's objective machine
     dungeonState = null;
     if (zoneNow.dungeon) initDungeon();
+    if (player) camGround = gy(player.x, player.z);
 
     if (fromZoneId) {
       announce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1], 28);
@@ -3349,7 +3611,7 @@ GH.game = (function () {
         fired: {}
       };
       dungeonState.haulerMesh = GH.models.buildHauler();
-      dungeonState.haulerMesh.position.set(dungeonState.hauler.x, 0, dungeonState.hauler.z);
+      dungeonState.haulerMesh.position.set(dungeonState.hauler.x, 0 + gy(dungeonState.hauler.x, dungeonState.hauler.z), dungeonState.hauler.z);
       scene.add(dungeonState.haulerMesh);
       queueAnnounce('THE HAULER ROLLS — KEEP IT ALIVE', 24);
     }
@@ -3360,6 +3622,47 @@ GH.game = (function () {
     mods.forEach(function (m) {
       queueAnnounce('MODIFIER — ' + m.name + ': ' + m.desc.toUpperCase(), 18);
     });
+    if (lay.raceway && lay.raceway.name) queueAnnounce('CIRCUIT — ' + lay.raceway.name, 22);
+    spawnDungeonHazards();
+  }
+
+  // every dungeon carries its territory's hazard: ice sheets under the
+  // frost range, vine snares under the canopy, vents in the cinder
+  // wastes, lightning over the highlands, drifting rifts in the void
+  function spawnDungeonHazards() {
+    clearHazards();
+    if (!stage || !stage.hazard || !zoneNow || !zoneNow.dungeon) return;
+    var arch = zoneNow.arch;
+    if (arch === 'labyrinth' || arch === 'halls' || arch === 'fluxways' || arch === 'raceway') return;
+    var kind = stage.hazard;
+    if (kind === 'lightning') { hazards.push({ kind: 'lightning', t: GH.rand(3, 6) }); return; }
+    var half = GH.world.BOUNDS.x - 16;
+    for (var i = 0; i < 6; i++) {
+      var x = GH.rand(-half, half), z = GH.rand(-half, half);
+      if (GH.dist2(x, z, player.x, player.z) < 16 * 16) continue;
+      if (zoneBlockedAt(x, z)) continue;
+      hazards.push(makeHazard(kind, x, z));
+    }
+  }
+
+  function makeHazard(kind, x, z) {
+    var h = { kind: kind, x: x, z: z, t: GH.rand(2, 5) };
+    if (kind === 'ice') {
+      h.r = GH.rand(4, 5.5);
+      h.mesh = groundDisc(x, z, h.r, 0xa0e0ff, 0.22);
+    } else if (kind === 'vines') {
+      h.r = GH.rand(3, 4);
+      h.mesh = groundDisc(x, z, h.r, 0x3aa040, 0.3);
+    } else if (kind === 'vents') {
+      h.r = 2.4;
+      h.mesh = groundDisc(x, z, 0.9, 0x803020, 0.5);
+      h.t = GH.rand(3, 7);
+    } else if (kind === 'rifts') {
+      h.r = 3;
+      h.mesh = groundDisc(x, z, h.r, 0x9040d0, 0.25);
+      h.vx = GH.rand(-1, 1); h.vz = GH.rand(-1, 1);
+    }
+    return h;
   }
 
   // tier modifiers stamp every hostile born in this dungeon
@@ -3761,7 +4064,7 @@ GH.game = (function () {
     var halls = lay.halls;
     // carried cargo rides on the frame's back
     if (ds.carrying && worldH.coreMeshes[ds.carrying]) {
-      worldH.coreMeshes[ds.carrying].position.set(player.x, 2.6, player.z);
+      worldH.coreMeshes[ds.carrying].position.set(player.x, 2.6 + gy(player.x, player.z), player.z);
       worldH.coreMeshes[ds.carrying].rotation.y += dt * 2;
     }
     // timed switch windows tick down
@@ -3994,7 +4297,7 @@ GH.game = (function () {
     }
     // hunters chew the hauler
     if (hunters > 0) h.hp -= Math.min(hunters, 6) * (2 + zoneNow.danger * 0.8) * dt;
-    ds.haulerMesh.position.set(h.x, 0, h.z);
+    ds.haulerMesh.position.set(h.x, 0 + gy(h.x, h.z), h.z);
     if (ds.haulerMesh.userData.core) {
       ds.haulerMesh.userData.core.scale.setScalar(1 + Math.sin(runTime * 6) * 0.2);
     }
@@ -4216,6 +4519,7 @@ GH.game = (function () {
     updateWeather(dt);
     updateHarrow(dt);
     updateDungeon(dt);
+    if (hazards.length) updateHazards(dt);
 
     // travel gates: walk into the veil and you're through
     if (travelCd > 0) travelCd -= dt;
@@ -4655,12 +4959,7 @@ GH.game = (function () {
     player.mesh.visible = !player.speederOn;
     player.speederMesh.visible = player.speederOn;
     if (player.speederOn) {
-      // fresh drivetrain: heading picks up the frame's facing, tank empty
-      player.drive = {
-        heading: player.facing || 0, spd: 0, nitro: 0, nitroT: 0,
-        slip: 0, fwd: 0, top: 1, drift: false, crashCd: 0,
-        skidT: 0, streakT: 0, score: 0
-      };
+      player.drive = freshDrive();
     } else {
       player.velX = 0;
       player.velZ = 0;
@@ -4799,7 +5098,7 @@ GH.game = (function () {
           h.z = player.z + Math.sin(a) * 14;
           h.vx = GH.rand(-1.2, 1.2); h.vz = GH.rand(-1.2, 1.2);
         }
-        h.mesh.position.set(h.x, 0.04, h.z);
+        h.mesh.position.set(h.x, 0.04 + gy(h.x, h.z), h.z);
         h.mesh.material.opacity = 0.2 + Math.sin(runTime * 4 + i * 2) * 0.08;
       }
     }
@@ -4859,7 +5158,7 @@ GH.game = (function () {
     var oldMesh = worldH.vaultMeshes[vaultId];
     if (oldMesh) worldH.group.remove(oldMesh);
     var openMesh = GH.models.buildVault(true);
-    openMesh.position.set(vx, 0, vz);
+    openMesh.position.set(vx, 0 + gy(vx, vz), vz);
     worldH.group.add(openMesh);
     worldH.vaultMeshes[vaultId] = openMesh;
     queueAnnounce('VAULT BREACHED — +150 SALVAGE BANKED', 28);
@@ -4894,10 +5193,11 @@ GH.game = (function () {
     hazards.length = 0;
   }
 
+  function fieldR() { return expActive ? GH.world.BOUNDS.x - 6 : ARENA_R; }
   function hazardSpot(minR) {
     for (var t = 0; t < 10; t++) {
-      var x = GH.rand(-ARENA_R + 5, ARENA_R - 5);
-      var z = GH.rand(-ARENA_R + 5, ARENA_R - 5);
+      var x = GH.rand(-fieldR() + 5, fieldR() - 5);
+      var z = GH.rand(-fieldR() + 5, fieldR() - 5);
       if (GH.dist2(x, z, player.x, player.z) > (minR || 8) * (minR || 8)) return { x: x, z: z };
     }
     return { x: 0, z: 0 };
@@ -4970,8 +5270,8 @@ GH.game = (function () {
           // strikes bias toward the player but threaten everything
           var sx, sz;
           if (Math.random() < 0.6) {
-            sx = GH.clamp(player.x + GH.rand(-5, 5), -ARENA_R, ARENA_R);
-            sz = GH.clamp(player.z + GH.rand(-5, 5), -ARENA_R, ARENA_R);
+            sx = GH.clamp(player.x + GH.rand(-5, 5), -fieldR(), fieldR());
+            sz = GH.clamp(player.z + GH.rand(-5, 5), -fieldR(), fieldR());
           } else {
             var sp = hazardSpot(0);
             sx = sp.x; sz = sp.z;
@@ -4985,9 +5285,9 @@ GH.game = (function () {
       } else if (h.kind === 'rifts') {
         h.x += h.vx * dt;
         h.z += h.vz * dt;
-        if (Math.abs(h.x) > ARENA_R - 4) h.vx *= -1;
-        if (Math.abs(h.z) > ARENA_R - 4) h.vz *= -1;
-        h.mesh.position.set(h.x, 0.04, h.z);
+        if (Math.abs(h.x) > fieldR() - 4) h.vx *= -1;
+        if (Math.abs(h.z) > fieldR() - 4) h.vz *= -1;
+        h.mesh.position.set(h.x, 0.04 + gy(h.x, h.z), h.z);
         h.mesh.material.opacity = 0.2 + Math.sin(runTime * 4 + i * 2) * 0.08;
       }
     }
@@ -5229,7 +5529,7 @@ GH.game = (function () {
       weapons: [makeWeaponInst('primary', def.weapon, false)]
     };
     mate.hp = player.stats.maxHP;
-    mate.mesh.position.set(mate.x, 0, mate.z);
+    mate.mesh.position.set(mate.x, 0 + gy(mate.x, mate.z), mate.z);
     scene.add(mate.mesh);
   }
 
@@ -5272,7 +5572,7 @@ GH.game = (function () {
       var m = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.9, 24),
         new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
       m.rotation.x = -Math.PI / 2;
-      m.position.set(mate.x, 0.3, mate.z);
+      m.position.set(mate.x, 0.3 + gy(mate.x, mate.z), mate.z);
       scene.add(m);
       effects.push({ kind: 'boom', mesh: m, t: 0.3, total: 0.3, grow: 6 });
       for (var i = 0; i < enemies.length; i++) {
@@ -5453,7 +5753,7 @@ GH.game = (function () {
     }
 
     // pose
-    mate.mesh.position.set(mate.x, 0, mate.z);
+    mate.mesh.position.set(mate.x, 0 + gy(mate.x, mate.z), mate.z);
     mate.mesh.rotation.y = mate.facing;
     var parts = mate.mesh.userData.parts;
     var moving = mx !== 0 || mz !== 0;
@@ -5535,8 +5835,10 @@ GH.game = (function () {
     shake = Math.max(0, shake - dt * 1.4);
     // higher and farther back, with the pilot sitting low in frame so
     // the world ahead gets the screen space
-    camera.position.set(tx + sx, 18 * camZoom, tz + 14.5 * camZoom + sz);
-    camera.lookAt(tx + sx, 0, tz - 1.6 + sz);
+    var pgy = player ? gy(tx, tz) : 0;
+    camGround += (pgy - camGround) * Math.min(1, dt * 5);
+    camera.position.set(tx + sx, camGround + 18 * camZoom, tz + 14.5 * camZoom + sz);
+    camera.lookAt(tx + sx, camGround, tz - 1.6 + sz);
   }
 
   // =================================================================
@@ -5595,7 +5897,11 @@ GH.game = (function () {
         el['dh-speed'].textContent = Math.round(Math.max(0, dvd.fwd) * 11);
         el['dh-nitro-fill'].style.width = Math.round(dvd.nitro * 100) + '%';
         el['dh-nitro-fill'].classList.toggle('dh-burning', dvd.nitroT > 0);
-        el['dh-drift'].classList.toggle('hidden', !(dvd.drift && dvd.slip > 1.2));
+        // one status word under the speedo: what the ground is doing to you
+        var dstat = dvd.bog > 0.5 ? (player.speederOn && GH.terrain.surface(player.x, player.z) === 'snow' ? 'SNOWBOUND — REVERSE' : 'BOGGED — REVERSE')
+          : dvd.air ? 'AIR' : dvd.offTrack ? 'OFF TRACK' : (dvd.drift && dvd.slip > 1.2) ? 'DRIFT' : '';
+        el['dh-drift'].textContent = dstat;
+        el['dh-drift'].classList.toggle('hidden', !dstat);
       }
     }
     // energy capacitor + ability hotbar
@@ -5765,6 +6071,9 @@ GH.game = (function () {
     hideBossBar();
     // expedition teardown: the continent, camp, and its UI
     if (worldH) { scene.remove(worldH.group); worldH = null; }
+    GH.terrain.clear();
+    GH.atmos.clear(scene);
+    camGround = 0;
     if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
     if (harrowTotem) { scene.remove(harrowTotem); harrowTotem = null; }
     scene.fog.near = 18; scene.fog.far = 52; // undo whiteout/dungeon gloom
@@ -5926,7 +6235,7 @@ GH.game = (function () {
         GH.meta.data.world.wreck = { zone: curZone, x: player.x, z: player.z, salvage: lost };
         if (wreckMesh) scene.remove(wreckMesh);
         wreckMesh = GH.models.buildWreckSite();
-        wreckMesh.position.set(player.x, 0, player.z);
+        wreckMesh.position.set(player.x, 0 + gy(player.x, player.z), player.z);
         scene.add(wreckMesh);
       }
       coinsRun = 0;
@@ -6129,6 +6438,8 @@ GH.game = (function () {
     if (G.state === 'race') {
       GH.race.update(dt, input);
       GH.race.tick(dt);
+      GH.terrain.update(dt);
+      if (player) GH.atmos.update(dt, player.x, gy(player.x, player.z), player.z);
       updateCamera(dt);
       updateHUD();
       G.dmg.update(dt, viewW, viewH);
@@ -6303,6 +6614,33 @@ GH.game = (function () {
   };
 
   // dev/test helper: jump the pilot somewhere (harmless outside dev use)
+  // dev: jump the expedition to any zone id (e.g. 'glacier', 'wreck:raceway:1')
+  G.devZone = function (zoneId) {
+    if (!expActive) return false;
+    loadZone(zoneId, curZone);
+    player.x = 0; player.z = 0;
+    if (zoneNow && zoneNow.dungeon) { player.z = GH.world.BOUNDS.z - 30; }
+    return true;
+  };
+  G.devSpeeder = function (on) {
+    if (!player) return;
+    if (!!player.speederOn !== !!on) toggleSpeeder();
+  };
+  G.devState = function () {
+    return {
+      state: G.state, zone: curZone, x: player ? player.x : 0, z: player ? player.z : 0,
+      y: player ? gy(player.x, player.z) : 0, enemies: enemies.length,
+      speeder: !!(player && player.speederOn), drive: player ? player.drive : null,
+      terrain: !!GH.terrain.active,
+      race: dungeonState && dungeonState.race ? {
+        lap: dungeonState.race.lap, gate: dungeonState.race.gate, pos: dungeonState.race.pos,
+        countdown: dungeonState.race.countdown, style: dungeonState.race.style,
+        rivals: dungeonState.race.rivals.map(function (r) { return { x: Math.round(r.x), z: Math.round(r.z), lap: r.raceLap, gate: r.raceGate, dead: !!r.dead }; })
+      } : null,
+      dungeonDone: !!(dungeonState && dungeonState.done),
+      surface: player ? GH.terrain.surface(player.x, player.z) : null
+    };
+  };
   G.teleport = function (x, z) {
     if (player) { player.x = x; player.z = z; }
   };

@@ -270,7 +270,7 @@ GH.world = (function () {
         lay.chest = { x: 0, z: -half + 22 };
         lay.packs.push({ x: 0, z: -half + 40, n: 3 }); // the far-side welcome
       } else if (arch2 === 'raceway') {
-        lay.raceway = GH.dungeons.genRaceway(size);
+        lay.raceway = GH.dungeons.genRaceway(size, info.parent);
         lay.chest = { x: 0, z: 0 }; // the winner's circle, mid-infield
       } else if (arch2 === 'halls') {
         // the null reach runs the master set; everywhere else teaches
@@ -375,16 +375,10 @@ GH.world = (function () {
     var st = W.stageFor(zoneId);
     var tex = GH.assets.stageTex[st.id];
 
-    // ground
-    var floorTex = tex.floor.clone();
-    floorTex.repeat.set(20 * size / 80, 20 * size / 80);
-    floorTex.needsUpdate = true;
-    var ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(size + 1, size + 1),
-      GH.assets.lambert({ map: floorTex, color: info.dungeon ? 0x777788 : 0xffffff }, { nosnap: true })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    group.add(ground);
+    // ground: a real height field with the zone's biome, sealed by a rim
+    var terrain = GH.terrain.build(zoneId, info, lay);
+    group.add(terrain);
+    var gy = function (x, z) { return GH.terrain.h(x, z); };
 
     // dungeon perimeter: a tight rock collar so the depths read enclosed
     if (info.dungeon) {
@@ -396,52 +390,68 @@ GH.world = (function () {
       group.add(collar);
     }
 
-    // props: dense enough to feel like terrain, not a floor.
-    // Mazes and flux floors keep their arenas clean.
+    // vegetation and rock: the biome's own kinds, clustered by noise into
+    // groves and boulder fields, merged into a handful of draw calls.
+    // Mazes and authored floors keep their arenas clean.
     var rnd = zrng('props:' + zoneId);
-    var propCount = info.dungeon ?
-      (info.arch === 'labyrinth' || info.arch === 'fluxways' ||
-        info.arch === 'raceway' || info.arch === 'halls' ? 0 : 46) : 150;
-    for (var i = 0; i < propCount; i++) {
-      var kind = st.props[Math.floor(rnd() * st.props.length)];
-      var p = GH.models.props[kind]();
-      var px = (rnd() - 0.5) * (size - 14);
-      var pz = (rnd() - 0.5) * (size - 14);
-      if (zoneId === 'wreck') {
-        if (GH.dist2(px, pz, W.CAMP.x, W.CAMP.z) < 26 * 26) continue;
-        if (GH.dist2(px, pz, W.CIRCUIT.x, W.CIRCUIT.z) < (W.CIRCUIT.r + 12) * (W.CIRCUIT.r + 12)) continue;
-      }
-      var clear = false;
-      for (var g3 = 0; g3 < lay.gates.length; g3++) {
-        if (GH.dist2(px, pz, lay.gates[g3].x, lay.gates[g3].z) < 12 * 12) { clear = true; break; }
-      }
-      if (lay.lair && GH.dist2(px, pz, lay.lair.x, lay.lair.z) < 15 * 15) clear = true;
-      if (lay.vault && GH.dist2(px, pz, lay.vault.x, lay.vault.z) < 12 * 12) clear = true;
-      if (clear) continue;
-      p.position.set(px, 0, pz);
-      group.add(p);
+    var noProps = info.dungeon && (info.arch === 'labyrinth' || info.arch === 'fluxways' || info.arch === 'halls');
+    if (!noProps) {
+      GH.terrain.scatterProps(group, zoneId, info, rnd, function (px, pz) {
+        if (zoneId === 'wreck') {
+          if (GH.dist2(px, pz, W.CAMP.x, W.CAMP.z) < 26 * 26) return true;
+          if (GH.dist2(px, pz, W.CIRCUIT.x, W.CIRCUIT.z) < (W.CIRCUIT.r + 14) * (W.CIRCUIT.r + 14)) return true;
+          if (GH.dist2(px, pz, W.DUEL_PIT.x, W.DUEL_PIT.z) < 24 * 24) return true;
+        }
+        for (var g3 = 0; g3 < lay.gates.length; g3++) {
+          if (GH.dist2(px, pz, lay.gates[g3].x, lay.gates[g3].z) < 12 * 12) return true;
+        }
+        if (lay.lair && GH.dist2(px, pz, lay.lair.x, lay.lair.z) < 15 * 15) return true;
+        if (lay.vault && GH.dist2(px, pz, lay.vault.x, lay.vault.z) < 12 * 12) return true;
+        if (lay.chest && GH.dist2(px, pz, lay.chest.x, lay.chest.z) < 8 * 8) return true;
+        if (lay.objective && GH.dist2(px, pz, lay.objective.x, lay.objective.z) < 14 * 14) return true;
+        if (lay.relic && GH.dist2(px, pz, lay.relic.x, lay.relic.z) < 8 * 8) return true;
+        if (lay.crucible && GH.dist2(px, pz, lay.crucible.x, lay.crucible.z) < 26 * 26) return true;
+        if (lay.raceway && GH.terrain.trackDistance(lay.raceway, px, pz) < 13) return true;
+        if (lay.convoyPath) {
+          for (var cv = 0; cv < lay.convoyPath.length; cv++) {
+            if (GH.dist2(px, pz, lay.convoyPath[cv].x, lay.convoyPath[cv].z) < 7 * 7) return true;
+          }
+        }
+        if (lay.checkpoints) {
+          for (var ck = 0; ck < lay.checkpoints.length; ck++) {
+            if (GH.dist2(px, pz, lay.checkpoints[ck].x, lay.checkpoints[ck].z) < 7 * 7) return true;
+          }
+        }
+        for (var nn = 0; nn < lay.nests.length; nn++) {
+          if (GH.dist2(px, pz, lay.nests[nn].x, lay.nests[nn].z) < 7 * 7) return true;
+        }
+        for (var pk = 0; pk < lay.packs.length; pk++) {
+          if (GH.dist2(px, pz, lay.packs[pk].x, lay.packs[pk].z) < 5 * 5) return true;
+        }
+        return false;
+      });
     }
 
     // world features
     lay.nests.forEach(function (n) {
       var nest = GH.models.buildNest(deadNests[n.id]);
-      nest.position.set(n.x, 0, n.z);
+      nest.position.set(n.x, gy(n.x, n.z), n.z);
       group.add(nest);
       nestMeshes[n.id] = nest;
     });
     if (lay.relay) {
       var relay = GH.models.buildRelay();
-      relay.position.set(lay.relay.x, 0, lay.relay.z);
+      relay.position.set(lay.relay.x, gy(lay.relay.x, lay.relay.z), lay.relay.z);
       group.add(relay);
     }
     if (lay.lair) {
       var lair = GH.models.buildLair(lairsDown[lay.lair.zone]);
-      lair.position.set(lay.lair.x, 0, lay.lair.z);
+      lair.position.set(lay.lair.x, gy(lay.lair.x, lay.lair.z), lay.lair.z);
       group.add(lair);
     }
     if (lay.vault) {
       var vault = GH.models.buildVault(vaultsOpen[lay.vault.id]);
-      vault.position.set(lay.vault.x, 0, lay.vault.z);
+      vault.position.set(lay.vault.x, gy(lay.vault.x, lay.vault.z), lay.vault.z);
       vault.rotation.y = lay.vault.x > 0 ? -Math.PI / 2 : Math.PI / 2;
       group.add(vault);
       vaultMeshes[lay.vault.id] = vault;
@@ -490,19 +500,19 @@ GH.world = (function () {
           GH.assets.basic(ci === lay.checkpoints.length - 1 ? 0xffd050 : 0x60c8ff,
             { transparent: true, opacity: 0.8 }));
         ring.rotation.x = Math.PI / 2;
-        ring.position.set(cp.x, 0.4, cp.z);
+        ring.position.set(cp.x, gy(cp.x, cp.z) + 0.4, cp.z);
         group.add(ring);
         cpMeshes.push(ring);
       });
     }
     if (lay.objective) {
       objectiveMesh = GH.models.buildObjective(lay.objective.def.kind);
-      objectiveMesh.position.set(lay.objective.x, 0, lay.objective.z);
+      objectiveMesh.position.set(lay.objective.x, gy(lay.objective.x, lay.objective.z), lay.objective.z);
       group.add(objectiveMesh);
     }
     if (lay.chest) {
       chestMesh = GH.models.buildChest();
-      chestMesh.position.set(lay.chest.x, 0, lay.chest.z);
+      chestMesh.position.set(lay.chest.x, gy(lay.chest.x, lay.chest.z), lay.chest.z);
       group.add(chestMesh);
     }
     // RACEWAY: gate pylons, start gantry, and dense trackside furniture —
@@ -515,7 +525,7 @@ GH.world = (function () {
         var rnx = rw.path[(Math.floor(rg * rw.path.length / rw.gates) + 1) % rw.path.length];
         var rang = Math.atan2(rnx.x - rpt.x, rnx.z - rpt.z);
         var rpg = GH.models.buildPylonPair(rg === 0 ? 0xffd050 : 0x60c8ff);
-        rpg.position.set(rpt.x, 0, rpt.z);
+        rpg.position.set(rpt.x, gy(rpt.x, rpt.z), rpt.z);
         rpg.rotation.y = rang;
         group.add(rpg);
       }
@@ -523,7 +533,7 @@ GH.world = (function () {
       var startPt = rw.path[0];
       var nxt = rw.path[1];
       var gantry = GH.models.buildStartGantry();
-      gantry.position.set(startPt.x, 0, startPt.z);
+      gantry.position.set(startPt.x, gy(startPt.x, startPt.z), startPt.z);
       gantry.rotation.y = Math.atan2(nxt.x - startPt.x, nxt.z - startPt.z);
       group.add(gantry);
       raceLights = gantry.userData.lamps;
@@ -532,28 +542,24 @@ GH.world = (function () {
       var postMat = GH.assets.lambert({ color: 0x2a3038 });
       var lampMatA = GH.assets.basic(0x60c8ff, { transparent: true, opacity: 0.85 });
       var lampMatB = GH.assets.basic(0xffd050, { transparent: true, opacity: 0.85 });
-      var chevMat = new THREE.MeshBasicMaterial({ color: 0xfff2d0, transparent: true, opacity: 0.25, depthWrite: false });
-      var chevGeo = new THREE.PlaneGeometry(1.4, 3.2);
       var lampGeo = new THREE.OctahedronGeometry(0.4);
-      for (var tp = 0; tp < rw.path.length; tp += 2) {
+      // the asphalt itself: curbs, centre line, tyre walls on the corners
+      GH.terrain.buildTrack(group, rw);
+      var postEvery = Math.max(2, Math.floor(rw.path.length / 36));
+      for (var tp = 0; tp < rw.path.length; tp += postEvery) {
         var pA = rw.path[tp];
         var pB = rw.path[(tp + 1) % rw.path.length];
         var tang = Math.atan2(pB.x - pA.x, pB.z - pA.z);
-        var side = (tp % 4 === 0) ? 1 : -1;
-        var offX = Math.cos(tang) * -side * 13;
-        var offZ = Math.sin(tang) * side * 13;
+        var side = ((tp / postEvery) % 2 === 0) ? 1 : -1;
+        var offX = Math.cos(tang) * -side * (rw.width / 2 + 3);
+        var offZ = Math.sin(tang) * side * (rw.width / 2 + 3);
+        var py = gy(pA.x + offX, pA.z + offZ);
         var post = new THREE.Mesh(postGeo, postMat);
-        post.position.set(pA.x + offX, 2.75, pA.z + offZ);
+        post.position.set(pA.x + offX, py + 2.75, pA.z + offZ);
         group.add(post);
-        var lamp = new THREE.Mesh(lampGeo, tp % 8 === 0 ? lampMatB : lampMatA);
-        lamp.position.set(pA.x + offX, 5.8, pA.z + offZ);
+        var lamp = new THREE.Mesh(lampGeo, (tp / postEvery) % 4 === 0 ? lampMatB : lampMatA);
+        lamp.position.set(pA.x + offX, py + 5.8, pA.z + offZ);
         group.add(lamp);
-        // lane chevron painted on the racing line
-        var chev = new THREE.Mesh(chevGeo, chevMat);
-        chev.rotation.x = -Math.PI / 2;
-        chev.rotation.z = -tang;
-        chev.position.set(pA.x, 0.05, pA.z);
-        group.add(chev);
       }
     }
     // CIPHER HALLS: solid walls, seals of four kinds, matter screens,
@@ -651,7 +657,7 @@ GH.world = (function () {
         var wpd = new THREE.Mesh(new THREE.CircleGeometry(2.2, 12),
           new THREE.MeshBasicMaterial({ color: wp.ambush ? 0xc05050 : 0x60c8ff, transparent: true, opacity: 0.2, depthWrite: false }));
         wpd.rotation.x = -Math.PI / 2;
-        wpd.position.set(wp.x, 0.05, wp.z);
+        wpd.position.set(wp.x, gy(wp.x, wp.z) + 0.05, wp.z);
         group.add(wpd);
       });
     }
@@ -659,30 +665,27 @@ GH.world = (function () {
     if (lay.relic) {
       relicMesh = GH.models.buildObjective(GH.dungeons.OBJECTIVES[info.parent].kind);
       relicMesh.scale.setScalar(0.7);
-      relicMesh.position.set(lay.relic.x, 0, lay.relic.z);
+      relicMesh.position.set(lay.relic.x, gy(lay.relic.x, lay.relic.z), lay.relic.z);
       group.add(relicMesh);
     }
 
     // ---- overworld landmarks: ruins, hulks, stains, roads ----
     if (!info.dungeon) {
       (lay.stains || []).forEach(function (stn) {
-        var stain = new THREE.Mesh(new THREE.CircleGeometry(stn.r, 20),
-          new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.16, depthWrite: false }));
-        stain.rotation.x = -Math.PI / 2;
-        stain.position.set(stn.x, 0.03, stn.z);
-        group.add(stain);
+        GH.terrain.paintDisc(stn.x, stn.z, stn.r, [0.08, 0.07, 0.07], 0.45);
       });
       (lay.ruins || []).forEach(function (rn) {
         if (rn.kind === 'hulk') {
           var hulk = GH.models.buildWreckSite();
           hulk.scale.setScalar(2.6);
-          hulk.position.set(rn.x, 0, rn.z);
+          hulk.position.set(rn.x, gy(rn.x, rn.z), rn.z);
           group.add(hulk);
         } else {
           for (var rp = 0; rp < 7; rp++) {
             var ra = (rp / 7) * Math.PI * 2;
             var pillar = GH.models.buildPillar();
-            pillar.position.set(rn.x + Math.cos(ra) * 9, 0, rn.z + Math.sin(ra) * 9);
+            var plx = rn.x + Math.cos(ra) * 9, plz = rn.z + Math.sin(ra) * 9;
+            pillar.position.set(plx, gy(plx, plz), plz);
             group.add(pillar);
           }
         }
@@ -690,13 +693,8 @@ GH.world = (function () {
       // roads: worn strips from each edge gate toward the middle
       lay.gates.forEach(function (gt) {
         if (gt.arch) return; // dungeon mouths keep their mystery
-        var len = Math.sqrt(gt.x * gt.x + gt.z * gt.z) * 0.82;
-        var road = new THREE.Mesh(new THREE.PlaneGeometry(6, len),
-          new THREE.MeshBasicMaterial({ color: 0xfff2d0, transparent: true, opacity: 0.1, depthWrite: false }));
-        road.rotation.x = -Math.PI / 2;
-        road.rotation.z = -Math.atan2(gt.x, gt.z);
-        road.position.set(gt.x / 2, 0.04, gt.z / 2);
-        group.add(road);
+        var hx = zoneId === 'wreck' ? W.CAMP.x : 0, hz = zoneId === 'wreck' ? W.CAMP.z : 0;
+        GH.terrain.paintStrip(gt.x, gt.z, hx * 0.9, hz * 0.9, 2.6, [0.42, 0.38, 0.33], 0.55);
       });
     }
 
@@ -704,7 +702,7 @@ GH.world = (function () {
     lay.gates.forEach(function (gt) {
       var toInfo = W.zoneInfo(gt.to);
       var mesh = GH.models.buildGate(gt.exit ? 'exit' : (toInfo.dungeon ? 'dungeon' : 'travel'));
-      mesh.position.set(gt.x, 0, gt.z);
+      mesh.position.set(gt.x, gy(gt.x, gt.z), gt.z);
       // gates on the map edge face inward
       mesh.rotation.y = Math.atan2(-gt.x, -gt.z);
       group.add(mesh);
@@ -714,7 +712,7 @@ GH.world = (function () {
     // the hub: survivor camp + race sites (wreck territory only)
     if (zoneId === 'wreck') {
       var camp = new THREE.Group();
-      camp.position.set(W.CAMP.x, 0, W.CAMP.z);
+      camp.position.set(W.CAMP.x, gy(W.CAMP.x, W.CAMP.z), W.CAMP.z);
       camp.add(GH.models.buildCampFire());
       var stations = [
         { m: GH.models.buildBrokerTable(), x: -5, z: -3 },
@@ -735,7 +733,7 @@ GH.world = (function () {
         var next = path[(Math.floor(g * path.length / W.CIRCUIT.gates) + 1) % path.length];
         var ang = Math.atan2(next.x - pp.x, next.z - pp.z);
         var gate = GH.models.buildPylonPair(g === 0 ? 0xffd050 : 0x60c8ff);
-        gate.position.set(pp.x, 0, pp.z);
+        gate.position.set(pp.x, gy(pp.x, pp.z), pp.z);
         gate.rotation.y = ang;
         group.add(gate);
       }
@@ -750,7 +748,7 @@ GH.world = (function () {
       coreMeshes: coreMeshes, relicMesh: relicMesh,
       receptorMeshes: receptorMeshes, switchMeshes: switchMeshes,
       screenMeshes: screenMeshes, beamPool: beamPool,
-      raceLights: raceLights,
+      raceLights: raceLights, terrain: terrain,
       layout: lay, info: info
     };
   };

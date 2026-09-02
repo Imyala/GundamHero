@@ -1286,7 +1286,11 @@ GH.weightedPick = function (arr) {
 // Everything is generated at runtime on canvases; no binary assets.
 GH.assets = (function () {
   var A = {};
-  A.PSX_SNAP = 96; // vertex snap grid (lower = wobblier). 0 disables.
+  A.PSX_SNAP = 1; // 1 = snap verts to the real render pixel grid; 0 disables.
+  // the snap grid tracks the render target: snapping to a coarser grid than
+  // the framebuffer made every mesh lurch several pixels as the camera moved
+  A.snap = { value: new THREE.Vector2(320, 180) };
+  A.setSnap = function (w, h) { A.snap.value.set(Math.max(1, w / 2), Math.max(1, h / 2)); };
 
   function makeCanvas(size) {
     var c = document.createElement('canvas');
@@ -1419,9 +1423,50 @@ GH.assets = (function () {
     return t;
   }
 
+  // ---- biome ground detail: tiling noise sheets, one per surface ----
+  function groundCanvas(kind) {
+    var S = 128;
+    var c = makeCanvas(S), ctx = c.getContext('2d');
+    var base = { sand: '#d8c08a', snow: '#f0f4fa', moss: '#5a7a3a', basalt: '#3a3234', slate: '#6a6e80', void: '#9a92aa' }[kind] || '#888';
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, S, S);
+    var img = ctx.getImageData(0, 0, S, S), d = img.data;
+    for (var y = 0; y < S; y++) {
+      for (var x = 0; x < S; x++) {
+        var i = (y * S + x) * 4;
+        var n = (Math.random() - 0.5) * 22;
+        if (kind === 'sand') {
+          // wind ripples: soft diagonal bands
+          n += Math.sin((x * 0.7 + y * 0.35) * 0.55) * 14;
+        } else if (kind === 'snow') {
+          n *= 0.5;
+          n += Math.sin(x * 0.4) * Math.sin(y * 0.37) * 5;
+        } else if (kind === 'moss') {
+          n += (Math.random() < 0.08 ? 26 : 0) - 6;
+        } else if (kind === 'basalt') {
+          // cracked plates: dark seams on a grid, warm speckle
+          if ((x % 32) < 2 || (y % 32) < 2) n -= 30;
+          if (Math.random() < 0.03) { d[i] += 40; }
+        } else if (kind === 'slate') {
+          n += ((y % 16) < 2 ? -22 : 0) + Math.sin(x * 0.9) * 4;
+        } else if (kind === 'void') {
+          if ((x % 16) === 0 || (y % 16) === 0) n -= 26;
+          if (Math.random() < 0.02) { d[i + 2] += 60; }
+        }
+        d[i] += n; d[i + 1] += n; d[i + 2] += n;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+
   A.init = function () {
     A._mats = {};
     A.stageTex = {};
+    A.groundTex = {};
+    ['sand', 'snow', 'moss', 'basalt', 'slate', 'void'].forEach(function (k) {
+      A.groundTex[k] = texFromCanvas(groundCanvas(k), 1, true);
+    });
     GH.stages.forEach(function (st) {
       A.stageTex[st.id] = {
         floor: texFromCanvas(cobbleCanvas(128, st.floor.base, st.floor.mortar, st.floor.dark), 20, true),
@@ -1470,11 +1515,11 @@ GH.assets = (function () {
   function psxPatch(mat) {
     if (!A.PSX_SNAP) return mat;
     mat.onBeforeCompile = function (shader) {
-      shader.vertexShader = shader.vertexShader.replace(
+      shader.uniforms.uSnap = A.snap;
+      shader.vertexShader = 'uniform vec2 uSnap;\n' + shader.vertexShader.replace(
         '#include <project_vertex>',
         '#include <project_vertex>\n' +
-        'gl_Position.xy = floor(gl_Position.xy / gl_Position.w * ' + A.PSX_SNAP.toFixed(1) +
-        ') / ' + A.PSX_SNAP.toFixed(1) + ' * gl_Position.w;'
+        'gl_Position.xy = floor(gl_Position.xy / gl_Position.w * uSnap) / uSnap * gl_Position.w;'
       );
     };
     return mat;
@@ -1647,7 +1692,7 @@ GH.gems = (function () {
 // Beating a stage's wave-20 CORRUPTED shell unlocks that shell + the next stage.
 GH.stages = [
   {
-    id: 'wreck', hazard: null, name: 'TIDE WRECKAGE', sub: 'Stage 1',
+    id: 'wreck', hazard: null, name: 'TIDE WRECKAGE', sub: 'Stage 1', biome: 'dune coast — sand seas, a drowned fleet, the beach camp',
     // sun-bleached island ruin
     floor: { base: 0xb0a078, dark: '#3a3020', mortar: '#584c34' },
     sky: ['#7ec8d8', '#3a7890', '#1a3a48'],
@@ -1657,7 +1702,9 @@ GH.stages = [
     roster: function (w) {
       var t = [{ id: 'husk', w: 10 }];
       if (w >= 2) t.push({ id: 'shardling', w: 6 + w });
+      if (w >= 3) t.push({ id: 'scarab', w: 4 });
       if (w >= 4) t.push({ id: 'spiker', w: 4 });
+      if (w >= 5) t.push({ id: 'burrower', w: 3 });
       if (w >= 6) t.push({ id: 'brute', w: 2 + w * 0.2 });
       return t;
     },
@@ -1666,16 +1713,18 @@ GH.stages = [
     hpMult: 1, dmgMult: 1
   },
   {
-    id: 'glacier', hazard: 'ice', name: 'GLACIER HOLLOW', sub: 'Stage 2',
+    id: 'glacier', hazard: 'ice', name: 'GLACIER HOLLOW', sub: 'Stage 2', biome: 'frost range — pine valleys, frozen lakes, snowfall',
     floor: { base: 0x8ab0c8, dark: '#16282e', mortar: '#2e4852' },
     sky: ['#bfe8ff', '#5a90c0', '#182848'],
     fog: 0x9fc8dc, hemiSky: 0xbfe8ff, hemiGround: 0x24485a, sun: 0xeaf6ff,
     wall: { base: '#9ec8dc', top: '#4a7890' },
     props: ['pillar', 'crystal'],
     roster: function (w) {
-      var t = [{ id: 'husk', w: 8 }, { id: 'shardling', w: 8 + w }];
-      if (w >= 3) t.push({ id: 'orb', w: 5 });
-      if (w >= 5) t.push({ id: 'spiker', w: 4 });
+      var t = [{ id: 'husk', w: 8 }, { id: 'shardling', w: 6 + w }];
+      if (w >= 2) t.push({ id: 'stalker', w: 6 });
+      if (w >= 3) t.push({ id: 'frostwisp', w: 5 });
+      if (w >= 4) t.push({ id: 'orb', w: 4 });
+      if (w >= 6) t.push({ id: 'spiker', w: 4 });
       if (w >= 7) t.push({ id: 'brute', w: 2 + w * 0.25 });
       return t;
     },
@@ -1684,17 +1733,19 @@ GH.stages = [
     hpMult: 1.35, dmgMult: 1.15
   },
   {
-    id: 'cloister', hazard: 'vines', name: 'VERDANT CLOISTER', sub: 'Stage 3',
+    id: 'cloister', hazard: 'vines', name: 'VERDANT CLOISTER', sub: 'Stage 3', biome: 'rain canopy — jungle, vines, ponds and mud',
     floor: { base: 0x7a8a58, dark: '#1c2410', mortar: '#3a4424' },
     sky: ['#b8d890', '#4a7840', '#122a18'],
     fog: 0x8aa878, hemiSky: 0xd0e8b0, hemiGround: 0x24381a, sun: 0xfff8d0,
     wall: { base: '#5a7848', top: '#243418' },
     props: ['tree', 'tree', 'pillar'],
     roster: function (w) {
-      var t = [{ id: 'husk', w: 6 }, { id: 'spiker', w: 6 + w * 0.5 }];
-      if (w >= 2) t.push({ id: 'shardling', w: 6 });
+      var t = [{ id: 'husk', w: 6 }, { id: 'spiker', w: 5 + w * 0.4 }];
+      if (w >= 2) t.push({ id: 'lurker', w: 5 });
+      if (w >= 3) t.push({ id: 'shardling', w: 5 });
       if (w >= 4) t.push({ id: 'creeper', w: 5 });
-      if (w >= 6) t.push({ id: 'orb', w: 4 });
+      if (w >= 5) t.push({ id: 'bloat', w: 4 });
+      if (w >= 7) t.push({ id: 'orb', w: 3 });
       if (w >= 8) t.push({ id: 'brute', w: 3 + w * 0.25 });
       return t;
     },
@@ -1703,16 +1754,18 @@ GH.stages = [
     hpMult: 1.8, dmgMult: 1.32
   },
   {
-    id: 'ember', hazard: 'vents', name: 'EMBER CORE', sub: 'Stage 4',
+    id: 'ember', hazard: 'vents', name: 'EMBER CORE', sub: 'Stage 4', biome: 'cinder wastes — basalt, lava basins, ash',
     floor: { base: 0x9a5848, dark: '#200a08', mortar: '#48201a' },
     sky: ['#ff9060', '#8a3020', '#180604'],
-    fog: 0x6a3028, hemiSky: 0xff9060, hemiGround: 0x2a0e0a, sun: 0xffb080,
+    fog: 0x6a3028, hemiSky: 0xffa070, hemiGround: 0x5a2a1c, sun: 0xffc090,
     wall: { base: '#7a4030', top: '#301008' },
     props: ['pillar', 'crystal'],
     roster: function (w) {
       var t = [{ id: 'husk', w: 6 }, { id: 'cinder', w: 6 + w * 0.5 }];
-      if (w >= 3) t.push({ id: 'orb', w: 5 });
-      if (w >= 4) t.push({ id: 'shardling', w: 6 });
+      if (w >= 2) t.push({ id: 'crawler', w: 6 });
+      if (w >= 3) t.push({ id: 'orb', w: 4 });
+      if (w >= 4) t.push({ id: 'drake', w: 4 });
+      if (w >= 5) t.push({ id: 'shardling', w: 5 });
       if (w >= 5) t.push({ id: 'brute', w: 4 + w * 0.3 });
       if (w >= 8) t.push({ id: 'spiker', w: 5 });
       return t;
@@ -1722,7 +1775,7 @@ GH.stages = [
     hpMult: 2.4, dmgMult: 1.55
   },
   {
-    id: 'storm', hazard: 'lightning', name: 'STORMSPIRE', sub: 'Stage 5',
+    id: 'storm', hazard: 'lightning', name: 'STORMSPIRE', sub: 'Stage 5', biome: 'thunder highlands — terraced mesas, rain, lightning',
     floor: { base: 0x707890, dark: '#141422', mortar: '#2c2c44' },
     sky: ['#9090b8', '#3c3c68', '#0a0a1c'],
     fog: 0x585c78, hemiSky: 0xa8a8d0, hemiGround: 0x1c1c30, sun: 0xd0d0ff,
@@ -1730,8 +1783,10 @@ GH.stages = [
     props: ['pillar', 'crystal', 'tree'],
     roster: function (w) {
       var t = [{ id: 'husk', w: 5 }, { id: 'volt', w: 6 + w * 0.5 }];
-      if (w >= 2) t.push({ id: 'orb', w: 6 });
-      if (w >= 3) t.push({ id: 'shardling', w: 7 });
+      if (w >= 2) t.push({ id: 'sentinel', w: 5 });
+      if (w >= 3) t.push({ id: 'orb', w: 4 });
+      if (w >= 4) t.push({ id: 'drake', w: 4 });
+      if (w >= 4) t.push({ id: 'shardling', w: 6 });
       if (w >= 5) t.push({ id: 'spiker', w: 5 });
       if (w >= 6) t.push({ id: 'brute', w: 4 + w * 0.3 });
       return t;
@@ -1741,7 +1796,7 @@ GH.stages = [
     hpMult: 3.2, dmgMult: 1.8
   },
   {
-    id: 'null', hazard: 'rifts', name: 'NULL SANCTUM', sub: 'Final Stage',
+    id: 'null', hazard: 'rifts', name: 'NULL SANCTUM', sub: 'Final Stage', biome: 'void sanctum — crystal shards, chasms, low gravity',
     floor: { base: 0x8a8a92, dark: '#0a0a0e', mortar: '#26262e' },
     sky: ['#d8d8e0', '#404048', '#000004'],
     fog: 0x3a3a44, hemiSky: 0xe8e8f0, hemiGround: 0x101014, sun: 0xffffff,
@@ -1749,10 +1804,12 @@ GH.stages = [
     props: ['pillar', 'crystal'],
     roster: function (w) {
       var t = [
-        { id: 'husk', w: 5 }, { id: 'shardling', w: 7 }, { id: 'volt', w: 4 },
-        { id: 'cinder', w: 4 }, { id: 'creeper', w: 4 }
+        { id: 'husk', w: 5 }, { id: 'shardling', w: 6 }, { id: 'volt', w: 3 },
+        { id: 'cinder', w: 3 }, { id: 'creeper', w: 3 }
       ];
-      if (w >= 3) t.push({ id: 'orb', w: 5 });
+      if (w >= 2) t.push({ id: 'phantom', w: 6 });
+      if (w >= 3) t.push({ id: 'nullshard', w: 6 });
+      if (w >= 3) t.push({ id: 'orb', w: 4 });
       if (w >= 4) t.push({ id: 'spiker', w: 5 });
       if (w >= 5) t.push({ id: 'brute', w: 5 + w * 0.35 });
       return t;
@@ -2817,7 +2874,1291 @@ GH.models = (function () {
     crystal: function () { return M.buildCrystal(); }
   };
 
+    // ---------------------------------------------------------------
+  // Biome props — every zone gets its own vegetation and rock so the
+  // ground reads as a place. All are static and get merged per material.
+  // ---------------------------------------------------------------
+  function R(rnd, a, b) { return a + (rnd ? rnd() : Math.random()) * (b - a); }
+  function cone(r, h, c, seg, o) { return new THREE.Mesh(new THREE.ConeGeometry(r, h, seg || 5), mat(c, o)); }
+  function cyl(rt, rb, h, c, seg, o) { return new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 6), mat(c, o)); }
+  function ico(r, c, o) { return new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), mat(c, o)); }
+
+  M.biomeProps = {
+    // ---- dune coast ----
+    palm: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 2.6, 4.2), lean = R(rnd, -0.25, 0.25);
+      var segs = 4;
+      for (var i = 0; i < segs; i++) {
+        var t = cyl(0.13, 0.17, h / segs + 0.05, 0x7a5a3a, 5);
+        t.position.set(lean * i * 0.5, (i + 0.5) * h / segs, 0);
+        t.rotation.z = -lean * 0.6;
+        g.add(t);
+      }
+      var top = new THREE.Vector3(lean * (segs - 0.5) * 0.5, h, 0);
+      for (var f = 0; f < 7; f++) {
+        var fr = box(0.18, 0.04, 1.9, f % 2 ? 0x3a8a3a : 0x2e7030);
+        var a = (f / 7) * Math.PI * 2;
+        fr.position.set(top.x + Math.cos(a) * 0.8, h + 0.1 - 0.25, top.z + Math.sin(a) * 0.8);
+        fr.rotation.y = -a + Math.PI / 2;
+        fr.rotation.x = 0.5;
+        g.add(fr);
+      }
+      var nut = ico(0.12, 0x6a4a2a); nut.position.set(top.x, h - 0.15, 0.2); g.add(nut);
+      return g;
+    },
+    cactus: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 1.2, 2.4);
+      var body = cyl(0.2, 0.24, h, 0x4a8a3a, 7); body.position.y = h / 2; g.add(body);
+      var arms = rnd() < 0.7 ? 1 + Math.floor(rnd() * 2) : 0;
+      for (var i = 0; i < arms; i++) {
+        var side = i === 0 ? 1 : -1;
+        var ay = h * R(rnd, 0.35, 0.65);
+        var arm = cyl(0.12, 0.14, 0.6, 0x4a8a3a, 6); arm.rotation.z = Math.PI / 2; arm.position.set(side * 0.4, ay, 0); g.add(arm);
+        var up = cyl(0.12, 0.14, R(rnd, 0.5, 0.9), 0x4a8a3a, 6); up.position.set(side * 0.66, ay + 0.35, 0); g.add(up);
+      }
+      return g;
+    },
+    duneRock: function (rnd) {
+      var g = new THREE.Group();
+      var r = R(rnd, 0.7, 1.6);
+      var rock = ico(r, 0xb89468); rock.scale.set(1.2, 0.6, 1); rock.position.y = r * 0.3; rock.rotation.y = rnd() * 3; g.add(rock);
+      var small = ico(r * 0.4, 0xa88458); small.position.set(r * 1.1, r * 0.15, r * 0.4); g.add(small);
+      return g;
+    },
+    wreckRib: function (rnd) {
+      var g = new THREE.Group();
+      var n = 3 + Math.floor(rnd() * 3);
+      var hh = R(rnd, 3, 5.5);
+      for (var i = 0; i < n; i++) {
+        var rib = box(0.22, hh, 0.5, 0x6a4a3a);
+        rib.position.set(i * 1.4 - n * 0.7, hh * 0.4, 0);
+        rib.rotation.z = R(rnd, 0.25, 0.5);
+        g.add(rib);
+      }
+      var keel = box(n * 1.4, 0.4, 0.6, 0x5a3a2a); keel.position.y = 0.2; g.add(keel);
+      return g;
+    },
+    bones: function (rnd) {
+      var g = new THREE.Group();
+      var skull = box(0.5, 0.4, 0.6, 0xe8e0d0); skull.position.y = 0.2; skull.rotation.y = rnd() * 2; g.add(skull);
+      for (var i = 0; i < 4; i++) {
+        var rib = box(0.08, 0.9, 0.08, 0xe0d8c8);
+        rib.position.set(1 + i * 0.35, 0.3, 0); rib.rotation.z = 0.7; g.add(rib);
+      }
+      return g;
+    },
+    // ---- frost range ----
+    pine: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 2.8, 5.0);
+      var trunk = cyl(0.1, 0.16, h * 0.4, 0x4a3020, 5); trunk.position.y = h * 0.2; g.add(trunk);
+      var tiers = 3;
+      for (var i = 0; i < tiers; i++) {
+        var ty = h * 0.3 + i * (h * 0.22);
+        var rad = 0.9 - i * 0.22;
+        var c = cone(rad, h * 0.32, i % 2 ? 0x1f4a2a : 0x25563a, 6); c.position.y = ty + h * 0.12; g.add(c);
+        var snow = cone(rad * 0.75, h * 0.14, 0xf0f4f8, 6); snow.position.y = ty + h * 0.24; g.add(snow);
+      }
+      return g;
+    },
+    snowRock: function (rnd) {
+      var g = new THREE.Group();
+      var r = R(rnd, 0.6, 1.5);
+      var rock = ico(r, 0x7a7e88); rock.position.y = r * 0.4; rock.scale.y = 0.7; g.add(rock);
+      var cap = ico(r * 0.85, 0xf4f6fa); cap.position.y = r * 0.75; cap.scale.set(1, 0.3, 1); g.add(cap);
+      return g;
+    },
+    iceSpire: function (rnd) {
+      var g = new THREE.Group();
+      for (var i = 0; i < 3; i++) {
+        var h = R(rnd, 1.6, 4.2);
+        var c = cone(R(rnd, 0.2, 0.4), h, 0xa0e0ff, 5, { transparent: true, opacity: 0.85, emissive: 0x104050 });
+        c.position.set(R(rnd, -0.6, 0.6), h / 2, R(rnd, -0.6, 0.6));
+        c.rotation.set(R(rnd, -0.2, 0.2), 0, R(rnd, -0.2, 0.2));
+        g.add(c);
+      }
+      return g;
+    },
+    deadTree: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 2.2, 3.6);
+      var trunk = box(0.22, h, 0.22, 0x3a3230); trunk.position.y = h / 2; trunk.rotation.z = R(rnd, -0.15, 0.15); g.add(trunk);
+      for (var i = 0; i < 4; i++) {
+        var br = box(0.08, 1.2, 0.08, 0x3a3230);
+        br.position.set(R(rnd, -0.4, 0.4), h * R(rnd, 0.5, 0.95), R(rnd, -0.4, 0.4));
+        br.rotation.set(R(rnd, -1, 1), 0, R(rnd, -1, 1));
+        g.add(br);
+      }
+      return g;
+    },
+    // ---- rain canopy ----
+    jungleTree: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 3.8, 6.2);
+      var trunk = cyl(0.16, 0.3, h, 0x5a3e28, 6); trunk.position.y = h / 2; g.add(trunk);
+      for (var r = 0; r < 3; r++) {
+        var root = box(0.12, 0.9, 0.5, 0x4a3020);
+        var ra = (r / 3) * Math.PI * 2;
+        root.position.set(Math.cos(ra) * 0.35, 0.3, Math.sin(ra) * 0.35);
+        root.rotation.y = -ra; root.rotation.x = 0.5; g.add(root);
+      }
+      for (var i = 0; i < 4; i++) {
+        var cnp = ico(R(rnd, 1.0, 1.7), i % 2 ? 0x2e7a34 : 0x3a9a40);
+        cnp.scale.y = 0.55;
+        cnp.position.set(R(rnd, -0.9, 0.9), h - 0.4 + R(rnd, -0.3, 0.5), R(rnd, -0.9, 0.9));
+        g.add(cnp);
+      }
+      return g;
+    },
+    fern: function (rnd) {
+      var g = new THREE.Group();
+      var n = 5 + Math.floor(rnd() * 3);
+      for (var i = 0; i < n; i++) {
+        var fr = box(0.14, 0.03, 1.0, i % 2 ? 0x4aa848 : 0x3a8a3a);
+        var a = (i / n) * Math.PI * 2;
+        fr.position.set(Math.cos(a) * 0.4, 0.35, Math.sin(a) * 0.4);
+        fr.rotation.y = -a + Math.PI / 2; fr.rotation.x = -0.6;
+        g.add(fr);
+      }
+      return g;
+    },
+    vineCurtain: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 3.4, 5);
+      var t1 = cyl(0.14, 0.2, h, 0x5a3e28, 5); t1.position.set(-1.6, h / 2, 0); g.add(t1);
+      var t2 = cyl(0.14, 0.2, h, 0x5a3e28, 5); t2.position.set(1.6, h / 2, 0); g.add(t2);
+      var bar = box(3.4, 0.14, 0.14, 0x4a3020); bar.position.y = h - 0.3; g.add(bar);
+      for (var i = 0; i < 7; i++) {
+        var len = R(rnd, 1.2, h - 0.9);
+        var v = box(0.07, len, 0.07, i % 2 ? 0x3a6a30 : 0x4a8a3a);
+        v.position.set(-1.4 + i * 0.47, h - 0.3 - len / 2, R(rnd, -0.1, 0.1));
+        g.add(v);
+      }
+      var can1 = ico(1.1, 0x2e7a34); can1.scale.y = 0.5; can1.position.set(-1.6, h, 0); g.add(can1);
+      var can2 = ico(1.1, 0x3a9a40); can2.scale.y = 0.5; can2.position.set(1.6, h, 0); g.add(can2);
+      return g;
+    },
+    mushroom: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 0.5, 1.3);
+      var stem = cyl(0.1, 0.14, h, 0xe0d8c0, 6); stem.position.y = h / 2; g.add(stem);
+      var cap = cone(R(rnd, 0.35, 0.6), 0.35, rnd() < 0.5 ? 0xc04a3a : 0x8a4aa0, 7, { emissive: 0x301020 }); cap.position.y = h + 0.12; g.add(cap);
+      return g;
+    },
+    mossRock: function (rnd) {
+      var g = new THREE.Group();
+      var r = R(rnd, 0.6, 1.4);
+      var rock = ico(r, 0x556a48); rock.position.y = r * 0.35; rock.scale.y = 0.65; g.add(rock);
+      var moss = ico(r * 0.7, 0x5aa040); moss.position.set(r * 0.2, r * 0.7, 0); moss.scale.y = 0.3; g.add(moss);
+      return g;
+    },
+    // ---- cinder wastes ----
+    basalt: function (rnd) {
+      var g = new THREE.Group();
+      var n = 4 + Math.floor(rnd() * 4);
+      for (var i = 0; i < n; i++) {
+        var h = R(rnd, 0.8, 3.4);
+        var col = cyl(0.36, 0.36, h, i % 3 ? 0x2a2628 : 0x3a3234, 6);
+        col.position.set(R(rnd, -1, 1), h / 2, R(rnd, -1, 1));
+        g.add(col);
+      }
+      return g;
+    },
+    lavaRock: function (rnd) {
+      var g = new THREE.Group();
+      var r = R(rnd, 0.6, 1.4);
+      var rock = ico(r, 0x3a2a28); rock.position.y = r * 0.4; rock.rotation.y = rnd() * 3; g.add(rock);
+      var glow = box(r * 0.9, 0.12, 0.12, 0xff6020); glow.position.y = r * 0.55; glow.rotation.y = rnd() * 3; g.add(glow);
+      return g;
+    },
+    charTree: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 2, 3.4);
+      var trunk = box(0.2, h, 0.2, 0x1a1414); trunk.position.y = h / 2; g.add(trunk);
+      for (var i = 0; i < 3; i++) {
+        var br = box(0.08, 1.1, 0.08, 0x1a1414);
+        br.position.set(R(rnd, -0.4, 0.4), h * R(rnd, 0.55, 0.95), R(rnd, -0.4, 0.4));
+        br.rotation.set(R(rnd, -0.9, 0.9), 0, R(rnd, -0.9, 0.9));
+        g.add(br);
+        var tip = box(0.1, 0.1, 0.1, 0xff6020); tip.position.copy(br.position); tip.position.y += 0.5; g.add(tip);
+      }
+      return g;
+    },
+    ventStack: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 1.2, 2.2);
+      var stack = cyl(0.5, 0.8, h, 0x3a3234, 7); stack.position.y = h / 2; g.add(stack);
+      var glow = cyl(0.3, 0.3, 0.2, 0xff7020, 7); glow.position.y = h; g.add(glow);
+      return g;
+    },
+    // ---- thunder highlands ----
+    slateSpire: function (rnd) {
+      var g = new THREE.Group();
+      for (var i = 0; i < 3; i++) {
+        var h = R(rnd, 1.8, 5);
+        var sp = box(R(rnd, 0.3, 0.6), h, R(rnd, 0.3, 0.7), i % 2 ? 0x5a5e70 : 0x4a4e60);
+        sp.position.set(R(rnd, -0.8, 0.8), h / 2 - 0.2, R(rnd, -0.8, 0.8));
+        sp.rotation.set(R(rnd, -0.15, 0.15), rnd() * 2, R(rnd, -0.15, 0.15));
+        g.add(sp);
+      }
+      return g;
+    },
+    heather: function (rnd) {
+      var g = new THREE.Group();
+      var n = 5 + Math.floor(rnd() * 4);
+      for (var i = 0; i < n; i++) {
+        var b = box(R(rnd, 0.3, 0.6), R(rnd, 0.3, 0.6), R(rnd, 0.3, 0.6), rnd() < 0.5 ? 0x7a4a9a : 0x3a5a3a);
+        b.position.set(R(rnd, -1, 1), 0.2, R(rnd, -1, 1)); b.rotation.y = rnd() * 2; g.add(b);
+      }
+      return g;
+    },
+    menhir: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 3.5, 5.5);
+      var st = box(1.0, h, 0.7, 0x6a6a72); st.position.y = h / 2; st.rotation.z = R(rnd, -0.08, 0.08); g.add(st);
+      var moss = box(1.02, 0.3, 0.72, 0x4a6a3a); moss.position.y = h - 0.15; g.add(moss);
+      return g;
+    },
+    // ---- void sanctum ----
+    crystal: function (rnd) {
+      var g = M.buildCrystal();
+      g.scale.setScalar(R(rnd, 1.2, 2.2));
+      return g;
+    },
+    floatShard: function (rnd) {
+      var g = new THREE.Group();
+      var sh = new THREE.Mesh(new THREE.OctahedronGeometry(R(rnd, 0.3, 0.7)), mat(0xa070ff, { emissive: 0x402080 }));
+      sh.position.y = R(rnd, 1.4, 3.0); sh.rotation.set(rnd(), rnd(), rnd()); g.add(sh);
+      var base = box(0.3, 0.2, 0.3, 0x4a4060); base.position.y = 0.1; g.add(base);
+      return g;
+    },
+    monolith: function (rnd) {
+      var g = new THREE.Group();
+      var h = R(rnd, 6, 9);
+      var m = box(1.4, h, 0.8, 0x1a1622); m.position.y = h / 2; g.add(m);
+      var stripe = box(0.2, h * 0.7, 0.85, 0x8050e0); stripe.position.y = h / 2; g.add(stripe);
+      return g;
+    },
+    voidReed: function (rnd) {
+      var g = new THREE.Group();
+      var n = 3 + Math.floor(rnd() * 3);
+      for (var i = 0; i < n; i++) {
+        var h = R(rnd, 1, 2.2);
+        var rd = box(0.08, h, 0.08, 0x8a7ab0);
+        rd.position.set(R(rnd, -0.4, 0.4), h / 2, R(rnd, -0.4, 0.4)); rd.rotation.z = R(rnd, -0.2, 0.2); g.add(rd);
+        var tip = box(0.16, 0.16, 0.16, 0xc090ff); tip.position.set(rd.position.x, h, rd.position.z); g.add(tip);
+      }
+      return g;
+    }
+  };
+
+  // race-track tyre wall: three stacked drums
+  M.buildTyreWall = function (red) {
+    var g = new THREE.Group();
+    for (var i = 0; i < 3; i++) {
+      var t = cyl(0.45, 0.45, 0.36, red ? 0xa02a2a : 0x202024, 8);
+      t.position.set(0, 0.2 + (i === 2 ? 0.38 : 0), i === 2 ? 0 : (i === 0 ? -0.5 : 0.5));
+      g.add(t);
+    }
+    return g;
+  };
+
+  // ---------------------------------------------------------------
+  // Zone-native hostiles
+  // ---------------------------------------------------------------
+  M.buildScarab = function () {
+    var g = new THREE.Group();
+    var shell = new THREE.Mesh(new THREE.SphereGeometry(0.62, 7, 5), mat(0x8a6a28, { emissive: 0x201808 }));
+    shell.position.y = 0.55; shell.scale.set(1, 0.6, 1.25); g.add(shell);
+    var stripe = box(0.1, 0.05, 1.4, 0x3a2a10); stripe.position.y = 0.92; g.add(stripe);
+    var head = box(0.36, 0.3, 0.36, 0x5a4218); head.position.set(0, 0.45, 0.8); g.add(head);
+    var mandL = box(0.08, 0.08, 0.5, 0x2a1a08); mandL.position.set(-0.16, 0.4, 1.1); mandL.rotation.y = 0.4; g.add(mandL);
+    var mandR = box(0.08, 0.08, 0.5, 0x2a1a08); mandR.position.set(0.16, 0.4, 1.1); mandR.rotation.y = -0.4; g.add(mandR);
+    var eye = box(0.3, 0.06, 0.05, 0xffb020); eye.position.set(0, 0.55, 0.98); g.add(eye);
+    var legs = {};
+    ['legL', 'legR', 'armL', 'armR'].forEach(function (k, i) {
+      var l = box(0.1, 0.45, 0.1, 0x3a2a10);
+      l.position.set(i % 2 ? 0.6 : -0.6, 0.25, i < 2 ? 0.3 : -0.3);
+      l.rotation.z = i % 2 ? -0.5 : 0.5;
+      g.add(l); legs[k] = l;
+    });
+    g.userData.limbs = legs;
+    blobShadow(g, 1.5);
+    return g;
+  };
+
+  M.buildBurrower = function () {
+    var g = new THREE.Group();
+    var body = new THREE.Group();
+    var segs = [0.5, 0.42, 0.34];
+    for (var i = 0; i < segs.length; i++) {
+      var s = ico(segs[i], i % 2 ? 0xb08a5a : 0x9a7648);
+      s.position.set(0, 0.55 + i * 0.1, -i * 0.7);
+      body.add(s);
+    }
+    var jawT = box(0.5, 0.12, 0.5, 0x6a4a3a); jawT.position.set(0, 0.85, 0.35); jawT.rotation.x = -0.4; body.add(jawT);
+    var jawB = box(0.5, 0.12, 0.5, 0x6a4a3a); jawB.position.set(0, 0.35, 0.35); jawB.rotation.x = 0.4; body.add(jawB);
+    for (var t = 0; t < 4; t++) {
+      var tooth = cone(0.06, 0.25, 0xf0e8d0, 4);
+      tooth.position.set(-0.18 + t * 0.12, 0.6, 0.55); tooth.rotation.x = Math.PI; body.add(tooth);
+    }
+    var eye = box(0.3, 0.05, 0.05, 0xff5020); eye.position.set(0, 0.95, 0.2); body.add(eye);
+    g.add(body);
+    var plume = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.16, 4, 10), mat(0xd8c090));
+    plume.rotation.x = Math.PI / 2; plume.position.y = 0.12; g.add(plume);
+    g.userData.body = body; g.userData.plume = plume;
+    blobShadow(g, 1.4);
+    return g;
+  };
+
+  M.buildStalker = function () {
+    var g = new THREE.Group();
+    var c = 0xe8ecf4;
+    var body = box(0.5, 0.42, 1.1, c); body.position.y = 0.7; g.add(body);
+    var neck = box(0.3, 0.3, 0.4, c); neck.position.set(0, 0.85, 0.65); neck.rotation.x = -0.5; g.add(neck);
+    var head = box(0.3, 0.26, 0.5, 0xd0d8e8); head.position.set(0, 1.0, 0.95); g.add(head);
+    var eye = box(0.24, 0.05, 0.05, 0x40c0ff); eye.position.set(0, 1.06, 1.2); g.add(eye);
+    var tail = box(0.1, 0.1, 0.7, c); tail.position.set(0, 0.85, -0.85); tail.rotation.x = 0.5; g.add(tail);
+    var legs = {};
+    ['legL', 'legR', 'armL', 'armR'].forEach(function (k, i) {
+      var l = box(0.14, 0.6, 0.14, 0x8ab0d0);
+      l.position.set(i % 2 ? 0.2 : -0.2, 0.3, i < 2 ? 0.4 : -0.4);
+      g.add(l); legs[k] = l;
+    });
+    g.userData.limbs = legs;
+    blobShadow(g, 1.3);
+    return g;
+  };
+
+  M.buildFrostWisp = function () {
+    var g = new THREE.Group();
+    var core = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), mat(0xc0f0ff, { emissive: 0x2060a0 }));
+    core.position.y = 1.0; g.add(core);
+    for (var i = 0; i < 5; i++) {
+      var ic = cone(0.06, 0.5, 0xa0e0ff, 4, { transparent: true, opacity: 0.85 });
+      var a = (i / 5) * Math.PI * 2;
+      ic.position.set(Math.cos(a) * 0.45, 0.85, Math.sin(a) * 0.45); ic.rotation.x = Math.PI; g.add(ic);
+    }
+    g.userData.core = core;
+    blobShadow(g, 0.8);
+    return g;
+  };
+
+  M.buildLurker = function () {
+    var g = new THREE.Group();
+    var body = new THREE.Group();
+    var thorax = box(0.5, 0.35, 0.9, 0x3a6a2a); thorax.position.y = 0.55; body.add(thorax);
+    var head = box(0.3, 0.26, 0.3, 0x2e5a22); head.position.set(0, 0.7, 0.55); body.add(head);
+    var eye = box(0.26, 0.05, 0.04, 0xd0ff40); eye.position.set(0, 0.75, 0.71); body.add(eye);
+    var sL = box(0.08, 0.9, 0.12, 0x9ad048); sL.position.set(-0.4, 0.9, 0.5); sL.rotation.x = 0.7; body.add(sL);
+    var sR = box(0.08, 0.9, 0.12, 0x9ad048); sR.position.set(0.4, 0.9, 0.5); sR.rotation.x = 0.7; body.add(sR);
+    for (var i = 0; i < 4; i++) {
+      var leg = box(0.08, 0.4, 0.08, 0x2a4018);
+      leg.position.set(i < 2 ? -0.35 : 0.35, 0.2, (i % 2) ? 0.3 : -0.3); body.add(leg);
+    }
+    g.add(body);
+    var cover = new THREE.Group();
+    for (var c = 0; c < 4; c++) {
+      var bush = ico(0.45, c % 2 ? 0x2e7a34 : 0x3a9a40);
+      bush.position.set((c % 2 ? 0.3 : -0.3), 0.4 + (c > 1 ? 0.35 : 0), (c > 1 ? 0.2 : -0.2)); cover.add(bush);
+    }
+    g.add(cover);
+    g.userData.body = body; g.userData.cover = cover;
+    blobShadow(g, 1.2);
+    return g;
+  };
+
+  M.buildBloat = function () {
+    var g = new THREE.Group();
+    var sac = new THREE.Mesh(new THREE.SphereGeometry(0.72, 7, 6), mat(0x8a9a48, { emissive: 0x2a3a10 }));
+    sac.position.y = 0.9; g.add(sac);
+    for (var i = 0; i < 6; i++) {
+      var wart = ico(0.14, 0xc0d060);
+      var a = (i / 6) * Math.PI * 2;
+      wart.position.set(Math.cos(a) * 0.62, 0.9 + Math.sin(i) * 0.3, Math.sin(a) * 0.62); g.add(wart);
+    }
+    var eye = box(0.3, 0.06, 0.05, 0x40ff80); eye.position.set(0, 1.0, 0.7); g.add(eye);
+    var legs = {};
+    ['legL', 'legR'].forEach(function (k, i) {
+      var l = box(0.16, 0.4, 0.16, 0x4a5a20); l.position.set(i ? 0.25 : -0.25, 0.2, 0); g.add(l); legs[k] = l;
+    });
+    legs.armL = box(0.01, 0.01, 0.01, 0x4a5a20); legs.armR = box(0.01, 0.01, 0.01, 0x4a5a20); g.add(legs.armL, legs.armR);
+    g.userData.limbs = legs;
+    blobShadow(g, 1.5);
+    return g;
+  };
+
+  M.buildCrawler = function () {
+    var g = new THREE.Group();
+    for (var i = 0; i < 4; i++) {
+      var seg = box(0.5, 0.36, 0.5, 0x2a1a18); seg.position.set(0, 0.3, 0.45 - i * 0.55); g.add(seg);
+      if (i > 0) { var gap = box(0.4, 0.2, 0.12, 0xff6020); gap.position.set(0, 0.3, 0.45 - i * 0.55 + 0.3); g.add(gap); }
+      for (var s = -1; s <= 1; s += 2) {
+        var leg = box(0.28, 0.08, 0.08, 0x3a2a28); leg.position.set(s * 0.36, 0.14, 0.45 - i * 0.55); g.add(leg);
+      }
+    }
+    var head = box(0.44, 0.32, 0.4, 0x3a2220); head.position.set(0, 0.34, 0.95); g.add(head);
+    var eye = box(0.3, 0.06, 0.05, 0xffb020); eye.position.set(0, 0.42, 1.16); g.add(eye);
+    blobShadow(g, 1.3);
+    return g;
+  };
+
+  M.buildDrake = function (zone) {
+    var g = new THREE.Group();
+    var c = zone === 'storm' ? 0x3a3a5a : 0x8a2a1a, c2 = zone === 'storm' ? 0x6a6a9a : 0xc04a20;
+    var body = ico(0.42, c); body.scale.set(0.9, 0.7, 1.5); body.position.y = 1.0; g.add(body);
+    var head = box(0.3, 0.26, 0.5, c); head.position.set(0, 1.05, 0.75); g.add(head);
+    var eye = box(0.22, 0.05, 0.05, 0xffd040); eye.position.set(0, 1.1, 1.0); g.add(eye);
+    var tail = box(0.12, 0.12, 0.9, c); tail.position.set(0, 1.0, -0.9); g.add(tail);
+    var wings = [];
+    [-1, 1].forEach(function (s) {
+      var w = box(1.4, 0.05, 0.7, c2); w.position.set(s * 0.85, 1.1, 0); g.add(w); wings.push(w);
+    });
+    g.userData.wings = wings;
+    blobShadow(g, 1.6);
+    return g;
+  };
+
+  M.buildSentinel = function () {
+    var g = new THREE.Group();
+    var body = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), mat(0x4a4a70, { emissive: 0x181830 }));
+    body.scale.y = 1.8; body.position.y = 1.3; g.add(body);
+    var core = new THREE.Mesh(new THREE.OctahedronGeometry(0.2), mat(0x80c0ff, { emissive: 0x4080ff }));
+    core.position.y = 1.3; g.add(core);
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.05, 4, 10), mat(0x9ab0ff, { emissive: 0x3050a0 }));
+    ring.position.y = 1.3; ring.rotation.x = Math.PI / 2; g.add(ring);
+    g.userData.core = core; g.userData.ring = ring;
+    blobShadow(g, 1.1);
+    return g;
+  };
+
+  M.buildPhantom = function () {
+    var g = new THREE.Group();
+    var robe = cone(0.45, 1.6, 0x3a2a50, 6, { transparent: true, opacity: 0.8, emissive: 0x201040 });
+    robe.position.y = 0.9; g.add(robe);
+    var hood = ico(0.3, 0x2a1a40); hood.position.y = 1.75; g.add(hood);
+    var eyeL = box(0.08, 0.08, 0.08, 0xc080ff); eyeL.position.set(-0.1, 1.75, 0.26); g.add(eyeL);
+    var eyeR = box(0.08, 0.08, 0.08, 0xc080ff); eyeR.position.set(0.1, 1.75, 0.26); g.add(eyeR);
+    g.userData.core = hood;
+    blobShadow(g, 1.0);
+    return g;
+  };
+
+  M.buildNullShard = function () {
+    var g = new THREE.Group();
+    for (var i = 0; i < 3; i++) {
+      var sh = new THREE.Mesh(new THREE.OctahedronGeometry(0.28 - i * 0.05), mat(0xa060ff, { emissive: 0x402080 }));
+      sh.position.set(Math.cos(i * 2.1) * 0.25, 0.75 + i * 0.25, Math.sin(i * 2.1) * 0.25); g.add(sh);
+      if (i === 0) g.userData.core = sh;
+    }
+    for (var l = 0; l < 3; l++) {
+      var leg = box(0.07, 0.5, 0.07, 0x4a3a60);
+      var a = (l / 3) * Math.PI * 2;
+      leg.position.set(Math.cos(a) * 0.3, 0.25, Math.sin(a) * 0.3); leg.rotation.z = Math.cos(a) * 0.4; leg.rotation.x = -Math.sin(a) * 0.4; g.add(leg);
+    }
+    blobShadow(g, 0.9);
+    return g;
+  };
+
   return M;
+})();
+
+</script>
+<script>
+// HERO FRAME — terrain: height fields, biomes, surfaces, and the map rim.
+// Every zone owns an analytic height function h(x,z) built from seeded
+// value noise plus biome shaping (dune ridges, mountain ranges, terraced
+// mesas, lava basins). The same function drives the ground mesh, every
+// entity's y, vehicle physics (slope, soft sand, jumps), and surface
+// queries (ice / water / lava / mud). Fixed installations sit on flat
+// pads blended into the field, and a mountain rim seals every map edge
+// so the world never ends at a visible line.
+GH.terrain = (function () {
+  var T = {};
+  T.active = null;
+
+  // ---------------- seeded value noise ----------------
+  function hash2(ix, iz, seed) {
+    var n = (ix * 374761393 + iz * 668265263 + seed * 1442695041) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    n = n ^ (n >>> 16);
+    return (n & 0x7fffffff) / 0x7fffffff;
+  }
+  function smooth(t) { return t * t * (3 - 2 * t); }
+  function vnoise(x, z, seed) {
+    var ix = Math.floor(x), iz = Math.floor(z);
+    var fx = smooth(x - ix), fz = smooth(z - iz);
+    var a = hash2(ix, iz, seed), b = hash2(ix + 1, iz, seed);
+    var c = hash2(ix, iz + 1, seed), d = hash2(ix + 1, iz + 1, seed);
+    return (a + (b - a) * fx) + ((c + (d - c) * fx) - (a + (b - a) * fx)) * fz;
+  }
+  // fractal noise in [0,1]
+  function fbm(x, z, seed, oct) {
+    var v = 0, amp = 0.5, sum = 0;
+    for (var i = 0; i < (oct || 4); i++) {
+      v += vnoise(x, z, seed + i * 17) * amp;
+      sum += amp;
+      x *= 2.03; z *= 1.97; amp *= 0.5;
+    }
+    return v / sum;
+  }
+  // ridged noise in [0,1]: sharp crests
+  function ridged(x, z, seed, oct) {
+    var v = 0, amp = 0.5, sum = 0;
+    for (var i = 0; i < (oct || 3); i++) {
+      var n = 1 - Math.abs(vnoise(x, z, seed + i * 23) * 2 - 1);
+      v += n * n * amp;
+      sum += amp;
+      x *= 2.1; z *= 2.1; amp *= 0.5;
+    }
+    return v / sum;
+  }
+  function sstep(a, b, t) {
+    t = GH.clamp((t - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+  T.noise = fbm;
+  T.ridged = ridged;
+  T.sstep = sstep;
+
+  // ---------------- biomes ----------------
+  // base(x,z): raw height before pads/rim. color(h, slope, x, z, out).
+  // soft(x,z): 0..1 bog-ability of the ground under a vehicle.
+  // surface(x,z,h): 'ice' | 'water' | 'lava' | 'mud' | 'sand' | 'snow' | 'rock' | null
+  T.BIOMES = {
+    wreck: {
+      name: 'DUNE COAST', ground: 'sand', gravity: 24,
+      water: { level: -1.9, color: 0x2a7a8a, opacity: 0.72 },
+      base: function (x, z) {
+        var broad = fbm(x * 0.012, z * 0.012, 11) * 3.2;
+        // dune field: ridges running NE, warped by low noise
+        var u = x * 0.8 + z * 0.6, v = -x * 0.6 + z * 0.8;
+        var warp = fbm(v * 0.02, u * 0.01, 12) * 2.5;
+        var d = 1 - Math.abs(Math.sin(u * 0.11 + warp));
+        d = Math.pow(d, 1.7) * (3.2 + fbm(x * 0.03, z * 0.03, 13) * 2.2);
+        // the dune field thins toward the beach in the south
+        var beach = sstep(150, 215, z);
+        var h = broad + d * (1 - beach * 0.85);
+        h -= sstep(195, 245, z) * 6.5;
+        return h;
+      },
+      soft: function (x, z) { return 1; },
+      color: function (h, s, x, z, o) {
+        var n = fbm(x * 0.08, z * 0.08, 14);
+        var t = GH.clamp((h + 1) / 8, 0, 1);
+        o[0] = 0.78 + t * 0.14 + n * 0.06 - s * 0.35;
+        o[1] = 0.66 + t * 0.12 + n * 0.05 - s * 0.3;
+        o[2] = 0.42 + t * 0.10 + n * 0.02 - s * 0.2;
+        if (h < -0.6) { var w = sstep(-0.6, -1.8, h); o[0] -= w * 0.25; o[1] -= w * 0.12; o[2] += w * 0.02; }
+      },
+      surface: function (x, z, h) { return h < -1.7 ? 'water' : 'sand'; }
+    },
+    glacier: {
+      name: 'FROST RANGE', ground: 'snow', gravity: 24,
+      base: function (x, z) {
+        var roll = fbm(x * 0.02, z * 0.02, 21) * 4.0;
+        var mask = sstep(0.42, 0.7, fbm(x * 0.006 + 7, z * 0.006, 22));
+        var peaks = Math.pow(ridged(x * 0.009, z * 0.009, 23), 2.2) * 16 * mask;
+        // frozen lakes: flat sheets sunk into the valleys
+        var lake = sstep(0.62, 0.7, fbm(x * 0.03, z * 0.03, 24));
+        var h = roll + peaks;
+        h = h * (1 - lake) + Math.min(h, 0.6) * lake;
+        return h;
+      },
+      soft: function (x, z) { return 0.8; },
+      color: function (h, s, x, z, o) {
+        var n = fbm(x * 0.1, z * 0.1, 25);
+        var rock = sstep(0.35, 0.75, s);
+        var ice = sstep(0.62, 0.7, fbm(x * 0.03, z * 0.03, 24)) * (h < 1.2 ? 1 : 0);
+        o[0] = 0.74 + n * 0.1; o[1] = 0.8 + n * 0.08; o[2] = 0.9;
+        o[0] = o[0] * (1 - rock) + 0.36 * rock; o[1] = o[1] * (1 - rock) + 0.38 * rock; o[2] = o[2] * (1 - rock) + 0.44 * rock;
+        o[0] = o[0] * (1 - ice) + 0.68 * ice; o[1] = o[1] * (1 - ice) + 0.82 * ice; o[2] = o[2] * (1 - ice) + 0.9 * ice;
+      },
+      surface: function (x, z, h) {
+        if (h < 1.2 && fbm(x * 0.03, z * 0.03, 24) > 0.66) return 'ice';
+        return 'snow';
+      }
+    },
+    cloister: {
+      name: 'RAIN CANOPY', ground: 'moss', gravity: 24,
+      water: { level: 0.15, color: 0x1e5a4a, opacity: 0.78 },
+      base: function (x, z) {
+        var h = fbm(x * 0.018, z * 0.018, 31) * 6 + 1.2;
+        var hills = Math.pow(fbm(x * 0.01 + 3, z * 0.01, 32), 2) * 7;
+        // river basins and ponds
+        var pond = fbm(x * 0.016 + 5, z * 0.016 + 5, 33);
+        h += hills - sstep(0.36, 0.26, pond) * 4.5;
+        return h;
+      },
+      soft: function (x, z) { return 0.3; },
+      color: function (h, s, x, z, o) {
+        var n = fbm(x * 0.12, z * 0.12, 34);
+        var mud = sstep(1.0, 0.2, h);
+        o[0] = 0.22 + n * 0.12 + mud * 0.18; o[1] = 0.46 + n * 0.16 - mud * 0.16; o[2] = 0.16 + n * 0.06;
+        var rock = sstep(0.45, 0.8, s);
+        o[0] = o[0] * (1 - rock) + 0.34 * rock; o[1] = o[1] * (1 - rock) + 0.33 * rock; o[2] = o[2] * (1 - rock) + 0.28 * rock;
+      },
+      surface: function (x, z, h) { return h < 0.0 ? 'water' : h < 0.9 ? 'mud' : 'moss'; }
+    },
+    ember: {
+      name: 'CINDER WASTES', ground: 'basalt', gravity: 24,
+      water: { level: -0.55, color: 0xff5a10, opacity: 0.95, lava: true },
+      base: function (x, z) {
+        var h = fbm(x * 0.02, z * 0.02, 41) * 2.6;
+        var cones = Math.pow(ridged(x * 0.012, z * 0.012, 42), 3) * 12 * sstep(0.5, 0.75, fbm(x * 0.007 + 2, z * 0.007, 43));
+        var basin = fbm(x * 0.02 + 9, z * 0.02, 44);
+        h += cones - sstep(0.34, 0.24, basin) * 2.6;
+        return h;
+      },
+      soft: function (x, z) { return 0.15; },
+      color: function (h, s, x, z, o) {
+        var n = fbm(x * 0.1, z * 0.1, 45);
+        o[0] = 0.34 + n * 0.1; o[1] = 0.22 + n * 0.06; o[2] = 0.19 + n * 0.05;
+        var glow = sstep(0.3, -0.4, h);
+        o[0] += glow * 0.7; o[1] += glow * 0.3;
+        var ash = sstep(0.3, 0.7, s);
+        o[0] = o[0] * (1 - ash) + 0.38 * ash; o[1] = o[1] * (1 - ash) + 0.3 * ash; o[2] = o[2] * (1 - ash) + 0.28 * ash;
+      },
+      surface: function (x, z, h) { return h < -0.45 ? 'lava' : 'basalt'; }
+    },
+    storm: {
+      name: 'THUNDER HIGHLANDS', ground: 'slate', gravity: 24,
+      base: function (x, z) {
+        var q = fbm(x * 0.011, z * 0.011, 51) * 5.2;
+        var f = q - Math.floor(q);
+        var terr = (Math.floor(q) + sstep(0.3, 0.7, f)) * 2.6; // mesas
+        var detail = fbm(x * 0.05, z * 0.05, 52) * 0.8;
+        return terr + detail - 2;
+      },
+      soft: function (x, z) { return 0.1; },
+      color: function (h, s, x, z, o) {
+        var n = fbm(x * 0.09, z * 0.09, 53);
+        var heath = sstep(0.3, 0.05, s) * sstep(0.45, 0.6, fbm(x * 0.04, z * 0.04, 54));
+        o[0] = 0.36 + n * 0.08; o[1] = 0.38 + n * 0.08; o[2] = 0.46 + n * 0.06;
+        o[0] = o[0] * (1 - heath) + 0.42 * heath; o[1] = o[1] * (1 - heath) + 0.32 * heath; o[2] = o[2] * (1 - heath) + 0.5 * heath;
+      },
+      surface: function (x, z, h) { return 'slate'; }
+    },
+    null: {
+      name: 'VOID SANCTUM', ground: 'void', gravity: 11,
+      base: function (x, z) {
+        var h = fbm(x * 0.02, z * 0.02, 61) * 1.4;
+        var shards = Math.pow(ridged(x * 0.02, z * 0.02, 62), 4) * 9 * sstep(0.55, 0.8, fbm(x * 0.01 + 4, z * 0.01, 63));
+        var chasm = sstep(0.24, 0.16, fbm(x * 0.014 + 1, z * 0.014 + 8, 64)) * 5;
+        return h + shards - chasm;
+      },
+      soft: function (x, z) { return 0; },
+      color: function (h, s, x, z, o) {
+        var n = fbm(x * 0.15, z * 0.15, 65);
+        var deep = sstep(0, -3, h);
+        o[0] = 0.5 + n * 0.1 - deep * 0.3; o[1] = 0.46 + n * 0.1 - deep * 0.35; o[2] = 0.56 + n * 0.1 - deep * 0.1;
+        var glow = sstep(0.4, 0.9, s);
+        o[0] += glow * 0.25; o[2] += glow * 0.35;
+      },
+      surface: function (x, z, h) { return 'void'; }
+    }
+  };
+
+  // ---------------- the active field ----------------
+  // pads: flat spots blended into the field so fixed installations sit true.
+  function padWeight(p, x, z) {
+    var d2 = GH.dist2(x, z, p.x, p.z);
+    if (p.w !== undefined) { // annulus
+      var d = Math.sqrt(d2);
+      var band = Math.abs(d - p.r);
+      return 1 - sstep(p.w, p.w + p.fade, band);
+    }
+    var outer = p.r + p.fade;
+    if (d2 > outer * outer) return 0;
+    return 1 - sstep(p.r, outer, Math.sqrt(d2));
+  }
+
+  T.makeField = function (zoneId, info, lay) {
+    var st = GH.world.stageFor(zoneId);
+    var biome = T.BIOMES[st.id] || T.BIOMES.wreck;
+    var half = info.size / 2;
+    var pads = [];
+    var flat = false;       // whole map flat (authored floors)
+    var amp = 1;            // amplitude scale
+    if (info.dungeon) {
+      if (info.arch === 'labyrinth' || info.arch === 'halls' || info.arch === 'fluxways') flat = true;
+      else if (info.arch === 'raceway') amp = 0.28;
+      else if (info.arch === 'gauntlet' || info.arch === 'convoy') amp = 0.35;
+      else amp = 0.45;
+    }
+    var addPad = function (x, z, r, fade) { pads.push({ x: x, z: z, r: r, fade: fade || 10 }); };
+    if (!info.dungeon) {
+      lay.gates.forEach(function (g) { addPad(g.x, g.z, g.arch ? 11 : 13, 12); });
+      lay.nests.forEach(function (n) { addPad(n.x, n.z, 6, 8); });
+      if (lay.relay) addPad(lay.relay.x, lay.relay.z, 8, 10);
+      if (zoneId === 'wreck') {
+        var W = GH.world;
+        addPad(W.CAMP.x, W.CAMP.z, W.CAMP.r + 4, 14);
+        addPad(W.DUEL_PIT.x, W.DUEL_PIT.z, 24, 12);
+        pads.push({ x: W.CIRCUIT.x, z: W.CIRCUIT.z, r: W.CIRCUIT.r, w: 11, fade: 12 });
+      }
+      (lay.ruins || []).forEach(function (r) { addPad(r.x, r.z, r.kind === 'hulk' ? 12 : 11, 10); });
+    } else {
+      lay.gates.forEach(function (g) { addPad(g.x, g.z, 10, 10); });
+      if (lay.lair) addPad(lay.lair.x, lay.lair.z, 14, 12);
+      if (lay.vault) addPad(lay.vault.x, lay.vault.z, 10, 10);
+      if (lay.chest) addPad(lay.chest.x, lay.chest.z, 6, 8);
+      if (lay.objective) addPad(lay.objective.x, lay.objective.z, 12, 10);
+      if (lay.relic) addPad(lay.relic.x, lay.relic.z, 7, 8);
+      if (lay.crucible) addPad(lay.crucible.x, lay.crucible.z, 26, 14);
+      (lay.checkpoints || []).forEach(function (c) { addPad(c.x, c.z, 5, 6); });
+      (lay.convoyPath || []).forEach(function (c) { addPad(c.x, c.z, 5, 6); });
+      (lay.breaches || []).forEach(function (b) { addPad(b.x, b.z, 6, 8); });
+    }
+    // pad heights sample the raw field once (deterministic)
+    pads.forEach(function (p) {
+      p.y = flat ? 0 : biome.base(p.x, p.z) * amp;
+      if (zoneId === 'wreck' && p.w === undefined && p.r >= 20) p.y = Math.max(p.y, -0.4);
+      if (biome.water && p.y < biome.water.level + 0.9) p.y = biome.water.level + 0.9;
+    });
+
+    var field = {
+      id: zoneId, biome: biome, half: half, size: info.size, pads: pads, flat: flat, amp: amp,
+      dungeon: info.dungeon, gravity: biome.gravity,
+      water: (!info.dungeon || info.arch === 'depths' || info.arch === 'hive' || info.arch === 'crucible') ? biome.water : null
+    };
+    field.raw = function (x, z) {
+      if (flat) return 0;
+      var h = biome.base(x, z) * amp;
+      for (var i = 0; i < pads.length; i++) {
+        var w = padWeight(pads[i], x, z);
+        if (w > 0) h = h + (pads[i].y - h) * w;
+      }
+      return h;
+    };
+    field.h = function (x, z) {
+      var h = field.raw(x, z);
+      // the rim: a mountain wall past the playable edge, so no map has a visible end
+      var rinf = Math.max(Math.abs(x), Math.abs(z));
+      var start = info.dungeon ? half - 6 : half - 10;
+      if (rinf > start) {
+        // a cliff bank at the edge, then a mountain wall rising into the fog
+        h += sstep(start, half + 5, rinf) * (info.dungeon ? 12 : 16);
+        var t = sstep(start, half + (info.dungeon ? 60 : 100), rinf);
+        h += Math.pow(t, 1.5) * (info.dungeon ? 40 : 58) + t * ridged(x * 0.03, z * 0.03, 77) * 12;
+      }
+      return h;
+    };
+    return field;
+  };
+
+  // ---------------- queries ----------------
+  T.h = function (x, z) { return T.active ? T.active.h(x, z) : 0; };
+  // dh per unit travelled along (dx,dz) (normalised)
+  T.slope = function (x, z, dx, dz) {
+    if (!T.active) return 0;
+    var l = Math.sqrt(dx * dx + dz * dz);
+    if (l < 0.0001) return 0;
+    dx /= l; dz /= l;
+    var step = 1.6;
+    return (T.active.h(x + dx * step, z + dz * step) - T.active.h(x - dx * step * 0.5, z - dz * step * 0.5)) / (step * 1.5);
+  };
+  T.steepness = function (x, z) {
+    if (!T.active) return 0;
+    var e = 1.2;
+    var dx = (T.active.h(x + e, z) - T.active.h(x - e, z)) / (2 * e);
+    var dz = (T.active.h(x, z + e) - T.active.h(x, z - e)) / (2 * e);
+    return Math.sqrt(dx * dx + dz * dz);
+  };
+  T.surface = function (x, z) {
+    if (!T.active) return null;
+    var h = T.active.h(x, z);
+    if (T.active.water && h < T.active.water.level - 0.25) return T.active.water.lava ? 'lava' : 'water';
+    return T.active.biome.surface(x, z, h);
+  };
+  T.soft = function (x, z) { return T.active ? T.active.biome.soft(x, z) : 0; };
+  T.gravity = function () { return T.active ? T.active.gravity : 24; };
+  T.waterLevel = function () { return T.active && T.active.water ? T.active.water.level : -999; };
+
+  // ---------------- mesh ----------------
+  T.build = function (zoneId, info, lay) {
+    var field = T.makeField(zoneId, info, lay);
+    T.active = field;
+    var group = new THREE.Group();
+    var margin = info.dungeon ? 70 : 140;
+    var W = info.size + margin * 2;
+    var seg = Math.min(220, Math.max(60, Math.round(W / (info.dungeon ? 2.6 : 3.6))));
+    var geo = new THREE.PlaneGeometry(W, W, seg, seg);
+    geo.rotateX(-Math.PI / 2);
+    var pos = geo.attributes.position;
+    var colors = new Float32Array(pos.count * 3);
+    var o = [0, 0, 0];
+    // heights first, then slopes from the grid neighbours (one field
+    // sample per vertex instead of five)
+    var cols = seg + 1;
+    var hs = new Float32Array(pos.count);
+    for (var hi = 0; hi < pos.count; hi++) {
+      hs[hi] = field.h(pos.getX(hi), pos.getZ(hi));
+      pos.setY(hi, hs[hi]);
+    }
+    var cell = W / seg;
+    for (var i = 0; i < pos.count; i++) {
+      var x = pos.getX(i), z = pos.getZ(i);
+      var h = hs[i];
+      var r = Math.floor(i / cols), c = i % cols;
+      var hl = hs[r * cols + Math.max(0, c - 1)], hr = hs[r * cols + Math.min(seg, c + 1)];
+      var hu = hs[Math.max(0, r - 1) * cols + c], hd = hs[Math.min(seg, r + 1) * cols + c];
+      var sx = (hr - hl) / (2 * cell), sz = (hd - hu) / (2 * cell);
+      var s = Math.min(1, Math.sqrt(sx * sx + sz * sz));
+      field.biome.color(h, s, x, z, o);
+      if (info.dungeon) { o[0] *= 0.55; o[1] *= 0.55; o[2] *= 0.62; }
+      colors[i * 3] = GH.clamp(o[0], 0, 1);
+      colors[i * 3 + 1] = GH.clamp(o[1], 0, 1);
+      colors[i * 3 + 2] = GH.clamp(o[2], 0, 1);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    field.geo = geo;
+    field.colorAttr = geo.attributes.color;
+    var tex = GH.assets.groundTex[field.biome.ground];
+    // flat shading: every facet catches the sun, so relief reads at a glance
+    var mat = GH.assets.lambert({ map: tex, vertexColors: true, flatShading: true }, { nosnap: true });
+    if (tex) { tex.repeat.set(W / 9, W / 9); tex.needsUpdate = true; }
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.terrain = true;
+    group.add(mesh);
+    field.mesh = mesh;
+
+    if (field.water) {
+      var wgeo = new THREE.PlaneGeometry(W, W, 1, 1);
+      wgeo.rotateX(-Math.PI / 2);
+      var wmat = new THREE.MeshBasicMaterial({
+        color: field.water.color, transparent: true, opacity: field.water.opacity, depthWrite: false
+      });
+      var wm = new THREE.Mesh(wgeo, wmat);
+      wm.position.y = field.water.level;
+      group.add(wm);
+      field.waterMesh = wm;
+    }
+    group.userData.field = field;
+    return group;
+  };
+
+  // paint a worn road into the vertex colours (no floating decals on hills)
+  T.paintStrip = function (x1, z1, x2, z2, halfW, tint, strength) {
+    var f = T.active;
+    if (!f || !f.geo) return;
+    var pos = f.geo.attributes.position, col = f.colorAttr;
+    var vx = x2 - x1, vz = z2 - z1, len2 = vx * vx + vz * vz || 1;
+    var minX = Math.min(x1, x2) - halfW - 4, maxX = Math.max(x1, x2) + halfW + 4;
+    var minZ = Math.min(z1, z2) - halfW - 4, maxZ = Math.max(z1, z2) + halfW + 4;
+    for (var i = 0; i < pos.count; i++) {
+      var x = pos.getX(i), z = pos.getZ(i);
+      if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+      var t = GH.clamp(((x - x1) * vx + (z - z1) * vz) / len2, 0, 1);
+      var px = x1 + vx * t, pz = z1 + vz * t;
+      var d = Math.sqrt(GH.dist2(x, z, px, pz));
+      if (d > halfW + 3) continue;
+      var w = (1 - sstep(halfW, halfW + 3, d)) * strength;
+      col.setX(i, col.getX(i) + (tint[0] - col.getX(i)) * w);
+      col.setY(i, col.getY(i) + (tint[1] - col.getY(i)) * w);
+      col.setZ(i, col.getZ(i) + (tint[2] - col.getZ(i)) * w);
+    }
+    col.needsUpdate = true;
+  };
+  T.paintDisc = function (x0, z0, r, tint, strength) {
+    var f = T.active;
+    if (!f || !f.geo) return;
+    var pos = f.geo.attributes.position, col = f.colorAttr;
+    for (var i = 0; i < pos.count; i++) {
+      var x = pos.getX(i), z = pos.getZ(i);
+      if (Math.abs(x - x0) > r + 3 || Math.abs(z - z0) > r + 3) continue;
+      var d = Math.sqrt(GH.dist2(x, z, x0, z0));
+      var w = (1 - sstep(r * 0.6, r + 2, d)) * strength;
+      if (w <= 0) continue;
+      col.setX(i, col.getX(i) + (tint[0] - col.getX(i)) * w);
+      col.setY(i, col.getY(i) + (tint[1] - col.getY(i)) * w);
+      col.setZ(i, col.getZ(i) + (tint[2] - col.getZ(i)) * w);
+    }
+    col.needsUpdate = true;
+  };
+
+  // ---------------- static merging ----------------
+  // Props are built as little groups of boxes; merging them per material
+  // turns a forest of thousands of parts into a dozen draw calls.
+  T.makeBuckets = function () { return { byMat: {}, order: [] }; };
+  T.mergeInto = function (buckets, group) {
+    group.updateMatrixWorld(true);
+    group.traverse(function (ch) {
+      if (!ch.isMesh || !ch.geometry) return;
+      var key = ch.material.uuid;
+      var b = buckets.byMat[key];
+      if (!b) {
+        b = buckets.byMat[key] = { mat: ch.material, pos: [], nor: [] };
+        buckets.order.push(key);
+      }
+      var g = ch.geometry.index ? ch.geometry.toNonIndexed() : ch.geometry;
+      var p = g.attributes.position, n = g.attributes.normal;
+      var m = ch.matrixWorld;
+      var nm = new THREE.Matrix3().getNormalMatrix(m);
+      var v = new THREE.Vector3(), vn = new THREE.Vector3();
+      for (var i = 0; i < p.count; i++) {
+        v.set(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(m);
+        b.pos.push(v.x, v.y, v.z);
+        if (n) {
+          vn.set(n.getX(i), n.getY(i), n.getZ(i)).applyMatrix3(nm).normalize();
+          b.nor.push(vn.x, vn.y, vn.z);
+        } else b.nor.push(0, 1, 0);
+      }
+      if (g !== ch.geometry) g.dispose();
+    });
+  };
+  T.flushBuckets = function (buckets, parent) {
+    buckets.order.forEach(function (key) {
+      var b = buckets.byMat[key];
+      if (!b.pos.length) return;
+      var geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
+      var mesh = new THREE.Mesh(geo, b.mat);
+      mesh.frustumCulled = false;
+      parent.add(mesh);
+    });
+    buckets.byMat = {}; buckets.order = [];
+  };
+
+  // ---------------- biome vegetation ----------------
+  // kinds map to GH.models.biomeProps; density noise clusters them into
+  // groves / boulder fields / crystal gardens instead of an even sprinkle.
+  T.PROP_SETS = {
+    wreck: [
+      { kind: 'palm', n: 420, cluster: 0.55, seed: 101, band: [-1.2, 99] },
+      { kind: 'cactus', n: 520, cluster: 0.5, seed: 102, band: [0.5, 99] },
+      { kind: 'duneRock', n: 360, cluster: 0.45, seed: 103, band: [-1, 99] },
+      { kind: 'wreckRib', n: 44, cluster: 0.0, seed: 104, band: [-1.5, 99] },
+      { kind: 'bones', n: 130, cluster: 0.3, seed: 105, band: [0, 99] }
+    ],
+    glacier: [
+      { kind: 'pine', n: 1900, cluster: 0.55, seed: 201, band: [-99, 9] },
+      { kind: 'snowRock', n: 420, cluster: 0.4, seed: 202, band: [-99, 99] },
+      { kind: 'iceSpire', n: 220, cluster: 0.6, seed: 203, band: [-99, 4] },
+      { kind: 'deadTree', n: 160, cluster: 0.4, seed: 204, band: [3, 99] }
+    ],
+    cloister: [
+      { kind: 'jungleTree', n: 1500, cluster: 0.45, seed: 301, band: [1.0, 99] },
+      { kind: 'fern', n: 1600, cluster: 0.35, seed: 302, band: [0.6, 99] },
+      { kind: 'vineCurtain', n: 240, cluster: 0.5, seed: 303, band: [1.2, 99] },
+      { kind: 'mushroom', n: 480, cluster: 0.5, seed: 304, band: [0.5, 6] },
+      { kind: 'mossRock', n: 320, cluster: 0.4, seed: 305, band: [0.8, 99] }
+    ],
+    ember: [
+      { kind: 'basalt', n: 520, cluster: 0.55, seed: 401, band: [-0.2, 99] },
+      { kind: 'lavaRock', n: 520, cluster: 0.4, seed: 402, band: [-0.3, 99] },
+      { kind: 'charTree', n: 380, cluster: 0.5, seed: 403, band: [0.4, 99] },
+      { kind: 'ventStack', n: 110, cluster: 0.0, seed: 404, band: [-0.2, 6] }
+    ],
+    storm: [
+      { kind: 'slateSpire', n: 480, cluster: 0.5, seed: 501, band: [-99, 99] },
+      { kind: 'heather', n: 1100, cluster: 0.45, seed: 502, band: [-99, 99] },
+      { kind: 'deadTree', n: 480, cluster: 0.45, seed: 503, band: [-99, 99] },
+      { kind: 'menhir', n: 64, cluster: 0.0, seed: 504, band: [-99, 99] }
+    ],
+    null: [
+      { kind: 'crystal', n: 720, cluster: 0.5, seed: 601, band: [-99, 99] },
+      { kind: 'floatShard', n: 460, cluster: 0.4, seed: 602, band: [-99, 99] },
+      { kind: 'monolith', n: 72, cluster: 0.0, seed: 603, band: [-1, 99] },
+      { kind: 'voidReed', n: 720, cluster: 0.5, seed: 604, band: [-6, 99] }
+    ]
+  };
+
+  // a prop template: its parts flattened into local-space arrays, so a
+  // thousand copies cost a thousand transforms instead of a thousand builds
+  function templateOf(group) {
+    group.updateMatrixWorld(true);
+    var parts = [];
+    group.traverse(function (ch) {
+      if (!ch.isMesh || !ch.geometry) return;
+      var g = ch.geometry.index ? ch.geometry.toNonIndexed() : ch.geometry;
+      var p = g.attributes.position, n = g.attributes.normal;
+      var m = ch.matrixWorld;
+      var nm = new THREE.Matrix3().getNormalMatrix(m);
+      var pos = new Float32Array(p.count * 3), nor = new Float32Array(p.count * 3);
+      var v = new THREE.Vector3(), vn = new THREE.Vector3();
+      for (var i = 0; i < p.count; i++) {
+        v.set(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(m);
+        pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
+        if (n) vn.set(n.getX(i), n.getY(i), n.getZ(i)).applyMatrix3(nm).normalize();
+        else vn.set(0, 1, 0);
+        nor[i * 3] = vn.x; nor[i * 3 + 1] = vn.y; nor[i * 3 + 2] = vn.z;
+      }
+      if (g !== ch.geometry) g.dispose();
+      parts.push({ mat: ch.material, pos: pos, nor: nor });
+    });
+    return parts;
+  }
+  function stamp(buckets, parts, x, y, z, yaw, sc) {
+    var c = Math.cos(yaw), s = Math.sin(yaw);
+    for (var k = 0; k < parts.length; k++) {
+      var part = parts[k];
+      var key = part.mat.uuid;
+      var b = buckets.byMat[key];
+      if (!b) { b = buckets.byMat[key] = { mat: part.mat, pos: [], nor: [] }; buckets.order.push(key); }
+      var P = part.pos, N = part.nor;
+      for (var i = 0; i < P.length; i += 3) {
+        var px = P[i], py = P[i + 1], pz = P[i + 2];
+        b.pos.push((px * c + pz * s) * sc + x, py * sc + y, (-px * s + pz * c) * sc + z);
+        var nx = N[i], ny = N[i + 1], nz = N[i + 2];
+        b.nor.push(nx * c + nz * s, ny, -nx * s + nz * c);
+      }
+    }
+  }
+  T.templateOf = templateOf;
+  T.stamp = stamp;
+
+  T.scatterProps = function (parent, zoneId, info, rnd, avoid) {
+    var f = T.active;
+    if (!f) return 0;
+    var st = GH.world.stageFor(zoneId);
+    var set = T.PROP_SETS[st.id] || T.PROP_SETS.wreck;
+    var scale = info.dungeon ? 0.3 : 1;
+    var buckets = T.makeBuckets();
+    var placed = 0;
+    var builders = GH.models.biomeProps;
+    set.forEach(function (ps) {
+      var b = builders[ps.kind];
+      if (!b) return;
+      // a handful of authored variants per kind, stamped by transform
+      var variants = [];
+      for (var v = 0; v < 6; v++) variants.push(templateOf(b(rnd)));
+      var want = Math.round(ps.n * scale);
+      var tries = want * 4;
+      var count = 0;
+      while (count < want && tries-- > 0) {
+        var x = (rnd() - 0.5) * (f.size - 10);
+        var z = (rnd() - 0.5) * (f.size - 10);
+        // clustering: keep only spots where the kind's density noise is high
+        if (ps.cluster > 0 && fbm(x * 0.02, z * 0.02, ps.seed) < 0.38 + ps.cluster * 0.3) continue;
+        var h = f.h(x, z);
+        if (h < ps.band[0] || h > ps.band[1]) continue;
+        if (f.water && h < f.water.level + 0.3) continue;
+        if (T.steepness(x, z) > 0.9) continue;
+        if (avoid && avoid(x, z)) continue;
+        stamp(buckets, variants[Math.floor(rnd() * variants.length)], x, h - 0.05, z, rnd() * Math.PI * 2, 0.8 + rnd() * 0.5);
+        count++;
+        placed++;
+      }
+    });
+    T.flushBuckets(buckets, parent);
+    return placed;
+  };
+
+  // ---------------- race track ribbon ----------------
+  // rw.path: closed centreline. Builds asphalt with curbs conforming to
+  // the field, plus tyre walls on the outside of every real corner.
+  T.buildTrack = function (parent, rw) {
+    var f = T.active;
+    var path = rw.path, n = path.length;
+    var w = (rw.width || 14) / 2;
+    var pos = [], col = [], nor = [];
+    var pts = [];
+    for (var i = 0; i < n; i++) {
+      var p = path[i], q = path[(i + 1) % n], r = path[(i - 1 + n) % n];
+      var tx = q.x - r.x, tz = q.z - r.z;
+      var tl = Math.sqrt(tx * tx + tz * tz) || 1;
+      tx /= tl; tz /= tl;
+      var nx = tz, nz = -tx; // left normal
+      var y = (f ? f.h(p.x, p.z) : 0) + 0.2;
+      pts.push({ x: p.x, z: p.z, y: y, nx: nx, nz: nz, tx: tx, tz: tz });
+      p.y = y; p.nx = nx; p.nz = nz;
+    }
+    var bands = [-1, -0.83, -0.05, 0.05, 0.83, 1]; // curb | asphalt | centre | asphalt | curb
+    for (var i2 = 0; i2 < n; i2++) {
+      var a = pts[i2], b = pts[(i2 + 1) % n];
+      for (var k = 0; k < bands.length - 1; k++) {
+        var s0 = bands[k], s1 = bands[k + 1];
+        var isCurb = k === 0 || k === 4;
+        var isMid = k === 2;
+        var cx, cy, cz;
+        if (isCurb) { var red = (i2 % 4) < 2; cx = red ? 0.8 : 0.9; cy = red ? 0.16 : 0.9; cz = red ? 0.12 : 0.88; }
+        else if (isMid) { var wht = (i2 % 8) < 4; cx = wht ? 0.85 : 0.2; cy = wht ? 0.85 : 0.2; cz = wht ? 0.8 : 0.22; }
+        else { var shade = 0.2 + ((i2 % 2) ? 0.02 : 0); cx = shade; cy = shade; cz = shade + 0.03; }
+        var quad = [
+          [a.x + a.nx * w * s0, a.y, a.z + a.nz * w * s0],
+          [a.x + a.nx * w * s1, a.y, a.z + a.nz * w * s1],
+          [b.x + b.nx * w * s1, b.y, b.z + b.nz * w * s1],
+          [b.x + b.nx * w * s0, b.y, b.z + b.nz * w * s0]
+        ];
+        // conform each corner to the field
+        for (var qi = 0; qi < 4; qi++) {
+          if (f) quad[qi][1] = f.h(quad[qi][0], quad[qi][2]) + 0.2;
+        }
+        var tri = [0, 1, 2, 0, 2, 3];
+        for (var ti = 0; ti < 6; ti++) {
+          var v = quad[tri[ti]];
+          pos.push(v[0], v[1], v[2]);
+          nor.push(0, 1, 0);
+          col.push(cx, cy, cz);
+        }
+      }
+    }
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    var mesh = new THREE.Mesh(geo, GH.assets.lambert({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }, { nosnap: true }));
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 1;
+    parent.add(mesh);
+    // tyre walls where the line bends
+    var buckets = T.makeBuckets();
+    var walls = 0;
+    for (var i3 = 0; i3 < n; i3 += 2) {
+      var c0 = pts[i3], c1 = pts[(i3 + 4) % n];
+      var turn = Math.atan2(c0.tx * c1.tz - c0.tz * c1.tx, c0.tx * c1.tx + c0.tz * c1.tz);
+      if (Math.abs(turn) < 0.11) continue;
+      var side = turn > 0 ? -1 : 1; // outside of the bend
+      for (var j = 0; j < 2; j++) {
+        var pp = pts[(i3 + j) % n];
+        var bx = pp.x + pp.nx * (w + 1.1) * side, bz = pp.z + pp.nz * (w + 1.1) * side;
+        var tyre = GH.models.buildTyreWall((i3 + j) % 3 === 0);
+        tyre.position.set(bx, (f ? f.h(bx, bz) : 0), bz);
+        tyre.rotation.y = Math.atan2(pp.tx, pp.tz);
+        T.mergeInto(buckets, tyre);
+        walls++;
+      }
+    }
+    T.flushBuckets(buckets, parent);
+    rw.width = w * 2;
+    return mesh;
+  };
+
+  // distance from a point to the track centreline (for off-track rules)
+  T.trackDistance = function (rw, x, z) {
+    var best = 1e9, path = rw.path, n = path.length;
+    for (var i = 0; i < n; i++) {
+      var a = path[i], b = path[(i + 1) % n];
+      var vx = b.x - a.x, vz = b.z - a.z;
+      var wx = x - a.x, wz = z - a.z;
+      var c2 = vx * vx + vz * vz || 1;
+      var t = GH.clamp((vx * wx + vz * wz) / c2, 0, 1);
+      var d2 = GH.dist2(x, z, a.x + vx * t, a.z + vz * t);
+      if (d2 < best) best = d2;
+    }
+    return Math.sqrt(best);
+  };
+
+  T.update = function (dt) {
+    var f = T.active;
+    if (!f) return;
+    if (f.waterMesh) {
+      f.waterMesh.position.y = f.water.level + Math.sin(performance.now() * 0.0012) * (f.water.lava ? 0.05 : 0.12);
+    }
+  };
+
+  T.clear = function () {
+    if (T.active && T.active.geo) T.active.geo.dispose();
+    T.active = null;
+  };
+
+  return T;
+})();
+
+</script>
+<script>
+// HERO FRAME — atmosphere: weather particles that live around the pilot.
+// Snow over the frost range, rain under the canopy and on the highlands,
+// rising embers over the cinder wastes, blown sand on the dune coast,
+// drifting motes in the void. One Points (or LineSegments) cloud per
+// zone, re-wrapped around the camera target every frame.
+GH.atmos = (function () {
+  var A = {};
+  var cur = null; // {kind, obj, pos, vel, n, box}
+
+  var KINDS = {
+    wreck: { kind: 'dust', n: 260, color: 0xe8d4a0, size: 0.22, opacity: 0.45, box: [70, 14, 70] },
+    glacier: { kind: 'snow', n: 900, color: 0xffffff, size: 0.34, opacity: 0.9, box: [70, 30, 70] },
+    cloister: { kind: 'rain', n: 700, color: 0xbfe8e0, opacity: 0.45, box: [60, 30, 60] },
+    ember: { kind: 'ember', n: 380, color: 0xff9040, size: 0.26, opacity: 0.9, box: [70, 26, 70] },
+    storm: { kind: 'rain', n: 900, color: 0xc8d0f0, opacity: 0.5, box: [70, 32, 70] },
+    null: { kind: 'motes', n: 420, color: 0xc090ff, size: 0.28, opacity: 0.75, box: [70, 24, 70] }
+  };
+
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  A.set = function (scene, zoneId, dungeon) {
+    A.clear(scene);
+    var st = GH.world.stageFor(zoneId);
+    var def = KINDS[st.id];
+    if (!def) return;
+    var n = dungeon ? Math.floor(def.n * 0.35) : def.n;
+    var box = def.box;
+    var pos = new Float32Array(n * 3 * (def.kind === 'rain' ? 2 : 1));
+    var vel = new Float32Array(n * 3);
+    for (var i = 0; i < n; i++) {
+      var x = rnd(-box[0] / 2, box[0] / 2), y = rnd(0, box[1]), z = rnd(-box[2] / 2, box[2] / 2);
+      if (def.kind === 'rain') {
+        pos[i * 6] = x; pos[i * 6 + 1] = y; pos[i * 6 + 2] = z;
+        pos[i * 6 + 3] = x + 0.15; pos[i * 6 + 4] = y - 1.3; pos[i * 6 + 5] = z;
+        vel[i * 3] = 1.5; vel[i * 3 + 1] = -rnd(26, 34); vel[i * 3 + 2] = 0;
+      } else {
+        pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+        if (def.kind === 'snow') { vel[i * 3] = rnd(-1.2, 1.2); vel[i * 3 + 1] = -rnd(1.6, 3.2); vel[i * 3 + 2] = rnd(-0.8, 0.8); }
+        else if (def.kind === 'ember') { vel[i * 3] = rnd(-0.8, 0.8); vel[i * 3 + 1] = rnd(1.2, 3.0); vel[i * 3 + 2] = rnd(-0.8, 0.8); }
+        else if (def.kind === 'dust') { vel[i * 3] = rnd(6, 11); vel[i * 3 + 1] = rnd(-0.3, 0.3); vel[i * 3 + 2] = rnd(2, 4); }
+        else { vel[i * 3] = rnd(-0.6, 0.6); vel[i * 3 + 1] = rnd(-0.4, 0.4); vel[i * 3 + 2] = rnd(-0.6, 0.6); }
+      }
+    }
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    var obj;
+    if (def.kind === 'rain') {
+      obj = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+        color: def.color, transparent: true, opacity: def.opacity, depthWrite: false
+      }));
+    } else {
+      obj = new THREE.Points(geo, new THREE.PointsMaterial({
+        color: def.color, size: def.size, transparent: true, opacity: def.opacity,
+        depthWrite: false, sizeAttenuation: true
+      }));
+    }
+    obj.frustumCulled = false;
+    scene.add(obj);
+    cur = { kind: def.kind, obj: obj, pos: pos, vel: vel, n: n, box: box, cx: 0, cz: 0, t: 0 };
+  };
+
+  A.update = function (dt, px, py, pz) {
+    if (!cur) return;
+    cur.t += dt;
+    var b = cur.box, pos = cur.pos, vel = cur.vel;
+    var hx = b[0] / 2, hz = b[2] / 2;
+    var floor = py - 1, ceil = py + b[1];
+    var gust = cur.kind === 'dust' ? Math.max(0, Math.sin(cur.t * 0.7)) * 8 : 0;
+    var stride = cur.kind === 'rain' ? 6 : 3;
+    for (var i = 0; i < cur.n; i++) {
+      var o = i * stride;
+      var x = pos[o] + (vel[i * 3] + gust) * dt;
+      var y = pos[o + 1] + vel[i * 3 + 1] * dt;
+      var z = pos[o + 2] + vel[i * 3 + 2] * dt;
+      if (cur.kind === 'snow') { x += Math.sin(cur.t * 1.3 + i) * 0.6 * dt; }
+      if (cur.kind === 'motes') { y += Math.sin(cur.t * 0.8 + i * 0.3) * 0.4 * dt; }
+      // wrap around the pilot
+      if (x < px - hx) x += b[0]; else if (x > px + hx) x -= b[0];
+      if (z < pz - hz) z += b[2]; else if (z > pz + hz) z -= b[2];
+      if (y < floor) y = ceil - (floor - y) % b[1];
+      else if (y > ceil) y = floor + (y - ceil) % b[1];
+      pos[o] = x; pos[o + 1] = y; pos[o + 2] = z;
+      if (cur.kind === 'rain') { pos[o + 3] = x + 0.15; pos[o + 4] = y - 1.3; pos[o + 5] = z; }
+    }
+    cur.obj.geometry.attributes.position.needsUpdate = true;
+  };
+
+  A.clear = function (scene) {
+    if (cur) {
+      scene.remove(cur.obj);
+      cur.obj.geometry.dispose();
+      cur.obj.material.dispose();
+      cur = null;
+    }
+  };
+
+  return A;
 })();
 
 </script>
@@ -3474,6 +4815,63 @@ GH.enemyDefs = {
     behavior: 'ranged', shootInterval: 2.0, shotSpeed: 12, keepDist: 8, shotElement: 'shock'
   },
 
+  // ---- zone-native hostiles: each territory fields its own fauna ----
+  scarab: {
+    name: 'Dune Scarab',         // dune coast: armoured, slow, shrugs off hits
+    hp: 80, speed: 2.8, damage: 12, radius: 0.7, xp: 4, mass: 2.5,
+    behavior: 'chase', armorMult: 0.6
+  },
+  burrower: {
+    name: 'Sand Maw',            // dune coast: tunnels under you, erupts to bite
+    hp: 70, speed: 7.5, damage: 18, radius: 0.75, xp: 6, mass: 2,
+    behavior: 'burrower', surfaceTime: 2.6
+  },
+  stalker: {
+    name: 'Frost Stalker',       // frost range: pack hunter, pounces
+    hp: 44, speed: 5.0, damage: 11, radius: 0.55, xp: 3, mass: 1,
+    behavior: 'dasher', dashInterval: 3.2, dashSpeed: 19, dashTime: 0.38
+  },
+  frostwisp: {
+    name: 'Rime Wisp',           // frost range: chilling shots slow the frame
+    hp: 30, speed: 3.0, damage: 7, radius: 0.45, xp: 2, mass: 0.6,
+    behavior: 'ranged', shootInterval: 2.3, shotSpeed: 11, keepDist: 8, shotElement: 'frost'
+  },
+  lurker: {
+    name: 'Vine Lurker',         // rain canopy: hides as a bush, snares, lunges
+    hp: 58, speed: 6.2, damage: 15, radius: 0.6, xp: 4, mass: 1.3,
+    behavior: 'ambusher', dashInterval: 3.5, dashSpeed: 15, dashTime: 0.45
+  },
+  bloat: {
+    name: 'Spore Bloat',         // rain canopy: slow sac, bursts into a chilling cloud
+    hp: 95, speed: 1.7, damage: 9, radius: 0.8, xp: 4, mass: 2.2,
+    behavior: 'chase', deathCloud: true
+  },
+  crawler: {
+    name: 'Magma Crawler',       // cinder wastes: leaves a burning trail behind it
+    hp: 50, speed: 3.9, damage: 10, radius: 0.6, xp: 3, mass: 1.2,
+    behavior: 'chase', trailBurn: true
+  },
+  drake: {
+    name: 'Drake',               // cinder wastes / highlands: circles overhead, dives
+    hp: 72, speed: 5.4, damage: 13, radius: 0.7, xp: 5, mass: 1.5,
+    behavior: 'flyer', shootInterval: 2.4, shotSpeed: 14
+  },
+  sentinel: {
+    name: 'Storm Sentinel',      // highlands: floating obelisk, three-shot arc bursts
+    hp: 64, speed: 2.4, damage: 9, radius: 0.6, xp: 4, mass: 1.5,
+    behavior: 'ranged', shootInterval: 3.0, shotSpeed: 13, keepDist: 10, shotElement: 'shock', burst: 3
+  },
+  phantom: {
+    name: 'Void Phantom',        // void sanctum: blinks out, reappears at your back
+    hp: 52, speed: 3.4, damage: 14, radius: 0.55, xp: 5, mass: 1,
+    behavior: 'phantom', blinkInterval: 3.4
+  },
+  nullshard: {
+    name: 'Null Shard',          // void sanctum: crystalline skirmisher
+    hp: 36, speed: 3.0, damage: 8, radius: 0.5, xp: 3, mass: 0.8,
+    behavior: 'ranged', shootInterval: 2.0, shotSpeed: 13, keepDist: 9, shotElement: 'void'
+  },
+
   // ---- midbosses ----
   warden: {
     name: 'RUST WARDEN', boss: true, mid: true,
@@ -3515,12 +4913,26 @@ GH.enemyDefs = {
     hp: 5600, speed: 2.2, damage: 38, radius: 1.5, xp: 140, mass: 20, behavior: 'corrupt' }
 };
 
+// builders receive the zone id so common fauna wears local colours
+var HUSK_TINT = { wreck: 0xb0a080, glacier: 0xc8d4e0, cloister: 0x6a7a48, ember: 0x5a3a30, storm: 0x6a6e80, null: 0x9a94a8 };
+var BRUTE_TINT = { wreck: 0x8a7a58, glacier: 0x8aa0b8, cloister: 0x4a5a30, ember: 0x3a2420, storm: 0x4a4e60, null: 0x6a6478 };
 GH.enemyBuilders = {
-  husk: function () { return GH.models.buildHusk(1); },
+  husk: function (zone) { return GH.models.buildHusk(1, HUSK_TINT[zone] || 0x9a9a92); },
   shardling: function () { return GH.models.buildShardling(); },
   orb: function () { return GH.models.buildOrb(); },
   spiker: function () { return GH.models.buildSpiker(); },
-  brute: function () { return GH.models.buildHusk(1.7, 0x7a736a); },
+  brute: function (zone) { return GH.models.buildHusk(1.7, BRUTE_TINT[zone] || 0x7a736a); },
+  scarab: function () { return GH.models.buildScarab(); },
+  burrower: function () { return GH.models.buildBurrower(); },
+  stalker: function () { return GH.models.buildStalker(); },
+  frostwisp: function () { return GH.models.buildFrostWisp(); },
+  lurker: function () { return GH.models.buildLurker(); },
+  bloat: function () { return GH.models.buildBloat(); },
+  crawler: function () { return GH.models.buildCrawler(); },
+  drake: function (zone) { return GH.models.buildDrake(zone); },
+  sentinel: function () { return GH.models.buildSentinel(); },
+  phantom: function () { return GH.models.buildPhantom(); },
+  nullshard: function () { return GH.models.buildNullShard(); },
   creeper: function () { return GH.models.buildCreeper(); },
   cinder: function () { return GH.models.buildCinder(); },
   volt: function () { return GH.models.buildVolt(); },
@@ -4768,15 +6180,49 @@ GH.dungeons = (function () {
   // RACEWAY: a wide ring circuit with ordered gates. Rivals follow the
   // centerline; everyone's lap/gate progress uses the same points.
   // ---------------------------------------------------------------
-  D.genRaceway = function (size) {
-    var r = size * 0.36;
-    var pts = [];
-    for (var i = 0; i < 72; i++) {
-      var a = (i / 72) * Math.PI * 2 + Math.PI / 2; // start line by the south entry
-      var rr = r + Math.sin(a * 4) * (size * 0.05);
-      pts.push({ x: Math.cos(a) * rr, z: Math.sin(a) * rr, a: a });
+  // Authored circuits, one per hosting territory, as control points in
+  // unit space (x right, z south). Point 0 sits by the south entry so the
+  // grid lines up with the exit gate. A closed Catmull-Rom spline turns
+  // the corners into real racing lines: sweepers, esses, hairpins.
+  var TRACKS = {
+    wreck: { name: 'DUNE RUN', pts: [
+      [0, 0.92], [0.45, 0.9], [0.85, 0.55], [0.62, 0.15], [0.9, -0.35], [0.55, -0.88],
+      [0.05, -0.72], [-0.4, -0.92], [-0.86, -0.5], [-0.55, -0.05], [-0.88, 0.45], [-0.45, 0.88]] },
+    storm: { name: 'THUNDER RIDGE', pts: [
+      [0, 0.92], [0.55, 0.9], [0.9, 0.5], [0.5, 0.3], [0.15, 0.5], [-0.2, 0.2], [0.25, -0.1],
+      [0.75, -0.3], [0.85, -0.78], [0.3, -0.92], [-0.3, -0.75], [-0.82, -0.88], [-0.92, -0.3],
+      [-0.55, 0.0], [-0.9, 0.45], [-0.55, 0.88]] },
+    ember: { name: 'CALDERA LOOP', pts: [
+      [0, 0.92], [0.6, 0.85], [0.92, 0.3], [0.7, -0.2], [0.9, -0.7], [0.35, -0.92],
+      [-0.1, -0.6], [-0.5, -0.9], [-0.92, -0.5], [-0.7, 0.0], [-0.92, 0.5], [-0.5, 0.88]] },
+    glacier: { name: 'ICEFALL', pts: [
+      [0, 0.92], [0.5, 0.88], [0.9, 0.6], [0.85, 0.05], [0.4, -0.2], [0.8, -0.6], [0.4, -0.92],
+      [-0.2, -0.75], [-0.75, -0.9], [-0.9, -0.35], [-0.5, 0.05], [-0.9, 0.5], [-0.5, 0.9]] },
+    def: { name: 'RING', pts: [
+      [0, 0.9], [0.64, 0.64], [0.9, 0], [0.64, -0.64], [0, -0.9], [-0.64, -0.64], [-0.9, 0], [-0.64, 0.64]] }
+  };
+
+  function catmullClosed(pts, samples) {
+    var n = pts.length, out = [];
+    for (var s = 0; s < samples; s++) {
+      var t = (s / samples) * n;
+      var i = Math.floor(t), f = t - i;
+      var p0 = pts[(i - 1 + n) % n], p1 = pts[i % n], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      var f2 = f * f, f3 = f2 * f;
+      var x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * f + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * f2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * f3);
+      var z = 0.5 * ((2 * p1.z) + (-p0.z + p2.z) * f + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * f2 + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * f3);
+      out.push({ x: x, z: z });
     }
-    return { path: pts, gates: 8, laps: 3, r: r };
+    return out;
+  }
+
+  D.genRaceway = function (size, zoneId) {
+    var tpl = TRACKS[zoneId] || TRACKS.def;
+    var k = size * 0.42;
+    var ctrl = tpl.pts.map(function (p) { return { x: p[0] * k, z: p[1] * k }; });
+    var path = catmullClosed(ctrl, 160);
+    // the ring runs clockwise as authored; rivals and gates follow index order
+    return { path: path, gates: 8, laps: 3, r: k, width: 14, name: tpl.name };
   };
 
   // ---------------------------------------------------------------
@@ -5392,7 +6838,7 @@ GH.world = (function () {
         lay.chest = { x: 0, z: -half + 22 };
         lay.packs.push({ x: 0, z: -half + 40, n: 3 }); // the far-side welcome
       } else if (arch2 === 'raceway') {
-        lay.raceway = GH.dungeons.genRaceway(size);
+        lay.raceway = GH.dungeons.genRaceway(size, info.parent);
         lay.chest = { x: 0, z: 0 }; // the winner's circle, mid-infield
       } else if (arch2 === 'halls') {
         // the null reach runs the master set; everywhere else teaches
@@ -5497,16 +6943,10 @@ GH.world = (function () {
     var st = W.stageFor(zoneId);
     var tex = GH.assets.stageTex[st.id];
 
-    // ground
-    var floorTex = tex.floor.clone();
-    floorTex.repeat.set(20 * size / 80, 20 * size / 80);
-    floorTex.needsUpdate = true;
-    var ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(size + 1, size + 1),
-      GH.assets.lambert({ map: floorTex, color: info.dungeon ? 0x777788 : 0xffffff }, { nosnap: true })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    group.add(ground);
+    // ground: a real height field with the zone's biome, sealed by a rim
+    var terrain = GH.terrain.build(zoneId, info, lay);
+    group.add(terrain);
+    var gy = function (x, z) { return GH.terrain.h(x, z); };
 
     // dungeon perimeter: a tight rock collar so the depths read enclosed
     if (info.dungeon) {
@@ -5518,52 +6958,68 @@ GH.world = (function () {
       group.add(collar);
     }
 
-    // props: dense enough to feel like terrain, not a floor.
-    // Mazes and flux floors keep their arenas clean.
+    // vegetation and rock: the biome's own kinds, clustered by noise into
+    // groves and boulder fields, merged into a handful of draw calls.
+    // Mazes and authored floors keep their arenas clean.
     var rnd = zrng('props:' + zoneId);
-    var propCount = info.dungeon ?
-      (info.arch === 'labyrinth' || info.arch === 'fluxways' ||
-        info.arch === 'raceway' || info.arch === 'halls' ? 0 : 46) : 150;
-    for (var i = 0; i < propCount; i++) {
-      var kind = st.props[Math.floor(rnd() * st.props.length)];
-      var p = GH.models.props[kind]();
-      var px = (rnd() - 0.5) * (size - 14);
-      var pz = (rnd() - 0.5) * (size - 14);
-      if (zoneId === 'wreck') {
-        if (GH.dist2(px, pz, W.CAMP.x, W.CAMP.z) < 26 * 26) continue;
-        if (GH.dist2(px, pz, W.CIRCUIT.x, W.CIRCUIT.z) < (W.CIRCUIT.r + 12) * (W.CIRCUIT.r + 12)) continue;
-      }
-      var clear = false;
-      for (var g3 = 0; g3 < lay.gates.length; g3++) {
-        if (GH.dist2(px, pz, lay.gates[g3].x, lay.gates[g3].z) < 12 * 12) { clear = true; break; }
-      }
-      if (lay.lair && GH.dist2(px, pz, lay.lair.x, lay.lair.z) < 15 * 15) clear = true;
-      if (lay.vault && GH.dist2(px, pz, lay.vault.x, lay.vault.z) < 12 * 12) clear = true;
-      if (clear) continue;
-      p.position.set(px, 0, pz);
-      group.add(p);
+    var noProps = info.dungeon && (info.arch === 'labyrinth' || info.arch === 'fluxways' || info.arch === 'halls');
+    if (!noProps) {
+      GH.terrain.scatterProps(group, zoneId, info, rnd, function (px, pz) {
+        if (zoneId === 'wreck') {
+          if (GH.dist2(px, pz, W.CAMP.x, W.CAMP.z) < 26 * 26) return true;
+          if (GH.dist2(px, pz, W.CIRCUIT.x, W.CIRCUIT.z) < (W.CIRCUIT.r + 14) * (W.CIRCUIT.r + 14)) return true;
+          if (GH.dist2(px, pz, W.DUEL_PIT.x, W.DUEL_PIT.z) < 24 * 24) return true;
+        }
+        for (var g3 = 0; g3 < lay.gates.length; g3++) {
+          if (GH.dist2(px, pz, lay.gates[g3].x, lay.gates[g3].z) < 12 * 12) return true;
+        }
+        if (lay.lair && GH.dist2(px, pz, lay.lair.x, lay.lair.z) < 15 * 15) return true;
+        if (lay.vault && GH.dist2(px, pz, lay.vault.x, lay.vault.z) < 12 * 12) return true;
+        if (lay.chest && GH.dist2(px, pz, lay.chest.x, lay.chest.z) < 8 * 8) return true;
+        if (lay.objective && GH.dist2(px, pz, lay.objective.x, lay.objective.z) < 14 * 14) return true;
+        if (lay.relic && GH.dist2(px, pz, lay.relic.x, lay.relic.z) < 8 * 8) return true;
+        if (lay.crucible && GH.dist2(px, pz, lay.crucible.x, lay.crucible.z) < 26 * 26) return true;
+        if (lay.raceway && GH.terrain.trackDistance(lay.raceway, px, pz) < 13) return true;
+        if (lay.convoyPath) {
+          for (var cv = 0; cv < lay.convoyPath.length; cv++) {
+            if (GH.dist2(px, pz, lay.convoyPath[cv].x, lay.convoyPath[cv].z) < 7 * 7) return true;
+          }
+        }
+        if (lay.checkpoints) {
+          for (var ck = 0; ck < lay.checkpoints.length; ck++) {
+            if (GH.dist2(px, pz, lay.checkpoints[ck].x, lay.checkpoints[ck].z) < 7 * 7) return true;
+          }
+        }
+        for (var nn = 0; nn < lay.nests.length; nn++) {
+          if (GH.dist2(px, pz, lay.nests[nn].x, lay.nests[nn].z) < 7 * 7) return true;
+        }
+        for (var pk = 0; pk < lay.packs.length; pk++) {
+          if (GH.dist2(px, pz, lay.packs[pk].x, lay.packs[pk].z) < 5 * 5) return true;
+        }
+        return false;
+      });
     }
 
     // world features
     lay.nests.forEach(function (n) {
       var nest = GH.models.buildNest(deadNests[n.id]);
-      nest.position.set(n.x, 0, n.z);
+      nest.position.set(n.x, gy(n.x, n.z), n.z);
       group.add(nest);
       nestMeshes[n.id] = nest;
     });
     if (lay.relay) {
       var relay = GH.models.buildRelay();
-      relay.position.set(lay.relay.x, 0, lay.relay.z);
+      relay.position.set(lay.relay.x, gy(lay.relay.x, lay.relay.z), lay.relay.z);
       group.add(relay);
     }
     if (lay.lair) {
       var lair = GH.models.buildLair(lairsDown[lay.lair.zone]);
-      lair.position.set(lay.lair.x, 0, lay.lair.z);
+      lair.position.set(lay.lair.x, gy(lay.lair.x, lay.lair.z), lay.lair.z);
       group.add(lair);
     }
     if (lay.vault) {
       var vault = GH.models.buildVault(vaultsOpen[lay.vault.id]);
-      vault.position.set(lay.vault.x, 0, lay.vault.z);
+      vault.position.set(lay.vault.x, gy(lay.vault.x, lay.vault.z), lay.vault.z);
       vault.rotation.y = lay.vault.x > 0 ? -Math.PI / 2 : Math.PI / 2;
       group.add(vault);
       vaultMeshes[lay.vault.id] = vault;
@@ -5612,19 +7068,19 @@ GH.world = (function () {
           GH.assets.basic(ci === lay.checkpoints.length - 1 ? 0xffd050 : 0x60c8ff,
             { transparent: true, opacity: 0.8 }));
         ring.rotation.x = Math.PI / 2;
-        ring.position.set(cp.x, 0.4, cp.z);
+        ring.position.set(cp.x, gy(cp.x, cp.z) + 0.4, cp.z);
         group.add(ring);
         cpMeshes.push(ring);
       });
     }
     if (lay.objective) {
       objectiveMesh = GH.models.buildObjective(lay.objective.def.kind);
-      objectiveMesh.position.set(lay.objective.x, 0, lay.objective.z);
+      objectiveMesh.position.set(lay.objective.x, gy(lay.objective.x, lay.objective.z), lay.objective.z);
       group.add(objectiveMesh);
     }
     if (lay.chest) {
       chestMesh = GH.models.buildChest();
-      chestMesh.position.set(lay.chest.x, 0, lay.chest.z);
+      chestMesh.position.set(lay.chest.x, gy(lay.chest.x, lay.chest.z), lay.chest.z);
       group.add(chestMesh);
     }
     // RACEWAY: gate pylons, start gantry, and dense trackside furniture —
@@ -5637,7 +7093,7 @@ GH.world = (function () {
         var rnx = rw.path[(Math.floor(rg * rw.path.length / rw.gates) + 1) % rw.path.length];
         var rang = Math.atan2(rnx.x - rpt.x, rnx.z - rpt.z);
         var rpg = GH.models.buildPylonPair(rg === 0 ? 0xffd050 : 0x60c8ff);
-        rpg.position.set(rpt.x, 0, rpt.z);
+        rpg.position.set(rpt.x, gy(rpt.x, rpt.z), rpt.z);
         rpg.rotation.y = rang;
         group.add(rpg);
       }
@@ -5645,7 +7101,7 @@ GH.world = (function () {
       var startPt = rw.path[0];
       var nxt = rw.path[1];
       var gantry = GH.models.buildStartGantry();
-      gantry.position.set(startPt.x, 0, startPt.z);
+      gantry.position.set(startPt.x, gy(startPt.x, startPt.z), startPt.z);
       gantry.rotation.y = Math.atan2(nxt.x - startPt.x, nxt.z - startPt.z);
       group.add(gantry);
       raceLights = gantry.userData.lamps;
@@ -5654,28 +7110,24 @@ GH.world = (function () {
       var postMat = GH.assets.lambert({ color: 0x2a3038 });
       var lampMatA = GH.assets.basic(0x60c8ff, { transparent: true, opacity: 0.85 });
       var lampMatB = GH.assets.basic(0xffd050, { transparent: true, opacity: 0.85 });
-      var chevMat = new THREE.MeshBasicMaterial({ color: 0xfff2d0, transparent: true, opacity: 0.25, depthWrite: false });
-      var chevGeo = new THREE.PlaneGeometry(1.4, 3.2);
       var lampGeo = new THREE.OctahedronGeometry(0.4);
-      for (var tp = 0; tp < rw.path.length; tp += 2) {
+      // the asphalt itself: curbs, centre line, tyre walls on the corners
+      GH.terrain.buildTrack(group, rw);
+      var postEvery = Math.max(2, Math.floor(rw.path.length / 36));
+      for (var tp = 0; tp < rw.path.length; tp += postEvery) {
         var pA = rw.path[tp];
         var pB = rw.path[(tp + 1) % rw.path.length];
         var tang = Math.atan2(pB.x - pA.x, pB.z - pA.z);
-        var side = (tp % 4 === 0) ? 1 : -1;
-        var offX = Math.cos(tang) * -side * 13;
-        var offZ = Math.sin(tang) * side * 13;
+        var side = ((tp / postEvery) % 2 === 0) ? 1 : -1;
+        var offX = Math.cos(tang) * -side * (rw.width / 2 + 3);
+        var offZ = Math.sin(tang) * side * (rw.width / 2 + 3);
+        var py = gy(pA.x + offX, pA.z + offZ);
         var post = new THREE.Mesh(postGeo, postMat);
-        post.position.set(pA.x + offX, 2.75, pA.z + offZ);
+        post.position.set(pA.x + offX, py + 2.75, pA.z + offZ);
         group.add(post);
-        var lamp = new THREE.Mesh(lampGeo, tp % 8 === 0 ? lampMatB : lampMatA);
-        lamp.position.set(pA.x + offX, 5.8, pA.z + offZ);
+        var lamp = new THREE.Mesh(lampGeo, (tp / postEvery) % 4 === 0 ? lampMatB : lampMatA);
+        lamp.position.set(pA.x + offX, py + 5.8, pA.z + offZ);
         group.add(lamp);
-        // lane chevron painted on the racing line
-        var chev = new THREE.Mesh(chevGeo, chevMat);
-        chev.rotation.x = -Math.PI / 2;
-        chev.rotation.z = -tang;
-        chev.position.set(pA.x, 0.05, pA.z);
-        group.add(chev);
       }
     }
     // CIPHER HALLS: solid walls, seals of four kinds, matter screens,
@@ -5773,7 +7225,7 @@ GH.world = (function () {
         var wpd = new THREE.Mesh(new THREE.CircleGeometry(2.2, 12),
           new THREE.MeshBasicMaterial({ color: wp.ambush ? 0xc05050 : 0x60c8ff, transparent: true, opacity: 0.2, depthWrite: false }));
         wpd.rotation.x = -Math.PI / 2;
-        wpd.position.set(wp.x, 0.05, wp.z);
+        wpd.position.set(wp.x, gy(wp.x, wp.z) + 0.05, wp.z);
         group.add(wpd);
       });
     }
@@ -5781,30 +7233,27 @@ GH.world = (function () {
     if (lay.relic) {
       relicMesh = GH.models.buildObjective(GH.dungeons.OBJECTIVES[info.parent].kind);
       relicMesh.scale.setScalar(0.7);
-      relicMesh.position.set(lay.relic.x, 0, lay.relic.z);
+      relicMesh.position.set(lay.relic.x, gy(lay.relic.x, lay.relic.z), lay.relic.z);
       group.add(relicMesh);
     }
 
     // ---- overworld landmarks: ruins, hulks, stains, roads ----
     if (!info.dungeon) {
       (lay.stains || []).forEach(function (stn) {
-        var stain = new THREE.Mesh(new THREE.CircleGeometry(stn.r, 20),
-          new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.16, depthWrite: false }));
-        stain.rotation.x = -Math.PI / 2;
-        stain.position.set(stn.x, 0.03, stn.z);
-        group.add(stain);
+        GH.terrain.paintDisc(stn.x, stn.z, stn.r, [0.08, 0.07, 0.07], 0.45);
       });
       (lay.ruins || []).forEach(function (rn) {
         if (rn.kind === 'hulk') {
           var hulk = GH.models.buildWreckSite();
           hulk.scale.setScalar(2.6);
-          hulk.position.set(rn.x, 0, rn.z);
+          hulk.position.set(rn.x, gy(rn.x, rn.z), rn.z);
           group.add(hulk);
         } else {
           for (var rp = 0; rp < 7; rp++) {
             var ra = (rp / 7) * Math.PI * 2;
             var pillar = GH.models.buildPillar();
-            pillar.position.set(rn.x + Math.cos(ra) * 9, 0, rn.z + Math.sin(ra) * 9);
+            var plx = rn.x + Math.cos(ra) * 9, plz = rn.z + Math.sin(ra) * 9;
+            pillar.position.set(plx, gy(plx, plz), plz);
             group.add(pillar);
           }
         }
@@ -5812,13 +7261,8 @@ GH.world = (function () {
       // roads: worn strips from each edge gate toward the middle
       lay.gates.forEach(function (gt) {
         if (gt.arch) return; // dungeon mouths keep their mystery
-        var len = Math.sqrt(gt.x * gt.x + gt.z * gt.z) * 0.82;
-        var road = new THREE.Mesh(new THREE.PlaneGeometry(6, len),
-          new THREE.MeshBasicMaterial({ color: 0xfff2d0, transparent: true, opacity: 0.1, depthWrite: false }));
-        road.rotation.x = -Math.PI / 2;
-        road.rotation.z = -Math.atan2(gt.x, gt.z);
-        road.position.set(gt.x / 2, 0.04, gt.z / 2);
-        group.add(road);
+        var hx = zoneId === 'wreck' ? W.CAMP.x : 0, hz = zoneId === 'wreck' ? W.CAMP.z : 0;
+        GH.terrain.paintStrip(gt.x, gt.z, hx * 0.9, hz * 0.9, 2.6, [0.42, 0.38, 0.33], 0.55);
       });
     }
 
@@ -5826,7 +7270,7 @@ GH.world = (function () {
     lay.gates.forEach(function (gt) {
       var toInfo = W.zoneInfo(gt.to);
       var mesh = GH.models.buildGate(gt.exit ? 'exit' : (toInfo.dungeon ? 'dungeon' : 'travel'));
-      mesh.position.set(gt.x, 0, gt.z);
+      mesh.position.set(gt.x, gy(gt.x, gt.z), gt.z);
       // gates on the map edge face inward
       mesh.rotation.y = Math.atan2(-gt.x, -gt.z);
       group.add(mesh);
@@ -5836,7 +7280,7 @@ GH.world = (function () {
     // the hub: survivor camp + race sites (wreck territory only)
     if (zoneId === 'wreck') {
       var camp = new THREE.Group();
-      camp.position.set(W.CAMP.x, 0, W.CAMP.z);
+      camp.position.set(W.CAMP.x, gy(W.CAMP.x, W.CAMP.z), W.CAMP.z);
       camp.add(GH.models.buildCampFire());
       var stations = [
         { m: GH.models.buildBrokerTable(), x: -5, z: -3 },
@@ -5857,7 +7301,7 @@ GH.world = (function () {
         var next = path[(Math.floor(g * path.length / W.CIRCUIT.gates) + 1) % path.length];
         var ang = Math.atan2(next.x - pp.x, next.z - pp.z);
         var gate = GH.models.buildPylonPair(g === 0 ? 0xffd050 : 0x60c8ff);
-        gate.position.set(pp.x, 0, pp.z);
+        gate.position.set(pp.x, gy(pp.x, pp.z), pp.z);
         gate.rotation.y = ang;
         group.add(gate);
       }
@@ -5872,7 +7316,7 @@ GH.world = (function () {
       coreMeshes: coreMeshes, relicMesh: relicMesh,
       receptorMeshes: receptorMeshes, switchMeshes: switchMeshes,
       screenMeshes: screenMeshes, beamPool: beamPool,
-      raceLights: raceLights,
+      raceLights: raceLights, terrain: terrain,
       layout: lay, info: info
     };
   };
@@ -5979,12 +7423,13 @@ GH.race = (function () {
   function startDuel() {
     var C = GH.world.DUEL_PIT;
     PIT.cx = C.x; PIT.cz = C.z;
+    PIT.y = GH.terrain.h(C.x, C.z);
     // pit floor + boundary glow
     var floor = new THREE.Mesh(
       new THREE.PlaneGeometry(PIT.half * 2 + 1, PIT.half * 2 + 1),
       new THREE.MeshBasicMaterial({ color: 0x101820, transparent: true, opacity: 0.85 }));
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(PIT.cx, 0.05, PIT.cz);
+    floor.position.set(PIT.cx, PIT.y + 0.05, PIT.cz);
     ctx.scene.add(floor);
     extras.push(floor);
     for (var s = 0; s < 4; s++) {
@@ -5992,7 +7437,7 @@ GH.race = (function () {
         s < 2 ? PIT.half * 2 : 0.2, 1.1, s < 2 ? 0.2 : PIT.half * 2),
         new THREE.MeshBasicMaterial({ color: 0x60c8ff, transparent: true, opacity: 0.5 }));
       edge.position.set(
-        PIT.cx + (s === 2 ? -PIT.half : s === 3 ? PIT.half : 0), 0.55,
+        PIT.cx + (s === 2 ? -PIT.half : s === 3 ? PIT.half : 0), PIT.y + 0.55,
         PIT.cz + (s === 0 ? -PIT.half : s === 1 ? PIT.half : 0));
       ctx.scene.add(edge);
       extras.push(edge);
@@ -6015,7 +7460,7 @@ GH.race = (function () {
         mesh: i === 0 ? ctx.speeder : makeRiderMesh(i)
       });
       riders[i].mesh.visible = true;
-      riders[i].mesh.position.set(riders[i].x, 0.1, riders[i].z);
+      riders[i].mesh.position.set(riders[i].x, GH.terrain.h(riders[i].x, riders[i].z) + 0.1, riders[i].z);
     }
   }
 
@@ -6029,7 +7474,7 @@ GH.race = (function () {
         new THREE.MeshBasicMaterial({
           color: TRAIL_COLORS[r.idx], transparent: true, opacity: 0.65
         }));
-      mesh.position.set((x1 + r.x) / 2, 0.5, (z1 + r.z) / 2);
+      mesh.position.set((x1 + r.x) / 2, GH.terrain.h((x1 + r.x) / 2, (z1 + r.z) / 2) + 0.5, (z1 + r.z) / 2);
       mesh.rotation.y = Math.atan2(dx, dz);
       ctx.scene.add(mesh);
       var wall = { x1: x1, z1: z1, x2: r.x, z2: r.z, mesh: mesh, owner: r.idx };
@@ -6119,7 +7564,7 @@ GH.race = (function () {
 
       if (duelHits(r.x, r.z, i, true)) { eliminate(r); continue; }
 
-      r.mesh.position.set(r.x, 0.12 + Math.sin(raceT * 6 + i) * 0.05, r.z);
+      r.mesh.position.set(r.x, GH.terrain.h(r.x, r.z) + 0.12 + Math.sin(raceT * 6 + i) * 0.05, r.z);
       r.mesh.rotation.y = r.heading;
       if (r.mesh.userData.flames) {
         r.mesh.userData.flames.forEach(function (fl) { fl.visible = true; fl.scale.y = 1.4; });
@@ -6227,7 +7672,7 @@ GH.race = (function () {
         }
       }
 
-      r.mesh.position.set(r.x, 0.14 + Math.sin(raceT * 5 + i) * 0.06, r.z);
+      r.mesh.position.set(r.x, GH.terrain.h(r.x, r.z) + 0.14 + Math.sin(raceT * 5 + i) * 0.06, r.z);
       r.mesh.rotation.y = r.heading;
       r.mesh.rotation.z = 0;
       if (r.mesh.userData.flames) {
@@ -6451,6 +7896,9 @@ GH.game = (function () {
 
   var raycaster = new THREE.Raycaster();
   var groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  // terrain height under a point (0 in the flat arenas)
+  function gy(x, z) { return GH.terrain.h(x, z); }
+  var camGround = 0; // smoothed ground height under the camera target
   var tmpV3 = new THREE.Vector3();
 
   // =================================================================
@@ -6467,8 +7915,8 @@ GH.game = (function () {
 
     hemi = new THREE.HemisphereLight(0xbfe8ff, 0x24485a, 0.95);
     scene.add(hemi);
-    sun = new THREE.DirectionalLight(0xfff4d8, 0.85);
-    sun.position.set(8, 20, 6);
+    sun = new THREE.DirectionalLight(0xfff4d8, 0.9);
+    sun.position.set(14, 13, 9); // low enough that slopes shade
     scene.add(sun);
 
     floor = new THREE.Mesh(
@@ -6540,7 +7988,7 @@ GH.game = (function () {
       spawn: function (x, y, z, text, cls, size) {
         var n = pool[idx]; idx = (idx + 1) % pool.length;
         n.life = 0.75;
-        n.wx = x + GH.rand(-0.4, 0.4); n.wy = y; n.wz = z;
+        n.wx = x + GH.rand(-0.4, 0.4); n.wy = y + gy(x, z); n.wz = z;
         n.vy = 2.6;
         n.el.textContent = text;
         n.el.className = 'dmg-num' + (cls ? ' ' + cls : '');
@@ -6807,7 +8255,7 @@ GH.game = (function () {
   function spawnEnemy(typeId, atX, atZ) {
     if (enemies.length > 110) return null;
     var def = GH.enemyDefs[typeId];
-    var mesh = def.corrupt ? GH.buildCorrupt(typeId) : GH.enemyBuilders[typeId]();
+    var mesh = def.corrupt ? GH.buildCorrupt(typeId) : GH.enemyBuilders[typeId](stage ? stage.id : null);
     var x, z;
     if (atX !== undefined) { x = atX; z = atZ; }
     else {
@@ -6816,7 +8264,7 @@ GH.game = (function () {
       x = GH.clamp(player.x + Math.cos(a) * r, -ARENA_R, ARENA_R);
       z = GH.clamp(player.z + Math.sin(a) * r, -ARENA_R, ARENA_R);
     }
-    mesh.position.set(x, 0, z);
+    mesh.position.set(x, 0 + gy(x, z), z);
     scene.add(mesh);
     var hpMult = def.boss ? Math.max(1, wavePlan.hpMult * 0.55) : wavePlan.hpMult;
     if (def.boss && GH.devWeakBoss) hpMult *= 0.03;
@@ -6840,8 +8288,15 @@ GH.game = (function () {
       // territorial AI (expedition): guard home ground until provoked
       homeX: x, homeZ: z,
       aggro: !expActive, // arena waves stay all-out; the Reach is territorial
-      wanderT: 0, wanderA: Math.random() * Math.PI * 2
+      wanderT: 0, wanderA: Math.random() * Math.PI * 2,
+      // zone-native behaviours
+      hgt: 0, buried: def.behavior === 'burrower', emergeT: 0, surfaceT: 0,
+      phased: 0, blinkT: def.blinkInterval || 0, sprung: false, trailT: 0,
+      burstLeft: 0, burstT: 0, orbitA: Math.random() * Math.PI * 2, diveT: 0
     };
+    if (e.buried && mesh.userData.body) { mesh.userData.body.visible = false; }
+    if (def.behavior === 'ambusher' && mesh.userData.body) { mesh.userData.body.visible = false; }
+    if (def.behavior === 'flyer') e.hgt = 3.0;
     // elites: from wave 6, one in ten spawns carries a modifier
     if (!def.boss && atX === undefined && waveNum >= 6 && Math.random() < 0.10) {
       var mods2 = ['blazing', 'shielded', 'swift', 'volatile', 'vampiric'];
@@ -6875,7 +8330,10 @@ GH.game = (function () {
   function damageEnemy(e, raw, opts) {
     if (e.dead || G.state !== 'play') return;
     opts = opts || {};
+    if (e.phased > 0) return; // blinked out — nothing to hit
     var dmg = raw;
+    if (e.def.armorMult) dmg *= e.def.armorMult;
+    if (e.buried) dmg *= 0.3;
     var crit = false;
     var inst = opts.inst;
     if (opts.canCrit !== false) {
@@ -6951,7 +8409,7 @@ GH.game = (function () {
         if (e.mesh.parent) e.mesh.parent.remove(e.mesh);
         // swap the structure for its dead husk
         var deadNest = GH.models.buildNest(true);
-        deadNest.position.set(e.x, 0, e.z);
+        deadNest.position.set(e.x, 0 + gy(e.x, e.z), e.z);
         worldH.group.add(deadNest);
         var cc = cleanseCount();
         queueAnnounce('NEST BROKEN — ' + cc.dead + '/' + cc.total + ' CLEANSED', 24);
@@ -7038,6 +8496,12 @@ GH.game = (function () {
       effects.push({ kind: 'patch', x: e.x, z: e.z, t: 3, radius: 1.3, dps: 5,
         mesh: groundDisc(e.x, e.z, 1.3, 0xff5020, 0.3) });
     }
+    if (e.def.deathCloud) {
+      // a chilling spore cloud: slow poison that saps the servos
+      effects.push({ kind: 'patch', x: e.x, z: e.z, t: 4.5, radius: 1.9, dps: 3, chill: true,
+        mesh: groundDisc(e.x, e.z, 1.9, 0x80c040, 0.3) });
+      spawnBurst(e.x, 0.8, e.z, 0xa0e060, 12);
+    }
     if (e.elite === 'volatile' || e.modVolatile) {
       // detonates on death — respect the ARC ward
       spawnBurst(e.x, 1, e.z, 0xff40a0, 14);
@@ -7084,7 +8548,7 @@ GH.game = (function () {
   }
 
   function addAt(mesh, x, z) {
-    mesh.position.set(x, 0, z);
+    mesh.position.set(x, 0 + gy(x, z), z);
     scene.add(mesh);
     return mesh;
   }
@@ -7093,7 +8557,7 @@ GH.game = (function () {
     var m = new THREE.Mesh(new THREE.CircleGeometry(r, 16),
       new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: opacity, depthWrite: false }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(x, 0.04, z);
+    m.position.set(x, 0.04 + gy(x, z), z);
     scene.add(m);
     return m;
   }
@@ -7147,7 +8611,7 @@ GH.game = (function () {
       if (def.behavior === 'static') continue;
       if (e.stun > 0) {
         e.stun -= dt;
-        e.mesh.position.set(e.x, Math.sin(runTime * 30) * 0.03, e.z);
+        e.mesh.position.set(e.x, gy(e.x, e.z) + Math.sin(runTime * 30) * 0.03, e.z);
         continue;
       }
       var spd = def.speed * (e.slowT > 0 ? 0.6 : 1) * (weekly ? weekly.mods.espd : 1) *
@@ -7170,6 +8634,11 @@ GH.game = (function () {
       // They wake when you close in (or wound them), give chase, and
       // walk home when you leave their hunting range. Event spawns
       // (sieges, defenses, summons, guardians) never stand down.
+      if (expActive && !def.boss && !e.event && def.behavior === 'ambusher' && !e.sprung) {
+        // a lurker is scenery until you are on top of it
+        if (dist < 6.5 || e.hp < e.maxHp) e.aggro = true;
+        if (!e.aggro) continue;
+      }
       if (expActive && !def.boss && !e.event) {
         var aggroR = def.behavior === 'ranged' ? 16 : 11;
         if (!e.aggro) {
@@ -7201,7 +8670,7 @@ GH.game = (function () {
           nx = mx; nz = mz;
           e.x += (mx * spd) * dt;
           e.z += (mz * spd) * dt;
-          e.mesh.position.set(e.x, 0, e.z);
+          e.mesh.position.set(e.x, 0 + gy(e.x, e.z), e.z);
           e.mesh.rotation.y = Math.atan2(nx, nz);
           var idleLimbs = e.mesh.userData.limbs;
           if (idleLimbs) {
@@ -7219,10 +8688,111 @@ GH.game = (function () {
         if (dist > def.keepDist + 1) { mx = nx; mz = nz; }
         else if (dist < def.keepDist - 2) { mx = -nx; mz = -nz; }
         e.shootCd -= dt;
-        if (e.shootCd <= 0 && dist < 22) {
+        if (e.burstLeft > 0) {
+          e.burstT -= dt;
+          if (e.burstT <= 0) {
+            e.burstT = 0.14; e.burstLeft--;
+            spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage * 0.7, def.shotElement);
+          }
+        } else if (e.shootCd <= 0 && dist < 22) {
           e.shootCd = def.shootInterval;
-          spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage * 0.9, def.shotElement);
+          if (def.burst) { e.burstLeft = def.burst; e.burstT = 0; }
+          else spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage * 0.9, def.shotElement);
         }
+        if (def.name === 'Storm Sentinel') e.hgt = 0.6 + Math.sin(e.anim * 0.5) * 0.25;
+      } else if (def.behavior === 'burrower') {
+        if (e.buried) {
+          // tunnelling: fast and unstoppable, a plume of sand marks the line
+          mx = nx; mz = nz; spd = def.speed;
+          if (e.mesh.userData.plume) e.mesh.userData.plume.visible = true;
+          if (dist < 3.4 && e.emergeT <= 0) {
+            e.emergeT = 0.55;
+            spawnTelegraph(e.x, e.z, 2.2, 0.55, e.damage);
+          }
+          if (e.emergeT > 0) {
+            spd = 0; mx = 0; mz = 0;
+            e.emergeT -= dt;
+            if (e.emergeT <= 0) {
+              e.buried = false; e.surfaceT = def.surfaceTime || 2.5;
+              if (e.mesh.userData.body) e.mesh.userData.body.visible = true;
+              if (e.mesh.userData.plume) e.mesh.userData.plume.visible = false;
+              e.popT = 0.25;
+              spawnBurst(e.x, 0.4, e.z, 0xd8c090, 14);
+              GH.audio.explode();
+            }
+          }
+        } else {
+          mx = nx; mz = nz; spd = def.speed * 0.28;
+          e.surfaceT -= dt;
+          if (e.surfaceT <= 0) {
+            e.buried = true;
+            if (e.mesh.userData.body) e.mesh.userData.body.visible = false;
+            spawnBurst(e.x, 0.3, e.z, 0xd8c090, 8);
+          }
+        }
+      } else if (def.behavior === 'flyer') {
+        e.orbitA += dt * 0.9;
+        if (e.diveT > 0) {
+          e.diveT -= dt;
+          mx = nx; mz = nz; spd = def.speed * 1.9;
+          e.hgt += (0.7 - e.hgt) * Math.min(1, dt * 6);
+        } else {
+          var ox2 = tgtP.x + Math.sin(e.orbitA) * 7.5, oz2 = tgtP.z + Math.cos(e.orbitA) * 7.5;
+          var oa = GH.angleTo(e.x, e.z, ox2, oz2);
+          mx = Math.sin(oa); mz = Math.cos(oa);
+          e.hgt += (3.2 + Math.sin(e.anim) * 0.3 - e.hgt) * Math.min(1, dt * 3);
+          e.shootCd -= dt;
+          if (e.shootCd <= 0 && dist < 14) {
+            e.shootCd = def.shootInterval;
+            e.diveT = 0.7;
+            GH.audio.dash();
+          }
+        }
+        if (e.mesh.userData.wings) {
+          var wf = Math.sin(e.anim * 2.5) * 0.6;
+          e.mesh.userData.wings[0].rotation.z = wf;
+          e.mesh.userData.wings[1].rotation.z = -wf;
+        }
+      } else if (def.behavior === 'ambusher') {
+        if (!e.sprung) {
+          mx = 0; mz = 0; spd = 0;
+          if (dist < 6.5 || e.hp < e.maxHp) {
+            e.sprung = true;
+            if (e.mesh.userData.body) e.mesh.userData.body.visible = true;
+            if (e.mesh.userData.cover) e.mesh.userData.cover.visible = false;
+            e.popT = 0.25;
+            spawnBurst(e.x, 0.6, e.z, 0x60c040, 10);
+            GH.audio.hit();
+            if (dist < 4.2 && tgtP === player) { player.snareT = 0.9; announce('SNARED', 16); }
+            e.dashing = def.dashTime; e.dashDirX = nx; e.dashDirZ = nz;
+          }
+        } else if (e.dashing > 0) {
+          e.dashing -= dt; spd = def.dashSpeed; mx = e.dashDirX; mz = e.dashDirZ;
+        } else {
+          mx = nx; mz = nz;
+          e.dashCd -= dt;
+          if (e.dashCd <= 0 && dist < 9) {
+            e.dashCd = def.dashInterval; e.dashing = def.dashTime; e.dashDirX = nx; e.dashDirZ = nz;
+          }
+        }
+      } else if (def.behavior === 'phantom') {
+        if (e.phased > 0) {
+          e.phased -= dt; spd = 0; mx = 0; mz = 0;
+          if (e.phased <= 0) {
+            var pa2 = Math.random() * Math.PI * 2;
+            e.x = tgtP.x + Math.sin(pa2) * 4.2; e.z = tgtP.z + Math.cos(pa2) * 4.2;
+            e.mesh.visible = true; e.popT = 0.2;
+            spawnBurst(e.x, 1, e.z, 0xc080ff, 10);
+          }
+        } else {
+          mx = nx; mz = nz;
+          e.blinkT -= dt;
+          if (e.blinkT <= 0 && dist > 5) {
+            e.blinkT = def.blinkInterval; e.phased = 0.7; e.mesh.visible = false;
+            spawnBurst(e.x, 1, e.z, 0xc080ff, 8);
+          }
+        }
+        e.hgt = 0.5 + Math.sin(e.anim * 0.7) * 0.2;
       } else if (def.behavior === 'dasher') {
         if (e.dashing > 0) {
           e.dashing -= dt;
@@ -7284,7 +8854,7 @@ GH.game = (function () {
           spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage);
         }
         // hover pose
-        e.mesh.position.y = 0.12 + Math.sin(runTime * 6 + e.anim) * 0.05;
+        e.mesh.position.y = gy(e.x, e.z) + 0.12 + Math.sin(runTime * 6 + e.anim) * 0.05;
         if (e.mesh.userData.flames) {
           e.mesh.userData.flames.forEach(function (fl) { fl.visible = true; fl.scale.y = 1.4; });
         }
@@ -7306,8 +8876,18 @@ GH.game = (function () {
       }
 
       var ePreX = e.x, ePreZ = e.z;
+      if (e.buried) { sepX = 0; sepZ = 0; } // tunnels pass under the crowd
       e.x += (mx * spd + sepX * 4 + e.vx) * dt;
       e.z += (mz * spd + sepZ * 4 + e.vz) * dt;
+      // a burning trail behind the magma crawler
+      if (def.trailBurn && e.aggro && spd > 0) {
+        e.trailT -= dt;
+        if (e.trailT <= 0) {
+          e.trailT = 0.55;
+          effects.push({ kind: 'patch', x: e.x, z: e.z, t: 2.2, radius: 0.9, dps: 4,
+            mesh: groundDisc(e.x, e.z, 0.9, 0xff5020, 0.28) });
+        }
+      }
       e.vx *= Math.pow(0.02, dt);
       e.vz *= Math.pow(0.02, dt);
       if (expActive) {
@@ -7336,7 +8916,7 @@ GH.game = (function () {
         }
       }
 
-      e.mesh.position.set(e.x, 0, e.z);
+      e.mesh.position.set(e.x, gy(e.x, e.z) + (e.hgt || 0), e.z);
       e.mesh.rotation.y = Math.atan2(nx, nz);
 
       // animation
@@ -7372,7 +8952,7 @@ GH.game = (function () {
 
       // contact damage (whichever pilot is in reach)
       e.attackCd -= dt;
-      if (e.attackCd <= 0) {
+      if (e.attackCd <= 0 && !e.buried && e.phased <= 0 && !(def.behavior === 'flyer' && e.hgt > 1.6)) {
         if (GH.dist2(e.x, e.z, player.x, player.z) < Math.pow(def.radius + 0.8, 2)) {
           e.attackCd = e.modFrenzied ? 0.75 : 1.1;
           playerDamage(e.damage, e, 'kinetic');
@@ -7515,7 +9095,7 @@ GH.game = (function () {
     }));
     m.rotation.x = -Math.PI / 2;
     m.rotation.z = -angle;
-    m.position.set(x + Math.sin(angle) * len / 2, 0.05, z + Math.cos(angle) * len / 2);
+    m.position.set(x + Math.sin(angle) * len / 2, 0.05 + gy(x, z), z + Math.cos(angle) * len / 2);
     scene.add(m);
     effects.push({ kind: 'lineTele', mesh: m, t: delay, x: x, z: z, angle: angle, len: len, width: width, damage: dmg });
   }
@@ -7592,7 +9172,7 @@ GH.game = (function () {
         : GH.rand(-w.spread, w.spread) * 0.5;
       var a = aimAngle + off;
       var m = projMesh(w.size, color);
-      m.position.set(originX, 1.2, originZ);
+      m.position.set(originX, 1.2 + gy(originX, originZ), originZ);
       scene.add(m);
       projectiles.push({
         mesh: m, x: originX, z: originZ,
@@ -7610,7 +9190,7 @@ GH.game = (function () {
 
   function spawnFlash(x, y, z) {
     var s = poolGet('flash');
-    s.position.set(x, y, z);
+    s.position.set(x, y + gy(x, z), z);
     s.scale.setScalar(GH.rand(0.7, 1.1));
     scene.add(s);
     effects.push({ kind: 'sprite', mesh: s, t: 0.07, total: 0.07 });
@@ -7664,7 +9244,7 @@ GH.game = (function () {
       var rw = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.2, 24),
         new THREE.MeshBasicMaterial({ color: 0x80d0ff, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
       rw.rotation.x = -Math.PI / 2;
-      rw.position.set(player.x, 0.35, player.z);
+      rw.position.set(player.x, 0.35 + gy(player.x, player.z), player.z);
       scene.add(rw);
       GH.audio.zap();
       effects.push({
@@ -7679,7 +9259,7 @@ GH.game = (function () {
         var vm = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.1, 4, 14),
           GH.assets.basic(0xc0a0ff, { transparent: true, opacity: 0.8 }));
         vm.rotation.x = Math.PI / 2;
-        vm.position.set(tgt3.x, 0.4, tgt3.z);
+        vm.position.set(tgt3.x, 0.4 + gy(tgt3.x, tgt3.z), tgt3.z);
         scene.add(vm);
         GH.audio.shoot();
         effects.push({
@@ -7745,7 +9325,7 @@ GH.game = (function () {
       if (e) setTarget(e);
     }
     if (reticle && target) {
-      reticle.position.set(target.x, 0.12, target.z);
+      reticle.position.set(target.x, 0.12 + gy(target.x, target.z), target.z);
       reticle.rotation.z += 0.02;
     }
   }
@@ -7835,7 +9415,7 @@ GH.game = (function () {
       var m = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.9, 24),
         new THREE.MeshBasicMaterial({ color: 0xffb050, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
       m.rotation.x = -Math.PI / 2;
-      m.position.set(player.x, 0.3, player.z);
+      m.position.set(player.x, 0.3 + gy(player.x, player.z), player.z);
       scene.add(m);
       effects.push({ kind: 'boom', mesh: m, t: 0.3, total: 0.3, grow: 6 });
       for (var si2 = 0; si2 < enemies.length; si2++) {
@@ -8006,7 +9586,7 @@ GH.game = (function () {
         damageEnemy(e, dmg, { inst: inst, noRes: true });
         var m = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.45, 6, 6),
           GH.assets.basic(0xfff2c0, { transparent: true, opacity: 0.7 }));
-        m.position.set(e.x, 3, e.z);
+        m.position.set(e.x, 3 + gy(e.x, e.z), e.z);
         scene.add(m);
         effects.push({ kind: 'fade', mesh: m, t: 0.25, total: 0.25 });
         hit++;
@@ -8023,7 +9603,7 @@ GH.game = (function () {
     var m = new THREE.Mesh(new THREE.RingGeometry(0.4, 1.0, 24),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(player.x, 0.3, player.z);
+    m.position.set(player.x, 0.3 + gy(player.x, player.z), player.z);
     scene.add(m);
     effects.push({ kind: 'boom', mesh: m, t: 0.35, total: 0.35, grow: 8 });
     var dmg = weaponDamage(inst) * 1.5;
@@ -8051,7 +9631,7 @@ GH.game = (function () {
       color: 0xfff0c0, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide
     }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(a2.x, 0.35, a2.z);
+    m.position.set(a2.x, 0.35 + gy(a2.x, a2.z), a2.z);
     scene.add(m);
     effects.push({ kind: 'fade', mesh: m, t: 0.18, total: 0.18 });
     // kick the swing animation (windup + cut, see poseMeleeSwing);
@@ -8082,7 +9662,7 @@ GH.game = (function () {
     if (w.wave) {
       var wm = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 0.16),
         GH.assets.basic(w.wave.color, { transparent: true, opacity: 0.85 }));
-      wm.position.set(a2.x, 1.2, a2.z);
+      wm.position.set(a2.x, 1.2 + gy(a2.x, a2.z), a2.z);
       wm.rotation.y = aim;
       scene.add(wm);
       projectiles.push({
@@ -8120,7 +9700,7 @@ GH.game = (function () {
     var m = new THREE.Mesh(new THREE.RingGeometry(range - 0.25, range, 22),
       new THREE.MeshBasicMaterial({ color: 0xc04060, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(a2.x, 0.3, a2.z);
+    m.position.set(a2.x, 0.3 + gy(a2.x, a2.z), a2.z);
     scene.add(m);
     effects.push({ kind: 'fade', mesh: m, t: 0.22, total: 0.22 });
   }
@@ -8227,7 +9807,7 @@ GH.game = (function () {
     var w = inst.w;
     var m = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.18, 8),
       GH.assets.mat(0xc8b040, { emissive: 0x604010 }));
-    m.position.set(player.x, 0.1, player.z);
+    m.position.set(player.x, 0.1 + gy(player.x, player.z), player.z);
     scene.add(m);
     mines.push({ mesh: m, x: player.x, z: player.z, life: w.life, damage: weaponDamage(inst), aoe: w.aoe, inst: inst });
   }
@@ -8259,7 +9839,7 @@ GH.game = (function () {
     if (dmg > 0) G.hitStop(0.03);
     var m = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.6, 8, 6),
       new THREE.MeshBasicMaterial({ color: 0xffc060, transparent: true, opacity: 0.7 }));
-    m.position.set(x, 0.8, z);
+    m.position.set(x, 0.8 + gy(x, z), z);
     scene.add(m);
     effects.push({ kind: 'boom', mesh: m, t: 0.25, total: 0.25, grow: radius });
     var scorch = groundDisc(x, z, radius * 0.7, 0x181410, 0.35);
@@ -8297,7 +9877,7 @@ GH.game = (function () {
       var a = inst.angle + (k / w.count) * Math.PI * 2;
       var bx = player.x + Math.sin(a) * w.radius;
       var bz = player.z + Math.cos(a) * w.radius;
-      blade.position.set(bx, 1.0, bz);
+      blade.position.set(bx, 1.0 + gy(bx, bz), bz);
       blade.rotation.y = a + Math.PI / 2;
       for (var j = 0; j < enemies.length; j++) {
         var e = enemies[j];
@@ -8331,7 +9911,7 @@ GH.game = (function () {
     droneAngle += dt * 1.6;
     droneMesh.position.set(
       player.x + Math.sin(droneAngle) * 3.2,
-      3.0 + Math.sin(runTime * 2) * 0.2,
+      gy(player.x, player.z) + 3.0 + Math.sin(runTime * 2) * 0.2,
       player.z + Math.cos(droneAngle) * 3.2
     );
     droneMesh.rotation.y += dt * 3;
@@ -8368,7 +9948,7 @@ GH.game = (function () {
       }
       p2.x += p2.dirX * p2.speed * dt;
       p2.z += p2.dirZ * p2.speed * dt;
-      p2.mesh.position.set(p2.x, 1.2, p2.z);
+      p2.mesh.position.set(p2.x, 1.2 + gy(p2.x, p2.z), p2.z);
       p2.mesh.rotation.y = Math.atan2(p2.dirX, p2.dirZ);
       if (!p2.flat) p2.mesh.rotation.x = Math.PI / 2;
 
@@ -8409,10 +9989,11 @@ GH.game = (function () {
       p2.life -= dt;
       p2.x += p2.dirX * p2.speed * dt;
       p2.z += p2.dirZ * p2.speed * dt;
-      p2.mesh.position.set(p2.x, p2.y, p2.z);
+      p2.mesh.position.set(p2.x, p2.y + gy(p2.x, p2.z), p2.z);
       var dead = p2.life <= 0;
       if (!dead && GH.dist2(p2.x, p2.z, player.x, player.z) < 0.8 * 0.8) {
         playerDamage(p2.damage, null, 'ballistic');
+        if (p2.elem === 'frost') { player.chillT = 1.6; announce('CHILLED', 14); }
         dead = true;
       }
       if (!dead && mate && !mate.down &&
@@ -8428,12 +10009,12 @@ GH.game = (function () {
   }
 
   function spawnEnemyShot(x, y, z, dirX, dirZ, speed, dmg, elem) {
-    var color = elem === 'shock' ? 0x90d0ff : 0xff4060;
+    var color = elem === 'shock' ? 0x90d0ff : elem === 'frost' ? 0xd8f8ff : elem === 'void' ? 0xc060ff : 0xff4060;
     var m = poolGet('sphere', color);
-    m.scale.setScalar(0.22);
-    m.position.set(x, y, z);
+    m.scale.setScalar(elem === 'void' ? 0.3 : 0.22);
+    m.position.set(x, y + gy(x, z), z);
     scene.add(m);
-    enemyShots.push({ mesh: m, x: x, y: y, z: z, dirX: dirX, dirZ: dirZ, speed: speed, damage: dmg, life: 4.5 });
+    enemyShots.push({ mesh: m, x: x, y: y, z: z, dirX: dirX, dirZ: dirZ, speed: speed, damage: dmg, life: 4.5, elem: elem });
   }
 
   // =================================================================
@@ -8453,7 +10034,7 @@ GH.game = (function () {
     else if (type === 'cipher') mesh = GH.models.buildCipher();
     else if (type === 'cache') mesh = GH.models.buildCache();
     else mesh = GH.models.buildCoin();
-    mesh.position.set(x, 0.5, z);
+    mesh.position.set(x, 0.5 + gy(x, z), z);
     scene.add(mesh);
     pickups.push({ type: type, mesh: mesh, x: x, z: z, vx: GH.rand(-2, 2), vz: GH.rand(-2, 2), t: Math.random() * 10 });
   }
@@ -8527,7 +10108,7 @@ GH.game = (function () {
         pk.x += ((px2 - pk.x) / d) * pull * dt;
         pk.z += ((pz2 - pk.z) / d) * pull * dt;
       }
-      pk.mesh.position.set(pk.x, 0.5 + Math.sin(pk.t * 3) * 0.12, pk.z);
+      pk.mesh.position.set(pk.x, gy(pk.x, pk.z) + 0.5 + Math.sin(pk.t * 3) * 0.12, pk.z);
       pk.mesh.rotation.y += dt * 2.5;
       if (pk.mesh.userData.spin) pk.mesh.userData.spin.rotation.y += dt * 3;
       if (d2 < 0.75 * 0.75) {
@@ -8544,7 +10125,7 @@ GH.game = (function () {
     for (var i = 0; i < n; i++) {
       var m = poolGet('box', color);
       m.scale.setScalar(0.14);
-      m.position.set(x, y, z);
+      m.position.set(x, y + gy(x, z), z);
       scene.add(m);
       effects.push({
         kind: 'shard', mesh: m, t: GH.rand(0.3, 0.6),
@@ -8561,7 +10142,7 @@ GH.game = (function () {
       if (fx.kind === 'shard') {
         fx.vy -= 18 * dt;
         fx.mesh.position.x += fx.vx * dt;
-        fx.mesh.position.y = Math.max(0.05, fx.mesh.position.y + fx.vy * dt);
+        fx.mesh.position.y = Math.max(gy(fx.mesh.position.x, fx.mesh.position.z) + 0.05, fx.mesh.position.y + fx.vy * dt);
         fx.mesh.position.z += fx.vz * dt;
         fx.mesh.rotation.x += dt * 8;
         fx.mesh.rotation.y += dt * 8;
@@ -8619,7 +10200,7 @@ GH.game = (function () {
         var tt = 1 - fx.t / fx.total;
         var px = GH.lerp(fx.x0, fx.x1, tt);
         var pz = GH.lerp(fx.z0, fx.z1, tt);
-        fx.mesh.position.set(px, 1 + Math.sin(tt * Math.PI) * 7, pz);
+        fx.mesh.position.set(px, gy(px, pz) + 1 + Math.sin(tt * Math.PI) * 7, pz);
         if (fx.t <= 0) {
           scene.remove(fx.disc);
           explode(fx.x1, fx.z1, fx.aoe, fx.damage, { inst: fx.inst });
@@ -8629,6 +10210,7 @@ GH.game = (function () {
         if (GH.dist2(fx.x, fx.z, player.x, player.z) < fx.radius * fx.radius) {
           fx.tick = (fx.tick || 0) - dt;
           if (fx.tick <= 0) { fx.tick = 0.5; playerDamage(fx.dps * 0.5 + player.stats.armor, null, 'arc'); }
+          if (fx.chill) player.chillT = Math.max(player.chillT || 0, 0.6);
         }
       } else if (fx.kind === 'friendPatch') {
         // artifact trails: scorch the swarm, never the pilot
@@ -8687,7 +10269,8 @@ GH.game = (function () {
             }
           }
           if (fx.kind === 'boltStrike') {
-            drawLightning(fx.x, 14, fx.z, fx.x, 0.3, fx.z);
+            var by = gy(fx.x, fx.z);
+            drawLightning(fx.x, by + 14, fx.z, fx.x, by + 0.3, fx.z);
             GH.audio.zap();
             shake = Math.min(0.5, shake + 0.15);
           } else {
@@ -9017,7 +10600,7 @@ GH.game = (function () {
       var m = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.9, 24),
         new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
       m.rotation.x = -Math.PI / 2;
-      m.position.set(player.x, 0.3, player.z);
+      m.position.set(player.x, 0.3 + gy(player.x, player.z), player.z);
       scene.add(m);
       effects.push({ kind: 'boom', mesh: m, t: 0.3, total: 0.3, grow: 6 });
       for (var i = 0; i < enemies.length; i++) {
@@ -9084,19 +10667,23 @@ GH.game = (function () {
     return a + d;
   }
 
+  // a fresh drivetrain: heading picks up the frame's facing, tank empty
+  function freshDrive() {
+    return {
+      heading: player.facing || 0, spd: 0, nitro: 0, nitroT: 0,
+      slip: 0, fwd: 0, top: 1, drift: false, crashCd: 0,
+      skidT: 0, streakT: 0, score: 0,
+      air: false, hgt: 0, vy: 0, bog: 0, bogMsg: false, offTrack: false, jumpMsgT: 0
+    };
+  }
+
   function updateDrive(dt, input, spd, onIce) {
     var d = player.drive;
-    if (!d) {
-      d = player.drive = {
-        heading: player.facing || 0, spd: 0, nitro: 0, nitroT: 0,
-        slip: 0, fwd: 0, top: 1, drift: false, crashCd: 0,
-        skidT: 0, streakT: 0, score: 0
-      };
-    }
+    if (!d || d.bog === undefined) d = player.drive = freshDrive();
     player.dashTime = 0; // no frame-dash on the throttle
     var top = spd * 3.3;
     // the bottle: SHIFT burns while there's charge
-    var wantNitro = !!input.special && d.nitro > 0.03;
+    var wantNitro = !!input.special && d.nitro > 0.03 && !d.air;
     if (wantNitro) {
       d.nitro = Math.max(0, d.nitro - 0.38 * dt);
       d.nitroT = 0.12;
@@ -9106,32 +10693,113 @@ GH.game = (function () {
     var nitroOn = d.nitroT > 0;
     if (nitroOn) top *= 1.5;
     var hasInput = player.moveX !== 0 || player.moveZ !== 0;
-    d.drift = !!input.boostHeld && d.spd > top * 0.2;
+    d.drift = !!input.boostHeld && d.spd > top * 0.2 && !d.air;
+    var T = GH.terrain;
+    var fx0 = Math.sin(d.heading), fz0 = Math.cos(d.heading);
+    // the ground ahead: how steep, how soft, what it is
+    var slope = T.active ? T.slope(player.x, player.z, fx0, fz0) : 0;
+    var soft = T.active ? T.soft(player.x, player.z) : 0;
+    var surf = T.active ? T.surface(player.x, player.z) : null;
+    var authority = d.air ? 0.25 : 1;
     if (hasInput) {
       var want = Math.atan2(player.moveX, player.moveZ);
-      var speedFrac = GH.clamp(d.spd / Math.max(0.01, top), 0, 1);
+      var speedFrac = GH.clamp(Math.abs(d.spd) / Math.max(0.01, top), 0, 1);
       // grip narrows the wheel at speed; a drift throws it wide open
-      var turn = (d.drift ? 3.8 : 2.6 - speedFrac * 1.1) * dt;
+      var turn = (d.drift ? 3.8 : 2.6 - speedFrac * 1.1) * dt * authority;
       d.heading = approachAngle(d.heading, want, turn);
       var dot = Math.sin(d.heading) * player.moveX + Math.cos(d.heading) * player.moveZ;
-      if (dot < -0.55 && d.spd > 4) {
+      if (dot < -0.55 && d.spd > 1.5) {
         d.spd = Math.max(0, d.spd - 34 * dt); // stand on the brakes
-      } else {
+      } else if (dot < -0.55) {
+        d.spd = Math.max(-top * 0.22, d.spd - 14 * dt); // reverse gear
+      } else if (!d.air) {
         d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * dt);
       }
     } else {
-      d.spd = Math.max(0, d.spd - (d.drift ? 6 : 12) * dt);
+      d.spd = d.spd > 0 ? Math.max(0, d.spd - (d.drift ? 6 : 12) * dt) : Math.min(0, d.spd + 12 * dt);
     }
     if (d.drift) d.spd = Math.max(0, d.spd - 3.5 * dt); // the slide scrubs speed
+    // gravity works along the slope: climbs bleed speed, descents lend it
+    if (!d.air && T.active) {
+      d.spd -= slope * 15 * dt;
+      d.spd = GH.clamp(d.spd, -top * 0.22, top * 1.08);
+      // sheer rock is a wall
+      if (slope > 1.0 && soft < 0.5 && d.spd > 3) d.spd = 3;
+    }
+    // soft ground on a steep face: blast over it with momentum, or bog down
+    var steepSoft = !d.air && soft > 0.5 && slope > 0.26;
+    if (steepSoft) {
+      if (d.fwd > top * 0.58) {
+        d.air = true; d.hgt = 0.02;
+        d.vy = Math.max(5, d.fwd * slope * 1.05);
+        if (d.jumpMsgT <= 0) { d.jumpMsgT = 6; announce(surf === 'snow' ? 'DRIFT JUMP' : 'DUNE JUMP', 18); }
+        GH.audio.dash();
+      } else if (d.fwd < top * 0.48 && d.spd > 0) {
+        d.bog = Math.min(1, d.bog + dt * 2.6);
+      }
+    }
+    // the crest: leave the ground when it falls away under speed
+    if (!d.air && T.active && slope < -0.42 && d.fwd > top * 0.7) {
+      d.air = true; d.hgt = 0.02; d.vy = 0.5;
+    }
+    d.jumpMsgT = Math.max(0, d.jumpMsgT - dt);
+    if (d.bog > 0) {
+      // dug in: forward is a crawl, reversing digs you out
+      if (d.spd > 0) d.spd = Math.min(d.spd, top * 0.1);
+      if (d.spd < 0) d.bog = Math.max(0, d.bog - dt * 1.6);
+      if (!steepSoft) d.bog = Math.max(0, d.bog - dt * 0.7);
+      if (d.bog > 0.5 && !d.bogMsg) {
+        d.bogMsg = true;
+        announce((surf === 'snow' ? 'SNOWBOUND' : 'BOGGED DOWN') + ' — REVERSE TO DIG OUT', 20);
+        GH.audio.hit();
+      }
+      if (Math.random() < 0.5) {
+        spawnBurst(player.x - fx0 * 1.2, 0.2, player.z - fz0 * 1.2, surf === 'snow' ? 0xf0f4ff : 0xd8c090, 2);
+      }
+    } else d.bogMsg = false;
+    // airborne: ballistic, barely steerable, and it lands hard
+    if (d.air) {
+      d.vy -= T.gravity() * dt;
+      d.hgt += d.vy * dt;
+      if (d.hgt <= 0) {
+        d.air = false; d.hgt = 0;
+        var impact = Math.min(0.5, Math.abs(d.vy) * 0.03);
+        shake = Math.min(0.6, shake + impact);
+        spawnBurst(player.x, 0.2, player.z, surf === 'snow' ? 0xf0f4ff : 0xd8c090, 8);
+        if (d.vy < -14) { d.spd *= 0.8; announce('HARD LANDING', 16); }
+        d.vy = 0;
+        GH.audio.hit();
+      }
+    }
+    // water and lava under the skids: hydroplane, scald
+    if (surf === 'water') { onIce = true; d.spd = Math.min(d.spd, top * 0.7); }
+    if (surf === 'lava') {
+      player.lavaT = (player.lavaT || 0) - dt;
+      if (player.lavaT <= 0) {
+        player.lavaT = 0.5;
+        playerDamage(5 + (zoneNow ? zoneNow.danger * 3 : 3), null, 'arc');
+        spawnBurst(player.x, 0.3, player.z, 0xff6020, 5);
+      }
+    }
+    // races: leaving the asphalt costs speed
+    d.offTrack = false;
+    if (dungeonState && dungeonState.race && worldH && worldH.layout.raceway && !d.air) {
+      var rwL = worldH.layout.raceway;
+      if (T.trackDistance(rwL, player.x, player.z) > (rwL.width || 14) * 0.5 + 1.2) {
+        d.offTrack = true;
+        d.spd -= d.spd * 1.1 * dt;
+      }
+    }
     // decompose velocity: forward chases the throttle, lateral bleeds by grip
-    var fx = Math.sin(d.heading), fz = Math.cos(d.heading);
+    var fx = fx0, fz = fz0;
     var fwd = player.velX * fx + player.velZ * fz;
     var latX = player.velX - fx * fwd, latZ = player.velZ - fz * fwd;
     var grip = d.drift ? 1.5 : (onIce ? 2.4 : 7.5);
+    if (d.air) grip = 0.6;
     var gk = Math.min(1, grip * dt);
     latX -= latX * gk;
     latZ -= latZ * gk;
-    fwd += (d.spd - fwd) * Math.min(1, 9 * dt);
+    fwd += (d.spd - fwd) * Math.min(1, (d.air ? 1.5 : 9) * dt);
     player.velX = fx * fwd + latX;
     player.velZ = fz * fwd + latZ;
     d.slip = Math.sqrt(latX * latX + latZ * latZ);
@@ -9147,6 +10815,8 @@ GH.game = (function () {
         dungeonState.race.style = (dungeonState.race.style || 0) + styleGain;
       }
     }
+    // air time pays too
+    if (d.air && d.hgt > 1.5) d.nitro = Math.min(1, d.nitro + 0.12 * dt);
   }
 
   // =================================================================
@@ -9155,6 +10825,8 @@ GH.game = (function () {
   function updatePlayer(dt, input) {
     var s = player.stats;
     G._mouseNDC = input.mouseNDC;
+    // the aim plane follows the ground under the frame
+    groundPlane.constant = -gy(player.x, player.z);
 
     // T: fold between frame and skimmer form — a true combat transform.
     // Skimmer: 2.6x speed, ram hits, its own strafe cannons, +25% damage taken.
@@ -9199,6 +10871,24 @@ GH.game = (function () {
     // hazards underfoot: vines snare, ice steals traction
     if (inHazard('vines', player.x, player.z)) spd *= 0.65;
     var onIce = !!inHazard('ice', player.x, player.z);
+    // the ground itself: frozen lakes, ponds, mud, lava
+    var surf = GH.terrain.surface(player.x, player.z);
+    if (surf === 'ice') onIce = true;
+    if (surf === 'water') spd *= 0.62;
+    if (surf === 'mud') spd *= 0.8;
+    if (surf === 'lava') {
+      player.lavaT = (player.lavaT || 0) - dt;
+      if (player.lavaT <= 0) {
+        player.lavaT = 0.5;
+        playerDamage(5 + (zoneNow ? zoneNow.danger * 3 : 3), null, 'arc');
+        spawnBurst(player.x, 0.3, player.z, 0xff6020, 5);
+      }
+    } else if (surf === 'water' && (player.moveX || player.moveZ) && Math.random() < 0.3) {
+      spawnBurst(player.x, 0.1, player.z, 0x9ad8e8, 1);
+    }
+    // status: chilled by rime shots and spore clouds, snared by lurkers
+    if (player.chillT > 0) { player.chillT -= dt; spd *= 0.6; }
+    if (player.snareT > 0) { player.snareT -= dt; spd *= 0.05; }
 
     var preMoveX = player.x, preMoveZ = player.z; // for maze wall resolution
     if (player.speederOn) {
@@ -9238,6 +10928,13 @@ GH.game = (function () {
       } else {
         player.velX = wantX;
         player.velZ = wantZ;
+      }
+      // hills: climbing costs stride, descending lends it, cliffs stop you
+      if (GH.terrain.active && (player.velX || player.velZ)) {
+        var sl = GH.terrain.slope(player.x, player.z, player.velX, player.velZ);
+        if (sl > 1.15) { player.velX = 0; player.velZ = 0; }
+        else if (sl > 0) { var kUp = 1 - Math.min(0.8, sl) * 0.55; player.velX *= kUp; player.velZ *= kUp; }
+        else { var kDn = 1 + Math.min(0.25, -sl * 0.3); player.velX *= kDn; player.velZ *= kDn; }
       }
       player.x += player.velX * dt;
       player.z += player.velZ * dt;
@@ -9286,7 +10983,7 @@ GH.game = (function () {
       var fwdFrac = dr ? GH.clamp(dr.fwd / Math.max(0.01, dr.top), 0, 1) : 0;
       // wall check: the hull expected to travel but barely moved — a crash.
       // NFSU2's harshest rule kept: the wall takes your speed AND your bottle.
-      if (dr && dr.crashCd <= 0) {
+      if (dr && dr.crashCd <= 0 && !dr.air && dr.bog <= 0) {
         var expX = player.velX * dt, expZ = player.velZ * dt;
         var exp2 = expX * expX + expZ * expZ;
         var actX = player.x - preMoveX, actZ = player.z - preMoveZ;
@@ -9305,7 +11002,7 @@ GH.game = (function () {
           GH.audio.hit();
         }
       }
-      sm.position.set(player.x, 0, player.z);
+      sm.position.set(player.x, 0 + gy(player.x, player.z), player.z);
       var movingS = dr ? dr.fwd > 0.6 : false;
       player.speederHeading = dr ? dr.heading : player.facing;
       sm.rotation.y = player.speederHeading;
@@ -9317,7 +11014,11 @@ GH.game = (function () {
       }
       var leanT = dr ? GH.clamp(-slipSign * dr.slip * 0.045, -0.55, 0.55) : 0;
       sm.rotation.z = GH.lerp(sm.rotation.z, leanT, dt * 7);
-      sm.position.y = 0.12 + Math.sin(runTime * 6) * 0.06; // hover bob
+      sm.position.y = gy(player.x, player.z) + 0.12 + (dr ? dr.hgt : 0) + Math.sin(runTime * 6) * 0.06; // hover bob
+      // pitch the hull with the ground it rides (and the arc it flies)
+      var pitchT = dr && dr.air ? GH.clamp(-dr.vy * 0.04, -0.5, 0.5)
+        : GH.clamp(-GH.terrain.slope(player.x, player.z, Math.sin(dr.heading), Math.cos(dr.heading)) * 0.8, -0.5, 0.5);
+      sm.rotation.x = GH.lerp(sm.rotation.x, pitchT, dt * 6);
       var nitroLive = dr && dr.nitroT > 0;
       if (sm.userData.flames) {
         sm.userData.flames.forEach(function (fl) {
@@ -9338,7 +11039,7 @@ GH.game = (function () {
             stm.scale.set(0.06, 0.06, 1.6 + dr.fwd * 0.09);
             stm.position.set(
               player.x + Math.sin(va) * aheadOff + Math.cos(va) * sideOff,
-              GH.rand(0.5, 3),
+              gy(player.x, player.z) + GH.rand(0.5, 3),
               player.z + Math.cos(va) * aheadOff - Math.sin(va) * sideOff);
             stm.rotation.set(0, va, 0);
             scene.add(stm);
@@ -9359,7 +11060,7 @@ GH.game = (function () {
               skm.scale.set(0.5, 0.03, 1.9);
               skm.position.set(
                 player.x + Math.cos(ha) * 0.8 * sk - Math.sin(ha) * 1.1,
-                0.04,
+                gy(player.x, player.z) + 0.04,
                 player.z - Math.sin(ha) * 0.8 * sk - Math.cos(ha) * 1.1);
               skm.rotation.set(0, Math.atan2(player.velX, player.velZ), 0);
               scene.add(skm);
@@ -9396,7 +11097,7 @@ GH.game = (function () {
       sm.visible = !(player.hurtCd > 0 && Math.floor(runTime * 24) % 2 === 0);
       return;
     }
-    player.mesh.position.set(player.x, 0, player.z);
+    player.mesh.position.set(player.x, 0 + gy(player.x, player.z), player.z);
     player.mesh.rotation.y = player.facing;
     var parts = player.mesh.userData.parts;
     var moving = player.moveX !== 0 || player.moveZ !== 0;
@@ -9544,12 +11245,13 @@ GH.game = (function () {
     if (info.dungeon) {
       scene.background = new THREE.Color(0x07080e);
       scene.fog.color.setHex(0x0d1018);
-      scene.fog.near = 14; scene.fog.far = 70;
-      hemi.color.setHex(0x6a7494);
-      hemi.groundColor.setHex(0x232636);
-      sun.color.setHex(0xa8b4cc);
+      scene.fog.near = 18; scene.fog.far = 84;
+      hemi.color.setHex(0x8a94b4);
+      hemi.groundColor.setHex(0x2e3246);
+      sun.color.setHex(0xc0cce4);
     } else {
-      scene.fog.near = 18; scene.fog.far = 52;
+      // open ground: let the hills and the rim show before the haze takes them
+      scene.fog.near = 30; scene.fog.far = 98;
     }
   }
 
@@ -9582,7 +11284,11 @@ GH.game = (function () {
 
     curZone = zoneId;
     var w = GH.meta.data.world;
+    GH.terrain.clear();
+    GH.atmos.clear(scene);
     worldH = GH.world.buildZone(scene, zoneId, w.nests, w.lairsDown, w.vaults);
+    GH.atmos.set(scene, zoneId, !!worldH.info.dungeon);
+    camGround = player ? gy(player.x, player.z) : 0;
     zoneNow = worldH.info;
     interactables = GH.world.interactables(worldH.layout, zoneId);
     stage = GH.world.stageFor(zoneId);
@@ -9609,17 +11315,18 @@ GH.game = (function () {
     // the day's phenomena, where they belong
     if (harrowSpot && harrowSpot.zone === zoneId) {
       harrowTotem = GH.models.buildHarrowTotem();
-      harrowTotem.position.set(harrowSpot.x, 0, harrowSpot.z);
+      harrowTotem.position.set(harrowSpot.x, 0 + gy(harrowSpot.x, harrowSpot.z), harrowSpot.z);
       scene.add(harrowTotem);
     }
     if (w.wreck && (w.wreck.zone || 'wreck') === zoneId) {
       wreckMesh = GH.models.buildWreckSite();
-      wreckMesh.position.set(w.wreck.x, 0, w.wreck.z);
+      wreckMesh.position.set(w.wreck.x, 0 + gy(w.wreck.x, w.wreck.z), w.wreck.z);
       scene.add(wreckMesh);
     }
     // dungeon setup: garrison + the archetype's objective machine
     dungeonState = null;
     if (zoneNow.dungeon) initDungeon();
+    if (player) camGround = gy(player.x, player.z);
 
     if (fromZoneId) {
       announce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1], 28);
@@ -9697,7 +11404,7 @@ GH.game = (function () {
         fired: {}
       };
       dungeonState.haulerMesh = GH.models.buildHauler();
-      dungeonState.haulerMesh.position.set(dungeonState.hauler.x, 0, dungeonState.hauler.z);
+      dungeonState.haulerMesh.position.set(dungeonState.hauler.x, 0 + gy(dungeonState.hauler.x, dungeonState.hauler.z), dungeonState.hauler.z);
       scene.add(dungeonState.haulerMesh);
       queueAnnounce('THE HAULER ROLLS — KEEP IT ALIVE', 24);
     }
@@ -9708,6 +11415,47 @@ GH.game = (function () {
     mods.forEach(function (m) {
       queueAnnounce('MODIFIER — ' + m.name + ': ' + m.desc.toUpperCase(), 18);
     });
+    if (lay.raceway && lay.raceway.name) queueAnnounce('CIRCUIT — ' + lay.raceway.name, 22);
+    spawnDungeonHazards();
+  }
+
+  // every dungeon carries its territory's hazard: ice sheets under the
+  // frost range, vine snares under the canopy, vents in the cinder
+  // wastes, lightning over the highlands, drifting rifts in the void
+  function spawnDungeonHazards() {
+    clearHazards();
+    if (!stage || !stage.hazard || !zoneNow || !zoneNow.dungeon) return;
+    var arch = zoneNow.arch;
+    if (arch === 'labyrinth' || arch === 'halls' || arch === 'fluxways' || arch === 'raceway') return;
+    var kind = stage.hazard;
+    if (kind === 'lightning') { hazards.push({ kind: 'lightning', t: GH.rand(3, 6) }); return; }
+    var half = GH.world.BOUNDS.x - 16;
+    for (var i = 0; i < 6; i++) {
+      var x = GH.rand(-half, half), z = GH.rand(-half, half);
+      if (GH.dist2(x, z, player.x, player.z) < 16 * 16) continue;
+      if (zoneBlockedAt(x, z)) continue;
+      hazards.push(makeHazard(kind, x, z));
+    }
+  }
+
+  function makeHazard(kind, x, z) {
+    var h = { kind: kind, x: x, z: z, t: GH.rand(2, 5) };
+    if (kind === 'ice') {
+      h.r = GH.rand(4, 5.5);
+      h.mesh = groundDisc(x, z, h.r, 0xa0e0ff, 0.22);
+    } else if (kind === 'vines') {
+      h.r = GH.rand(3, 4);
+      h.mesh = groundDisc(x, z, h.r, 0x3aa040, 0.3);
+    } else if (kind === 'vents') {
+      h.r = 2.4;
+      h.mesh = groundDisc(x, z, 0.9, 0x803020, 0.5);
+      h.t = GH.rand(3, 7);
+    } else if (kind === 'rifts') {
+      h.r = 3;
+      h.mesh = groundDisc(x, z, h.r, 0x9040d0, 0.25);
+      h.vx = GH.rand(-1, 1); h.vz = GH.rand(-1, 1);
+    }
+    return h;
   }
 
   // tier modifiers stamp every hostile born in this dungeon
@@ -10109,7 +11857,7 @@ GH.game = (function () {
     var halls = lay.halls;
     // carried cargo rides on the frame's back
     if (ds.carrying && worldH.coreMeshes[ds.carrying]) {
-      worldH.coreMeshes[ds.carrying].position.set(player.x, 2.6, player.z);
+      worldH.coreMeshes[ds.carrying].position.set(player.x, 2.6 + gy(player.x, player.z), player.z);
       worldH.coreMeshes[ds.carrying].rotation.y += dt * 2;
     }
     // timed switch windows tick down
@@ -10342,7 +12090,7 @@ GH.game = (function () {
     }
     // hunters chew the hauler
     if (hunters > 0) h.hp -= Math.min(hunters, 6) * (2 + zoneNow.danger * 0.8) * dt;
-    ds.haulerMesh.position.set(h.x, 0, h.z);
+    ds.haulerMesh.position.set(h.x, 0 + gy(h.x, h.z), h.z);
     if (ds.haulerMesh.userData.core) {
       ds.haulerMesh.userData.core.scale.setScalar(1 + Math.sin(runTime * 6) * 0.2);
     }
@@ -10564,6 +12312,7 @@ GH.game = (function () {
     updateWeather(dt);
     updateHarrow(dt);
     updateDungeon(dt);
+    if (hazards.length) updateHazards(dt);
 
     // travel gates: walk into the veil and you're through
     if (travelCd > 0) travelCd -= dt;
@@ -11003,12 +12752,7 @@ GH.game = (function () {
     player.mesh.visible = !player.speederOn;
     player.speederMesh.visible = player.speederOn;
     if (player.speederOn) {
-      // fresh drivetrain: heading picks up the frame's facing, tank empty
-      player.drive = {
-        heading: player.facing || 0, spd: 0, nitro: 0, nitroT: 0,
-        slip: 0, fwd: 0, top: 1, drift: false, crashCd: 0,
-        skidT: 0, streakT: 0, score: 0
-      };
+      player.drive = freshDrive();
     } else {
       player.velX = 0;
       player.velZ = 0;
@@ -11147,7 +12891,7 @@ GH.game = (function () {
           h.z = player.z + Math.sin(a) * 14;
           h.vx = GH.rand(-1.2, 1.2); h.vz = GH.rand(-1.2, 1.2);
         }
-        h.mesh.position.set(h.x, 0.04, h.z);
+        h.mesh.position.set(h.x, 0.04 + gy(h.x, h.z), h.z);
         h.mesh.material.opacity = 0.2 + Math.sin(runTime * 4 + i * 2) * 0.08;
       }
     }
@@ -11207,7 +12951,7 @@ GH.game = (function () {
     var oldMesh = worldH.vaultMeshes[vaultId];
     if (oldMesh) worldH.group.remove(oldMesh);
     var openMesh = GH.models.buildVault(true);
-    openMesh.position.set(vx, 0, vz);
+    openMesh.position.set(vx, 0 + gy(vx, vz), vz);
     worldH.group.add(openMesh);
     worldH.vaultMeshes[vaultId] = openMesh;
     queueAnnounce('VAULT BREACHED — +150 SALVAGE BANKED', 28);
@@ -11242,10 +12986,11 @@ GH.game = (function () {
     hazards.length = 0;
   }
 
+  function fieldR() { return expActive ? GH.world.BOUNDS.x - 6 : ARENA_R; }
   function hazardSpot(minR) {
     for (var t = 0; t < 10; t++) {
-      var x = GH.rand(-ARENA_R + 5, ARENA_R - 5);
-      var z = GH.rand(-ARENA_R + 5, ARENA_R - 5);
+      var x = GH.rand(-fieldR() + 5, fieldR() - 5);
+      var z = GH.rand(-fieldR() + 5, fieldR() - 5);
       if (GH.dist2(x, z, player.x, player.z) > (minR || 8) * (minR || 8)) return { x: x, z: z };
     }
     return { x: 0, z: 0 };
@@ -11318,8 +13063,8 @@ GH.game = (function () {
           // strikes bias toward the player but threaten everything
           var sx, sz;
           if (Math.random() < 0.6) {
-            sx = GH.clamp(player.x + GH.rand(-5, 5), -ARENA_R, ARENA_R);
-            sz = GH.clamp(player.z + GH.rand(-5, 5), -ARENA_R, ARENA_R);
+            sx = GH.clamp(player.x + GH.rand(-5, 5), -fieldR(), fieldR());
+            sz = GH.clamp(player.z + GH.rand(-5, 5), -fieldR(), fieldR());
           } else {
             var sp = hazardSpot(0);
             sx = sp.x; sz = sp.z;
@@ -11333,9 +13078,9 @@ GH.game = (function () {
       } else if (h.kind === 'rifts') {
         h.x += h.vx * dt;
         h.z += h.vz * dt;
-        if (Math.abs(h.x) > ARENA_R - 4) h.vx *= -1;
-        if (Math.abs(h.z) > ARENA_R - 4) h.vz *= -1;
-        h.mesh.position.set(h.x, 0.04, h.z);
+        if (Math.abs(h.x) > fieldR() - 4) h.vx *= -1;
+        if (Math.abs(h.z) > fieldR() - 4) h.vz *= -1;
+        h.mesh.position.set(h.x, 0.04 + gy(h.x, h.z), h.z);
         h.mesh.material.opacity = 0.2 + Math.sin(runTime * 4 + i * 2) * 0.08;
       }
     }
@@ -11577,7 +13322,7 @@ GH.game = (function () {
       weapons: [makeWeaponInst('primary', def.weapon, false)]
     };
     mate.hp = player.stats.maxHP;
-    mate.mesh.position.set(mate.x, 0, mate.z);
+    mate.mesh.position.set(mate.x, 0 + gy(mate.x, mate.z), mate.z);
     scene.add(mate.mesh);
   }
 
@@ -11620,7 +13365,7 @@ GH.game = (function () {
       var m = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.9, 24),
         new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
       m.rotation.x = -Math.PI / 2;
-      m.position.set(mate.x, 0.3, mate.z);
+      m.position.set(mate.x, 0.3 + gy(mate.x, mate.z), mate.z);
       scene.add(m);
       effects.push({ kind: 'boom', mesh: m, t: 0.3, total: 0.3, grow: 6 });
       for (var i = 0; i < enemies.length; i++) {
@@ -11801,7 +13546,7 @@ GH.game = (function () {
     }
 
     // pose
-    mate.mesh.position.set(mate.x, 0, mate.z);
+    mate.mesh.position.set(mate.x, 0 + gy(mate.x, mate.z), mate.z);
     mate.mesh.rotation.y = mate.facing;
     var parts = mate.mesh.userData.parts;
     var moving = mx !== 0 || mz !== 0;
@@ -11883,8 +13628,10 @@ GH.game = (function () {
     shake = Math.max(0, shake - dt * 1.4);
     // higher and farther back, with the pilot sitting low in frame so
     // the world ahead gets the screen space
-    camera.position.set(tx + sx, 18 * camZoom, tz + 14.5 * camZoom + sz);
-    camera.lookAt(tx + sx, 0, tz - 1.6 + sz);
+    var pgy = player ? gy(tx, tz) : 0;
+    camGround += (pgy - camGround) * Math.min(1, dt * 5);
+    camera.position.set(tx + sx, camGround + 18 * camZoom, tz + 14.5 * camZoom + sz);
+    camera.lookAt(tx + sx, camGround, tz - 1.6 + sz);
   }
 
   // =================================================================
@@ -11943,7 +13690,11 @@ GH.game = (function () {
         el['dh-speed'].textContent = Math.round(Math.max(0, dvd.fwd) * 11);
         el['dh-nitro-fill'].style.width = Math.round(dvd.nitro * 100) + '%';
         el['dh-nitro-fill'].classList.toggle('dh-burning', dvd.nitroT > 0);
-        el['dh-drift'].classList.toggle('hidden', !(dvd.drift && dvd.slip > 1.2));
+        // one status word under the speedo: what the ground is doing to you
+        var dstat = dvd.bog > 0.5 ? (player.speederOn && GH.terrain.surface(player.x, player.z) === 'snow' ? 'SNOWBOUND — REVERSE' : 'BOGGED — REVERSE')
+          : dvd.air ? 'AIR' : dvd.offTrack ? 'OFF TRACK' : (dvd.drift && dvd.slip > 1.2) ? 'DRIFT' : '';
+        el['dh-drift'].textContent = dstat;
+        el['dh-drift'].classList.toggle('hidden', !dstat);
       }
     }
     // energy capacitor + ability hotbar
@@ -12113,6 +13864,9 @@ GH.game = (function () {
     hideBossBar();
     // expedition teardown: the continent, camp, and its UI
     if (worldH) { scene.remove(worldH.group); worldH = null; }
+    GH.terrain.clear();
+    GH.atmos.clear(scene);
+    camGround = 0;
     if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
     if (harrowTotem) { scene.remove(harrowTotem); harrowTotem = null; }
     scene.fog.near = 18; scene.fog.far = 52; // undo whiteout/dungeon gloom
@@ -12274,7 +14028,7 @@ GH.game = (function () {
         GH.meta.data.world.wreck = { zone: curZone, x: player.x, z: player.z, salvage: lost };
         if (wreckMesh) scene.remove(wreckMesh);
         wreckMesh = GH.models.buildWreckSite();
-        wreckMesh.position.set(player.x, 0, player.z);
+        wreckMesh.position.set(player.x, 0 + gy(player.x, player.z), player.z);
         scene.add(wreckMesh);
       }
       coinsRun = 0;
@@ -12477,6 +14231,8 @@ GH.game = (function () {
     if (G.state === 'race') {
       GH.race.update(dt, input);
       GH.race.tick(dt);
+      GH.terrain.update(dt);
+      if (player) GH.atmos.update(dt, player.x, gy(player.x, player.z), player.z);
       updateCamera(dt);
       updateHUD();
       G.dmg.update(dt, viewW, viewH);
@@ -12651,6 +14407,33 @@ GH.game = (function () {
   };
 
   // dev/test helper: jump the pilot somewhere (harmless outside dev use)
+  // dev: jump the expedition to any zone id (e.g. 'glacier', 'wreck:raceway:1')
+  G.devZone = function (zoneId) {
+    if (!expActive) return false;
+    loadZone(zoneId, curZone);
+    player.x = 0; player.z = 0;
+    if (zoneNow && zoneNow.dungeon) { player.z = GH.world.BOUNDS.z - 30; }
+    return true;
+  };
+  G.devSpeeder = function (on) {
+    if (!player) return;
+    if (!!player.speederOn !== !!on) toggleSpeeder();
+  };
+  G.devState = function () {
+    return {
+      state: G.state, zone: curZone, x: player ? player.x : 0, z: player ? player.z : 0,
+      y: player ? gy(player.x, player.z) : 0, enemies: enemies.length,
+      speeder: !!(player && player.speederOn), drive: player ? player.drive : null,
+      terrain: !!GH.terrain.active,
+      race: dungeonState && dungeonState.race ? {
+        lap: dungeonState.race.lap, gate: dungeonState.race.gate, pos: dungeonState.race.pos,
+        countdown: dungeonState.race.countdown, style: dungeonState.race.style,
+        rivals: dungeonState.race.rivals.map(function (r) { return { x: Math.round(r.x), z: Math.round(r.z), lap: r.raceLap, gate: r.raceGate, dead: !!r.dead }; })
+      } : null,
+      dungeonDone: !!(dungeonState && dungeonState.done),
+      surface: player ? GH.terrain.surface(player.x, player.z) : null
+    };
+  };
   G.teleport = function (x, z) {
     if (player) { player.x = x; player.z = z; }
   };
@@ -12706,7 +14489,9 @@ GH.game = (function () {
 
   function resize() {
     var w = window.innerWidth, h = window.innerHeight;
-    renderer.setSize(Math.max(2, Math.floor(w / PIXEL_SCALE)), Math.max(2, Math.floor(h / PIXEL_SCALE)), false);
+    var rw = Math.max(2, Math.floor(w / PIXEL_SCALE)), rh = Math.max(2, Math.floor(h / PIXEL_SCALE));
+    renderer.setSize(rw, rh, false);
+    GH.assets.setSnap(rw, rh);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     var cam = GH.game.camera();

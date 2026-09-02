@@ -216,15 +216,49 @@ GH.dungeons = (function () {
   // RACEWAY: a wide ring circuit with ordered gates. Rivals follow the
   // centerline; everyone's lap/gate progress uses the same points.
   // ---------------------------------------------------------------
-  D.genRaceway = function (size) {
-    var r = size * 0.36;
-    var pts = [];
-    for (var i = 0; i < 72; i++) {
-      var a = (i / 72) * Math.PI * 2 + Math.PI / 2; // start line by the south entry
-      var rr = r + Math.sin(a * 4) * (size * 0.05);
-      pts.push({ x: Math.cos(a) * rr, z: Math.sin(a) * rr, a: a });
+  // Authored circuits, one per hosting territory, as control points in
+  // unit space (x right, z south). Point 0 sits by the south entry so the
+  // grid lines up with the exit gate. A closed Catmull-Rom spline turns
+  // the corners into real racing lines: sweepers, esses, hairpins.
+  var TRACKS = {
+    wreck: { name: 'DUNE RUN', pts: [
+      [0, 0.92], [0.45, 0.9], [0.85, 0.55], [0.62, 0.15], [0.9, -0.35], [0.55, -0.88],
+      [0.05, -0.72], [-0.4, -0.92], [-0.86, -0.5], [-0.55, -0.05], [-0.88, 0.45], [-0.45, 0.88]] },
+    storm: { name: 'THUNDER RIDGE', pts: [
+      [0, 0.92], [0.55, 0.9], [0.9, 0.5], [0.5, 0.3], [0.15, 0.5], [-0.2, 0.2], [0.25, -0.1],
+      [0.75, -0.3], [0.85, -0.78], [0.3, -0.92], [-0.3, -0.75], [-0.82, -0.88], [-0.92, -0.3],
+      [-0.55, 0.0], [-0.9, 0.45], [-0.55, 0.88]] },
+    ember: { name: 'CALDERA LOOP', pts: [
+      [0, 0.92], [0.6, 0.85], [0.92, 0.3], [0.7, -0.2], [0.9, -0.7], [0.35, -0.92],
+      [-0.1, -0.6], [-0.5, -0.9], [-0.92, -0.5], [-0.7, 0.0], [-0.92, 0.5], [-0.5, 0.88]] },
+    glacier: { name: 'ICEFALL', pts: [
+      [0, 0.92], [0.5, 0.88], [0.9, 0.6], [0.85, 0.05], [0.4, -0.2], [0.8, -0.6], [0.4, -0.92],
+      [-0.2, -0.75], [-0.75, -0.9], [-0.9, -0.35], [-0.5, 0.05], [-0.9, 0.5], [-0.5, 0.9]] },
+    def: { name: 'RING', pts: [
+      [0, 0.9], [0.64, 0.64], [0.9, 0], [0.64, -0.64], [0, -0.9], [-0.64, -0.64], [-0.9, 0], [-0.64, 0.64]] }
+  };
+
+  function catmullClosed(pts, samples) {
+    var n = pts.length, out = [];
+    for (var s = 0; s < samples; s++) {
+      var t = (s / samples) * n;
+      var i = Math.floor(t), f = t - i;
+      var p0 = pts[(i - 1 + n) % n], p1 = pts[i % n], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      var f2 = f * f, f3 = f2 * f;
+      var x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * f + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * f2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * f3);
+      var z = 0.5 * ((2 * p1.z) + (-p0.z + p2.z) * f + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * f2 + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * f3);
+      out.push({ x: x, z: z });
     }
-    return { path: pts, gates: 8, laps: 3, r: r };
+    return out;
+  }
+
+  D.genRaceway = function (size, zoneId) {
+    var tpl = TRACKS[zoneId] || TRACKS.def;
+    var k = size * 0.42;
+    var ctrl = tpl.pts.map(function (p) { return { x: p[0] * k, z: p[1] * k }; });
+    var path = catmullClosed(ctrl, 160);
+    // the ring runs clockwise as authored; rivals and gates follow index order
+    return { path: path, gates: 8, laps: 3, r: k, width: 14, name: tpl.name };
   };
 
   // ---------------------------------------------------------------
