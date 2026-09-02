@@ -158,8 +158,10 @@
         if (e.code === 'KeyQ') input.wardCycle = true;
         if (e.code === 'KeyE') input.interactPressed = true;
         if (e.code === 'KeyT') input.transformPressed = true;
+        if (e.code === 'KeyG') input.itemPressed = true;
         if (e.code === 'Tab') { GH.game.tabTarget(); e.preventDefault(); }
       }
+      if (e.code === 'KeyV' && (GH.game.state === 'play' || GH.game.state === 'race')) GH.game.toggleCamera();
       if (e.code === 'KeyK' &&
         (GH.game.state === 'play' || GH.game.state === 'title')) {
         openSkills(GH.game.state === 'play');
@@ -308,7 +310,7 @@
   // ----------------------------------------------------------------
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
-    'trials-screen', 'season-screen', 'hub-screen', 'save-screen',
+    'trials-screen', 'season-screen', 'hub-screen', 'save-screen', 'factions-screen',
     'reward-screen', 'pause-screen', 'end-screen', 'skills-screen', 'map-screen'];
 
   function show(id) {
@@ -666,7 +668,9 @@
         sub: GH.meta.isIron() ? 'sealed on iron profiles' : GH.meta.data.salvage + ' salvage to spend',
         open: openHangar },
       { id: 'hub-save', glyph: '⛃', name: 'SAVE CODE',
-        sub: 'back up or restore progress', open: openSave }
+        sub: 'back up or restore progress', open: openSave },
+      { id: 'hub-factions', glyph: '⚑', name: 'THE HOUSES',
+        sub: factionsSub(), open: openFactions }
     ];
     var wrap = document.getElementById('hub-cards');
     wrap.innerHTML = '';
@@ -680,6 +684,98 @@
       wrap.appendChild(div);
     });
     show('hub-screen');
+  }
+
+  // ----------------------------------------------------------------
+  // THE HOUSES — reputation, pledges, your own banner
+  function factionsSub() {
+    var f = GH.factions.state();
+    if (f.banner) return f.seated ? 'THE ' + f.banner.name + ' — SEATED' : 'your banner: THE ' + f.banner.name;
+    if (f.pledge) return 'pledged to the ' + GH.factions.byId(f.pledge).name;
+    var best = null;
+    GH.factions.LIST.forEach(function (h) { if (!best || GH.factions.rep(h.id) > GH.factions.rep(best.id)) best = h; });
+    return best ? best.name + ' ' + Math.round(GH.factions.rep(best.id)) : 'no standing yet';
+  }
+  function openFactions() {
+    GH.audio.card();
+    GH.game.state = 'hangar';
+    renderFactions();
+    show('factions-screen');
+  }
+  function renderFactions() {
+    var F = GH.factions, st = F.state();
+    var head = st.banner
+      ? 'YOUR BANNER: <b>THE ' + st.banner.name + '</b> · doctrine ' + (F.activeDoctrine() ? F.activeDoctrine().name : '—') + (st.seated ? ' · <b>SEATED</b>' : '')
+      : st.pledge ? 'PLEDGED TO THE <b>' + F.byId(st.pledge).name + '</b> · doctrine ' + F.byId(st.pledge).doctrine.name
+        : 'Unpledged. Contracts, dungeon clears and podiums in a house\'s lands raise its regard; killing its troops lowers it. Pledge at 40.';
+    document.getElementById('fac-head').innerHTML = head;
+    var wrap = document.getElementById('fac-cards');
+    wrap.innerHTML = '';
+    F.LIST.forEach(function (h) {
+      var rep = F.rep(h.id), stain = F.stain(h.id), standing = F.standing(h.id);
+      var card = document.createElement('div');
+      card.className = 'fac-card ' + standing;
+      var pct = Math.abs(rep) / 2;
+      var bar = '<div class="fac-bar"><div class="fb-zero"></div><div class="fb-fill' + (rep < 0 ? ' neg' : '') + '" style="' +
+        (rep < 0 ? 'right:50%;width:' + pct + '%' : 'left:50%;width:' + pct + '%') + '"></div></div>';
+      var seat = GH.world.stageFor(h.seat).name;
+      var parts = h.parts.map(function (pid) {
+        for (var i = 0; i < GH.upgrades.length; i++) if (GH.upgrades[i].id === pid) return GH.upgrades[i].name;
+        return pid;
+      }).join(', ');
+      var btn = '';
+      if (standing === 'pledged') btn = '<span class="fac-btn" data-act="renounce">RENOUNCE</span>';
+      else if (F.canPledge(h.id)) btn = '<span class="fac-btn" data-act="pledge" data-id="' + h.id + '">PLEDGE</span>';
+      else if (!st.banner) btn = '<span class="fac-btn off">PLEDGE AT 40</span>';
+      card.innerHTML =
+        '<div class="fac-name">' + h.glyph + ' ' + h.name + '</div>' +
+        '<div class="fac-creed">' + h.creed + '</div>' +
+        '<div class="fac-line">seat: <b>' + seat + '</b></div>' +
+        bar +
+        '<div class="fac-line">regard <b>' + Math.round(rep) + '</b> · <b>' + F.standingLabel(h.id) + '</b>' +
+        (stain > 0 ? ' · stain ' + Math.round(stain) : '') + '</div>' +
+        '<div class="fac-line">doctrine: <b>' + h.doctrine.name + '</b> — ' + h.doctrine.desc + '</div>' +
+        '<div class="fac-line">parts favoured: ' + parts + '</div>' +
+        '<div class="fac-line">circuit: ' + GH.world.stageFor(h.circuit).name + '</div>' +
+        btn;
+      wrap.appendChild(card);
+    });
+    wrap.querySelectorAll('.fac-btn[data-act]').forEach(function (b) {
+      b.onclick = function () {
+        if (b.dataset.act === 'pledge') F.pledge(b.dataset.id);
+        else F.renounce();
+        GH.audio.card();
+        if (GH.game.refreshPilot) GH.game.refreshPilot();
+        renderFactions();
+      };
+    });
+    // the banner
+    var bw = document.getElementById('fac-banner');
+    if (st.banner) {
+      var sp = F.seatProgress();
+      bw.innerHTML = '<b>THE ' + st.banner.name + '</b> — raised ' + st.banner.raised + '. ' +
+        (st.seated ? 'Seated: the camp is your court, and every house treats you by your regard.' :
+          'A seat needs three territories held (every nest broken) and two houses at 60, or three at −60. ' +
+          'Held <b>' + sp.held + '/3</b> · friends <b>' + sp.friends + '</b> · foes <b>' + sp.foes + '</b>.');
+    } else if (F.canRaiseBanner()) {
+      var opts = F.DOCTRINES.map(function (d) { return '<option value="' + d.id + '">' + d.name + ' — ' + d.desc + '</option>'; }).join('');
+      var paints = GH.progress.cosmetics.filter(function (c) { return c.kind === 'paint' && GH.meta.data.style.owned[c.id]; })
+        .map(function (c) { return '<option value="' + c.id + '">' + c.name + '</option>'; }).join('');
+      bw.innerHTML = '<b>RAISE YOUR OWN BANNER.</b> Leaving a pledge this way is not betrayal, but the house will mark it. ' +
+        '<div><input id="fac-name" maxlength="24" placeholder="house name"> <select id="fac-doc">' + opts + '</select> ' +
+        '<select id="fac-paint"><option value="">standard paint</option>' + paints + '</select> ' +
+        '<span class="fac-btn" id="fac-raise">RAISE</span></div>';
+      document.getElementById('fac-raise').onclick = function () {
+        var nm = document.getElementById('fac-name').value.trim();
+        if (!nm) { document.getElementById('fac-name').focus(); return; }
+        F.raiseBanner(nm, document.getElementById('fac-doc').value, document.getElementById('fac-paint').value || null);
+        GH.audio.win();
+        if (GH.game.refreshPilot) GH.game.refreshPilot();
+        renderFactions();
+      };
+    } else {
+      bw.innerHTML = F.bannerRequirement();
+    }
   }
 
   // ----------------------------------------------------------------
@@ -1196,6 +1292,7 @@
     // meta screens live under the hub now (or under a camp station)
     document.getElementById('btn-season-back').onclick = openHub;
     document.getElementById('btn-map-back').onclick = metaBack('map', openHub);
+    document.getElementById('btn-fac-back').onclick = metaBack('factions', openHub);
     document.getElementById('btn-skills-back').onclick = metaBack('skills', openHub);
     document.getElementById('btn-respec').onclick = function () {
       if (GH.skills.respec()) {

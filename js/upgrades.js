@@ -160,6 +160,8 @@ GH.rollRewards = function (player, wave, count) {
   var weighted = pool.map(function (c) {
     var w = c.w;
     if (c.kind === 'trait' && (picksCount[c.id] || 0) >= 3) w = Math.max(1, w * 0.4);
+    // parts come easier from a house you stand with
+    if (c.kind === 'weapon' && GH.factions) w *= GH.factions.partWeight(c.id);
     return { card: c, w: w };
   });
   while (picks.length < count && weighted.length) {

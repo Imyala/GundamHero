@@ -67,6 +67,48 @@ GH.audio = (function () {
     win: function () { [392, 494, 587, 784].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, 'triangle', 0.18, 15); }, i * 160); }); }
   };
 
+  // ---- ambient beds: looping filtered noise shaped per territory ----
+  var amb = null;
+  S.ambient = function (kind) {
+    if (amb) {
+      try { amb.src.stop(); } catch (e) { /* already stopped */ }
+      if (amb.timer) clearInterval(amb.timer);
+      amb = null;
+    }
+    if (!kind) return;
+    ensure();
+    if (!ctx || muted) return;
+    var len = ctx.sampleRate * 2;
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    var src = ctx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    var f = ctx.createBiquadFilter();
+    var g = ctx.createGain();
+    var cfg = {
+      wind: { type: 'lowpass', freq: 420, gain: 0.05, lfo: 0.15 },
+      rain: { type: 'bandpass', freq: 3200, gain: 0.045, lfo: 0 },
+      embers: { type: 'lowpass', freq: 900, gain: 0.03, lfo: 0.6 },
+      cave: { type: 'lowpass', freq: 180, gain: 0.04, lfo: 0.08, drip: true },
+      city: { type: 'lowpass', freq: 260, gain: 0.035, lfo: 0.02 },
+      hum: { type: 'bandpass', freq: 140, gain: 0.03, lfo: 0.05 }
+    }[kind] || { type: 'lowpass', freq: 400, gain: 0.04, lfo: 0.1 };
+    f.type = cfg.type; f.frequency.value = cfg.freq; f.Q.value = 0.7;
+    g.gain.value = cfg.gain;
+    src.connect(f); f.connect(g); g.connect(master);
+    if (cfg.lfo) {
+      var lfo = ctx.createOscillator(), lg = ctx.createGain();
+      lfo.frequency.value = cfg.lfo; lg.gain.value = cfg.gain * 0.6;
+      lfo.connect(lg); lg.connect(g.gain); lfo.start();
+    }
+    src.start();
+    amb = { src: src, gain: g };
+    if (cfg.drip) {
+      amb.timer = setInterval(function () { if (!muted) tone(GH.rand(900, 1500), 0.12, 'sine', 0.05, -500); }, 1800 + Math.random() * 1200);
+    }
+  };
+
   S.setMuted = function (m) {
     muted = m;
     if (GH.music) GH.music.setMuted(m);

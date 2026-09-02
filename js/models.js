@@ -940,17 +940,41 @@ GH.models = (function () {
   };
 
   // transformed frame: a folded speeder / skimmer form
-  M.buildSpeeder = function (cfg) {
+  M.buildSpeeder = function (cfg, kind) {
     var g = new THREE.Group();
     var body = cfg.body, accent = cfg.accent, dark = cfg.dark || 0x30343a;
-    var hull = box(0.9, 0.4, 2.4, body); hull.position.y = 0.75;
-    var nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.1, 4), mat(accent));
-    nose.rotation.x = Math.PI / 2;
-    nose.position.set(0, 0.75, 1.6);
-    var canopy = box(0.5, 0.28, 0.8, 0x202830); canopy.position.set(0, 1.05, 0.2);
-    var finL = box(0.1, 0.5, 0.9, dark); finL.position.set(-0.55, 0.95, -0.8); finL.rotation.z = 0.5;
-    var finR = box(0.1, 0.5, 0.9, dark); finR.position.set(0.55, 0.95, -0.8); finR.rotation.z = -0.5;
-    g.add(hull, nose, canopy, finL, finR);
+    if (kind === 'tank') {
+      // hover-tank: wide hull, a turret, skirts
+      var hullT = box(1.7, 0.5, 2.6, body); hullT.position.y = 0.7; g.add(hullT);
+      var skirtL = box(0.3, 0.3, 2.4, dark); skirtL.position.set(-0.95, 0.5, 0); g.add(skirtL);
+      var skirtR = box(0.3, 0.3, 2.4, dark); skirtR.position.set(0.95, 0.5, 0); g.add(skirtR);
+      var turret = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.4, 8), mat(accent)); turret.position.set(0, 1.15, -0.2); g.add(turret);
+      var barrel = box(0.16, 0.16, 1.6, dark); barrel.position.set(0, 1.2, 0.9); g.add(barrel);
+      var canopyT = box(0.5, 0.22, 0.5, 0x202830); canopyT.position.set(0, 1.45, -0.2); g.add(canopyT);
+    } else if (kind === 'disc') {
+      // disc: a flat saucer with an underslung cannon
+      var disc = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.1, 0.35, 10), mat(body)); disc.position.y = 0.8; g.add(disc);
+      var dome = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 5), mat(0x202830)); dome.position.y = 1.05; g.add(dome);
+      var ring = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.08, 4, 12), mat(accent)); ring.rotation.x = Math.PI / 2; ring.position.y = 0.8; g.add(ring);
+      var gunD = box(0.14, 0.14, 1.2, dark); gunD.position.set(0, 0.5, 0.9); g.add(gunD);
+    } else if (kind === 'bike') {
+      // hover-bike: narrow, long, a fork and a spine
+      var spine = box(0.5, 0.36, 2.6, body); spine.position.y = 0.8; g.add(spine);
+      var fork = box(0.3, 0.3, 0.9, dark); fork.position.set(0, 0.7, 1.5); fork.rotation.x = 0.4; g.add(fork);
+      var noseB = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.9, 4), mat(accent)); noseB.rotation.x = Math.PI / 2; noseB.position.set(0, 0.8, 1.9); g.add(noseB);
+      var seat = box(0.42, 0.18, 0.9, 0x202830); seat.position.set(0, 1.05, -0.2); g.add(seat);
+      var barL = box(0.6, 0.06, 0.06, dark); barL.position.set(0, 1.15, 0.7); g.add(barL);
+      var finB = box(0.08, 0.5, 0.7, dark); finB.position.set(0, 1.1, -1.1); g.add(finB);
+    } else {
+      var hull = box(0.9, 0.4, 2.4, body); hull.position.y = 0.75;
+      var nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.1, 4), mat(accent));
+      nose.rotation.x = Math.PI / 2;
+      nose.position.set(0, 0.75, 1.6);
+      var canopy = box(0.5, 0.28, 0.8, 0x202830); canopy.position.set(0, 1.05, 0.2);
+      var finL = box(0.1, 0.5, 0.9, dark); finL.position.set(-0.55, 0.95, -0.8); finL.rotation.z = 0.5;
+      var finR = box(0.1, 0.5, 0.9, dark); finR.position.set(0.55, 0.95, -0.8); finR.rotation.z = -0.5;
+      g.add(hull, nose, canopy, finL, finR);
+    }
     var flames = [];
     [-0.28, 0.28].forEach(function (x) {
       var flame = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.9, 4),
@@ -962,6 +986,24 @@ GH.models = (function () {
     });
     g.userData.flames = flames;
     blobShadow(g, 2.2);
+    return g;
+  };
+
+  // race item pad: a spinning question box on the line
+  M.buildItemPad = function () {
+    var g = new THREE.Group();
+    var b = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), mat(0xffd050, { emissive: 0x806010, emissiveIntensity: 0.6, transparent: true, opacity: 0.85 }));
+    b.rotation.set(0.6, 0.6, 0);
+    g.add(b);
+    g.userData.spin = b;
+    return g;
+  };
+  // a house banner for the camp
+  M.buildBanner = function (color) {
+    var g = new THREE.Group();
+    var pole = box(0.18, 6.5, 0.18, 0x4a4038); pole.position.y = 3.25; g.add(pole);
+    var flag = box(0.08, 2.2, 3.0, color); flag.position.set(0, 5.2, 1.5); g.add(flag);
+    var top = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), mat(0xe0b050)); top.position.y = 6.8; g.add(top);
     return g;
   };
 

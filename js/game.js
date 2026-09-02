@@ -106,6 +106,19 @@ GH.game = (function () {
   // terrain height under a point (0 in the flat arenas)
   function gy(x, z) { return GH.terrain.h(x, z); }
   var camGround = 0; // smoothed ground height under the camera target
+  // CHASE: behind the frame, mouse turns you, the crosshair sits dead centre.
+  // TACTICAL: the old top-down view. V swaps them.
+  var camMode = 'chase';
+  try { camMode = localStorage.getItem('hf_cam') || 'chase'; } catch (e) { /* no storage */ }
+  var camYaw = Math.PI;
+  var camPrevX = 0, camPrevZ = 0;
+  G.camMode = function () { return camMode; };
+  G.toggleCamera = function () {
+    camMode = camMode === 'chase' ? 'top' : 'chase';
+    try { localStorage.setItem('hf_cam', camMode); } catch (e) { /* no storage */ }
+    if (player) camYaw = player.speederOn && player.drive ? player.drive.heading : (player.facing || Math.PI);
+    announce(camMode === 'chase' ? 'CHASE CAMERA — MOUSE TURNS, WASD FOLLOWS THE VIEW' : 'TACTICAL CAMERA', 20);
+  };
   var tmpV3 = new THREE.Vector3();
 
   // =================================================================
@@ -118,6 +131,7 @@ GH.game = (function () {
 
     scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0x9fc8dc, 18, 52);
+    GH.factions.notify = function (text, size) { if (G.state === 'play') queueAnnounce(text, size); };
     camera = new THREE.PerspectiveCamera(48, 16 / 9, 0.1, 220);
 
     hemi = new THREE.HemisphereLight(0xbfe8ff, 0x24485a, 0.95);
@@ -310,6 +324,8 @@ GH.game = (function () {
       weaponLevels: {},
       protocols: {},
       pendingGems: [],
+      pendingCards: [],
+      item: null, shieldT: 0,
       boost: 1, dashTime: 0, dashX: 0, dashZ: 0, dashId: 0, dashKind: 'boost',
       blocking: false,
       special: { cd: 0, active: 0 },
@@ -325,6 +341,7 @@ GH.game = (function () {
     };
     p.hp = p.stats.maxHP;
     p.weapons.push(makeWeaponInst('primary', mechDef.weapon, true));
+    if (GH.factions) GH.factions.applyDoctrine(p.stats);
     p.mesh.position.set(0, 0, 0);
     scene.add(p.mesh);
     return p;
@@ -332,6 +349,7 @@ GH.game = (function () {
 
   function playerDamage(raw, srcE, dmgType) {
     if (!player || player.hp <= 0 || player.dashTime > 0.12 || GH.devGod) return;
+    if (player.shieldT > 0) { G.dmg.spawn(player.x, 2.6, player.z, 'SHIELD', 'heal', 14); return; }
     var s = player.stats;
     if (player.speederOn) raw *= 1.25; // skimmer hull is thin — speed is the armor
     var block = s.block + (player.protocols.vents && player.hp < s.maxHP * 0.35 ? 10 : 0);
@@ -520,6 +538,14 @@ GH.game = (function () {
       burstLeft: 0, burstT: 0, orbitA: Math.random() * Math.PI * 2, diveT: 0
     };
     if (e.buried && mesh.userData.body) { mesh.userData.body.visible = false; }
+    // a house's troops know your name
+    var fac = expActive && !def.boss ? GH.factions.byTroop(typeId) : null;
+    if (fac) {
+      var stnd = GH.factions.standing(fac.id);
+      e.faction = fac.id;
+      if (stnd === 'allied' || stnd === 'pledged') { e.allied = true; e.aggro = false; }
+      else if (stnd === 'hostile') { e.hostileHouse = true; e.damage *= 1.2; }
+    }
     if (def.behavior === 'ambusher' && mesh.userData.body) { mesh.userData.body.visible = false; }
     if (def.behavior === 'flyer') e.hgt = 3.0;
     // elites: from wave 6, one in ten spawns carries a modifier
@@ -558,7 +584,15 @@ GH.game = (function () {
     if (e.phased > 0) return; // blinked out — nothing to hit
     var dmg = raw;
     if (e.def.armorMult) dmg *= e.def.armorMult;
-    if (e.buried) dmg *= 0.3;
+    if (e.buried) {
+      // shoot the plume: enough hits force it up
+      dmg *= 0.3;
+      e.buriedDmg = (e.buriedDmg || 0) + dmg;
+      if (e.buriedDmg > e.maxHp * 0.25 && e.emergeT <= 0) { e.buriedDmg = 0; e.emergeT = 0.3; }
+    }
+    if (e.def.behavior === 'flyer' && e.hgt < 1.6) dmg *= 1.5;            // caught on the dive
+    if (e.def.behavior === 'turret' && e.burstLeft === 0 &&
+      e.shootCd > (e.def.shootInterval || 3) - 1.0) dmg *= 1.8;            // hit it while it recharges
     var crit = false;
     var inst = opts.inst;
     if (opts.canCrit !== false) {
@@ -625,6 +659,14 @@ GH.game = (function () {
     if (e.def.boss) G.hitStop(0.14);
     else if (e.def.mass >= 3) G.hitStop(0.06);
     scene.remove(e.mesh);
+    // kill the caller and the pack it called loses heart
+    if (e.def.behavior === 'caller') {
+      for (var ci2 = 0; ci2 < enemies.length; ci2++) {
+        var cl = enemies[ci2];
+        if (!cl.dead && cl.calledBy === e) { cl.hp = 0; killEnemy(cl); }
+      }
+    }
+    if (expActive && GH.factions) GH.factions.troopKilled(e.id);
 
     // expedition world scars: broken nests stay broken, lairs fall once
     if (expActive) {
@@ -669,6 +711,7 @@ GH.game = (function () {
         if (GH.meta.unlockShell(shellId)) {
           queueAnnounce(GH.mechById(shellId).name + ' FRAME RECOVERED', 30);
         }
+        GH.factions.deed(curZone, 'lair', 8);
         var lairArtifacts = {
           wreck: 'bulwark_fragment', glacier: 'glacier_core', cloister: 'harvest_coil',
           ember: 'cinder_heart', storm: 'stormcap', null: 'null_lens'
@@ -690,6 +733,7 @@ GH.game = (function () {
     // progression hooks: collection log, contracts, trials, season, ciphers
     GH.progress.logKill(e.id);
     var cdone = GH.progress.contractKill(e.id, stage.id);
+    if (cdone && expActive) GH.factions.deed(curZone, 'contract', 8);
     if (cdone) {
       queueAnnounce('CONTRACT COMPLETE — +' + cdone.salvage + ' SALVAGE, +' + cdone.pts + ' PTS', 22);
       GH.audio.win();
@@ -739,6 +783,8 @@ GH.game = (function () {
       spawnPickup('coin', e.x, e.z);
       spawnPickup('spark1', e.x + 0.5, e.z);
     }
+    if (e.def.boss && expActive) awardCards(3);
+    else if (e.elite && expActive && Math.random() < 0.25) awardCards(2);
     if (e.def.boss) {
       for (var c = 0; c < (e.def.corrupt ? 24 : 12); c++) {
         spawnPickup('coin', e.x + GH.rand(-2, 2), e.z + GH.rand(-2, 2));
@@ -865,8 +911,13 @@ GH.game = (function () {
         if (dist < 6.5 || e.hp < e.maxHp) e.aggro = true;
         if (!e.aggro) continue;
       }
+      if (e.allied && !e.event) {
+        // an allied patrol keeps the peace until you break it
+        if (e.hp < e.maxHp) e.allied = false;
+        else e.aggro = false;
+      }
       if (expActive && !def.boss && !e.event) {
-        var aggroR = def.behavior === 'ranged' ? 16 : 11;
+        var aggroR = (def.behavior === 'ranged' ? 16 : 11) * (e.hostileHouse ? 2 : 1);
         if (!e.aggro) {
           if (dist < aggroR || e.hp < e.maxHp) {
             e.aggro = true;
@@ -929,7 +980,7 @@ GH.game = (function () {
           GH.audio.zap();
           for (var cc2 = 0; cc2 < (def.callCount || 2); cc2++) {
             var called = spawnEnemy(def.calls || 'husk', e.x + GH.rand(-3, 3), e.z + GH.rand(-3, 3));
-            if (called) { called.aggro = true; called.event = true; }
+            if (called) { called.aggro = true; called.event = true; called.calledBy = e; }
           }
         }
       } else if (def.behavior === 'latcher') {
@@ -1034,7 +1085,7 @@ GH.game = (function () {
         } else {
           mx = nx; mz = nz;
           e.blinkT -= dt;
-          if (e.blinkT <= 0 && dist > 5) {
+          if (e.blinkT <= 0 && dist > 5 && target !== e) { // a marked phantom cannot slip away
             e.blinkT = def.blinkInterval; e.phased = 0.7; e.mesh.visible = false;
             spawnBurst(e.x, 1, e.z, 0xc080ff, 8);
           }
@@ -2645,15 +2696,17 @@ GH.game = (function () {
   var rewardQueue = [];
 
   function showRewards() {
-    // no more power-up cards — only dropped gems still need socketing
-    if (player.pendingGems.length === 0) {
+    // every third wave hands out parts; dropped gems still need socketing
+    var cards = (waveNum % 3 === 0) ? GH.rollRewards(player, waveNum, 3) : null;
+    if (player.pendingGems.length === 0 && !cards) {
       startWave(waveNum + 1);
       updateHUDStatic();
       return;
     }
     G.state = 'reward';
     rewardQueue = [];
-    document.getElementById('reward-heading').innerHTML = 'SOCKET&nbsp;GEM';
+    document.getElementById('reward-heading').innerHTML = cards ? 'WAVE&nbsp;SALVAGE' : 'SOCKET&nbsp;GEM';
+    if (cards) rewardQueue.push({ cards: cards });
     player.pendingGems.forEach(function (t) { rewardQueue.push({ gemType: t }); });
     player.pendingGems = [];
     document.getElementById('reward-screen').classList.remove('hidden');
@@ -2828,6 +2881,16 @@ GH.game = (function () {
     player.dashKind = 'boost';
     GH.audio.dash();
     spawnBurst(player.x, 0.6, player.z, player.trailColor || 0xa0c8ff, 6);
+    // a dash shakes leeches and skitters loose
+    for (var li = 0; li < enemies.length; li++) {
+      var le = enemies[li];
+      if (le.dead || le.def.behavior !== 'latcher') continue;
+      if (GH.dist2(player.x, player.z, le.x, le.z) < 2.4 * 2.4) {
+        le.stun = 1.0;
+        var la = GH.angleTo(player.x, player.z, le.x, le.z);
+        le.vx += Math.sin(la) * 12 / le.def.mass; le.vz += Math.cos(la) * 12 / le.def.mass;
+      }
+    }
     if (cipherRun) cipherRun.boosts++;
     // artifact-charged boosts
     if (artOn('stormcap')) {
@@ -2957,7 +3020,8 @@ GH.game = (function () {
     var d = player.drive;
     if (!d || d.bog === undefined) d = player.drive = freshDrive();
     player.dashTime = 0; // no frame-dash on the throttle
-    var top = spd * 3.3;
+    var V = GH.VECTORS[player.def.vector] || GH.VECTORS.bike;
+    var top = spd * 3.3 * V.top;
     // the bottle: SHIFT burns while there's charge
     var wantNitro = !!input.special && d.nitro > 0.03 && !d.air;
     if (wantNitro) {
@@ -2989,7 +3053,7 @@ GH.game = (function () {
       } else if (dot < -0.55) {
         d.spd = Math.max(-top * 0.22, d.spd - 14 * dt); // reverse gear
       } else if (!d.air) {
-        d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * dt);
+        d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * V.accel * dt);
       }
     } else {
       d.spd = d.spd > 0 ? Math.max(0, d.spd - (d.drift ? 6 : 12) * dt) : Math.min(0, d.spd + 12 * dt);
@@ -3027,11 +3091,11 @@ GH.game = (function () {
       player.velZ += Math.cos(runTime * 0.45) * 9 * dt;
     }
     // soft ground on a steep face: blast over it with momentum, or bog down
-    var steepSoft = !d.air && soft > 0.5 && slope > 0.26;
+    var steepSoft = !d.air && soft > 0.5 && slope > 0.26 && !V.hover;
     if (steepSoft) {
       if (d.fwd > top * 0.58) {
         d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02;
-        d.vy = Math.max(5, d.fwd * slope * 1.05);
+        d.vy = Math.max(5, d.fwd * slope * 1.05) * V.jump;
         if (d.jumpMsgT <= 0) { d.jumpMsgT = 6; announce(surf === 'snow' ? 'DRIFT JUMP' : 'DUNE JUMP', 18); }
         GH.audio.dash();
       } else if (d.fwd < top * 0.48 && d.spd > 0) {
@@ -3073,7 +3137,7 @@ GH.game = (function () {
       }
     }
     // water and lava under the skids: hydroplane, scald
-    if (surf === 'water') { onIce = true; d.spd = Math.min(d.spd, top * 0.7); }
+    if (surf === 'water' && !V.hover) { onIce = true; d.spd = Math.min(d.spd, top * 0.7); }
     if (surf === 'lava') {
       player.lavaT = (player.lavaT || 0) - dt;
       if (player.lavaT <= 0) {
@@ -3095,7 +3159,7 @@ GH.game = (function () {
     var fx = fx0, fz = fz0;
     var fwd = player.velX * fx + player.velZ * fz;
     var latX = player.velX - fx * fwd, latZ = player.velZ - fz * fwd;
-    var grip = d.drift ? 1.5 : (onIce ? 2.4 : 7.5);
+    var grip = d.drift ? 1.5 * V.driftGrip : (onIce ? 2.4 : 7.5 * V.grip);
     if (d.air) grip = 0.6;
     var gk = Math.min(1, grip * dt);
     latX -= latX * gk;
@@ -3143,7 +3207,19 @@ GH.game = (function () {
     }
 
     // aim priority: right stick / touch aim > mouse
-    if (input.padAimActive) {
+    if (camMode === 'chase' && !player.speederOn) {
+      // the frame faces where the camera looks; the mouse's offset from
+      // centre turns both (a stick or touch aim turns them too)
+      var turn = 0;
+      if (input.padAimActive) turn = input.padAimX;
+      else if (input.touchAimActive) turn = input.touchAimX;
+      else {
+        var mxn = input.mouseNDC.x, dz0 = 0.1;
+        if (Math.abs(mxn) > dz0) turn = (mxn > 0 ? 1 : -1) * Math.pow((Math.abs(mxn) - dz0) / (1 - dz0), 1.4);
+      }
+      camYaw -= turn * 3.2 * dt;
+      player.facing = camYaw;
+    } else if (input.padAimActive) {
       player.facing = Math.atan2(input.padAimX, input.padAimY);
     } else if (input.touchAimActive) {
       player.facing = Math.atan2(input.touchAimX, input.touchAimY);
@@ -3156,6 +3232,14 @@ GH.game = (function () {
 
     var mx = (input.keys.d ? 1 : 0) - (input.keys.a ? 1 : 0) + input.padMoveX + input.touchMoveX;
     var mz = (input.keys.s ? 1 : 0) - (input.keys.w ? 1 : 0) + input.padMoveY + input.touchMoveY;
+    if (camMode === 'chase') {
+      // WASD is relative to the view: W goes where the camera looks
+      var yr = camYaw - Math.PI, cyr = Math.cos(yr), syr = Math.sin(yr);
+      var rmx = mx * cyr + mz * syr, rmz = -mx * syr + mz * cyr;
+      mx = rmx; mz = rmz;
+    }
+    if (input.itemPressed) { input.itemPressed = false; useItem(); }
+    if (player.shieldT > 0) player.shieldT -= dt;
     var len = Math.sqrt(mx * mx + mz * mz);
     if (len > 0.001) {
       var nlen = Math.max(1, len);
@@ -3169,6 +3253,9 @@ GH.game = (function () {
     if (artOn('circuit_laurel')) spd *= 1.08;
     // a shouldered power core weighs on the servos
     if (dungeonState && dungeonState.carrying) spd *= 0.8;
+    // race servos: a walker on the circuit sprints, so a hairpin can be taken on foot
+    var inRace = !!(dungeonState && dungeonState.race);
+    if (inRace && !player.speederOn) spd *= 1.5;
 
     // hazards underfoot: vines snare, ice steals traction
     if (inHazard('vines', player.x, player.z)) spd *= 0.65;
@@ -3285,7 +3372,7 @@ GH.game = (function () {
       player.z = GH.clamp(player.z, -ARENA_R, ARENA_R);
     }
 
-    player.boost = Math.min(1, player.boost + s.boostRegen * dt);
+    player.boost = Math.min(1, player.boost + s.boostRegen * dt * (inRace && !player.speederOn ? 2 : 1));
     if (input.boostPressed) { tryBoost(); input.boostPressed = false; }
     if (input.specialPressed) { trySpecial(); input.specialPressed = false; }
 
@@ -3416,7 +3503,7 @@ GH.game = (function () {
           if (GH.dist2(player.x, player.z, re2.x, re2.z) < rr2b * rr2b &&
             (!re2.ramT || re2.ramT < runTime)) {
             re2.ramT = runTime + 0.8;
-            damageEnemy(re2, (8 + s.flatDamage) * s.damageMult, { canCrit: false, noRes: true });
+            damageEnemy(re2, (8 + s.flatDamage) * s.damageMult * ((GH.VECTORS[player.def.vector] || GH.VECTORS.bike).ram), { canCrit: false, noRes: true });
             var ra2 = GH.angleTo(player.x, player.z, re2.x, re2.z);
             re2.vx += Math.sin(ra2) * 15 / re2.def.mass;
             re2.vz += Math.cos(ra2) * 15 / re2.def.mass;
@@ -3481,6 +3568,133 @@ GH.game = (function () {
   var harrowTotem = null;
   var harrowUp = false;
 
+  // ---- race items: pads on the line hand out a shield, a mine, a missile, a bottle ----
+  var ITEM_NAMES = { shield: 'SHIELD', mine: 'MINE', missile: 'SEEKER', nitro: 'BOTTLE' };
+  function updateItemPads(dt) {
+    if (!worldH || !worldH.itemPads) return;
+    for (var i = 0; i < worldH.itemPads.length; i++) {
+      var pad = worldH.itemPads[i];
+      pad.cd = Math.max(0, pad.cd - dt);
+      pad.mesh.visible = pad.cd <= 0;
+      if (pad.mesh.userData.spin) pad.mesh.userData.spin.rotation.y += dt * 2.4;
+      if (pad.cd <= 0 && !player.item && player.speederOn &&
+        GH.dist2(player.x, player.z, pad.x, pad.z) < 2.8 * 2.8) {
+        pad.cd = 7;
+        player.item = GH.pick(['shield', 'mine', 'missile', 'nitro']);
+        announce('ITEM — ' + ITEM_NAMES[player.item] + ' [G]', 20);
+        GH.audio.gem();
+      }
+    }
+  }
+  function useItem() {
+    if (!player || !player.item) return;
+    var it = player.item;
+    player.item = null;
+    var s = player.stats;
+    if (it === 'shield') {
+      player.shieldT = 6;
+      announce('SHIELD UP — 6s', 18);
+    } else if (it === 'nitro') {
+      if (player.drive) player.drive.nitro = 1;
+      announce('BOTTLE FULL', 18);
+    } else if (it === 'mine') {
+      var h = player.drive ? player.drive.heading : player.facing;
+      var mx = player.x - Math.sin(h) * 2.6, mz = player.z - Math.cos(h) * 2.6;
+      var m = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 0.2, 8),
+        GH.assets.mat(0xff5030, { emissive: 0x802010 }));
+      m.position.set(mx, gy(mx, mz) + 0.1, mz);
+      scene.add(m);
+      mines.push({ mesh: m, x: mx, z: mz, life: 25, damage: 60 * s.damageMult, aoe: 3.2, inst: null });
+      announce('MINE DROPPED', 16);
+    } else if (it === 'missile') {
+      var tgt = null;
+      if (dungeonState && dungeonState.race) {
+        var best = -1;
+        dungeonState.race.rivals.forEach(function (rr) {
+          if (rr.dead) return;
+          var pg = racewayProgress(rr.raceLap, rr.raceGate);
+          if (pg > best) { best = pg; tgt = rr; }
+        });
+      }
+      if (!tgt) tgt = nearestEnemy(player.x, player.z, 40);
+      if (tgt) {
+        var tmp = makeWeaponInst('seeker', {
+          type: 'shot', damage: 90, speed: 30, life: 4, size: 1.3, color: 0xff5030, spread: 0, count: 1, homing: 9, aoe: 2.2
+        });
+        fireShot(tmp, player.x, player.z, GH.angleTo(player.x, player.z, tgt.x, tgt.z));
+        announce('SEEKER AWAY', 16);
+      } else {
+        announce('NO TARGET FOR THE SEEKER', 16);
+        player.item = 'missile';
+        return;
+      }
+    }
+    GH.audio.card();
+  }
+
+  // ---- zone events: a built territory answers an intruder ----
+  var zoneEvent = null, zoneEventT = 0;
+  var ZONE_EVENTS = {
+    hive: { name: 'LOCKDOWN', line: 'THE SPIRE SEALS THE STREETS — HOLD UNTIL THE SIREN STOPS', types: ['slinger', 'habbrute', 'rodsentry'], waves: 3, gap: 9, dur: 34 },
+    keep: { name: 'SIEGE', line: 'THE WALLS WAKE — BALLISTAE AND KNIGHTS', types: ['wardenknight', 'ballista', 'stalker'], waves: 3, gap: 10, dur: 36 },
+    ruins: { name: 'AWAKENING', line: 'THE STATUES REMEMBER HOW TO WALK', types: ['slaggolem', 'gravestalker', 'carrionkite'], waves: 2, gap: 12, dur: 32 },
+    warrens: { name: 'CAVE-IN', line: 'THE TUNNELS SHIFT — RIFTS OPEN UNDERFOOT', types: ['tunnelmaw', 'glowmite', 'fungalshambler'], waves: 3, gap: 8, dur: 30, hazard: 'rifts' },
+    sky: { name: 'GALE', line: 'THE WIND TURNS — THE BRIDGES ARE NO PLACE TO STAND', types: ['aetherray', 'cloudwisp', 'sentinel'], waves: 3, gap: 9, dur: 30, weather: 'gale' }
+  };
+  function scheduleZoneEvent() {
+    zoneEvent = null;
+    zoneEventT = ZONE_EVENTS[curZone] && zoneNow && !zoneNow.dungeon ? 40 + Math.random() * 35 : 0;
+  }
+  function updateZoneEvent(dt) {
+    var def = ZONE_EVENTS[curZone];
+    if (!def || !zoneNow || zoneNow.dungeon) return;
+    if (!zoneEvent) {
+      if (zoneEventT <= 0) return;
+      zoneEventT -= dt;
+      if (zoneEventT > 0 || siege || dungeonState) return;
+      zoneEvent = { def: def, t: 0, wave: 0, waveT: 1.5, done: false, savedWeather: weatherNow };
+      announce(def.name + ' — ' + def.line, 26);
+      GH.music.setBoss(true);
+      GH.audio.boss();
+      if (def.weather) weatherNow = { id: def.weather, name: def.name };
+      if (def.hazard) {
+        for (var hi = 0; hi < 5; hi++) {
+          var ha = Math.random() * Math.PI * 2, hr = 8 + Math.random() * 14;
+          var hz = makeHazard(def.hazard, player.x + Math.cos(ha) * hr, player.z + Math.sin(ha) * hr);
+          hz.event = true;
+          hazards.push(hz);
+        }
+      }
+      return;
+    }
+    if (zoneEvent.done) return;
+    zoneEvent.t += dt;
+    zoneEvent.waveT -= dt;
+    if (zoneEvent.waveT <= 0 && zoneEvent.wave < def.waves) {
+      zoneEvent.wave++;
+      zoneEvent.waveT = def.gap;
+      var n = 3 + zoneNow.danger + zoneEvent.wave;
+      for (var i = 0; i < n; i++) {
+        var a = Math.random() * Math.PI * 2, r = 13 + Math.random() * 9;
+        var ev = spawnEnemy(GH.pick(def.types), player.x + Math.cos(a) * r, player.z + Math.sin(a) * r);
+        if (ev) { ev.aggro = true; ev.event = true; ev.allied = false; }
+      }
+      queueAnnounce(def.name + ' — WAVE ' + zoneEvent.wave + '/' + def.waves, 20);
+    }
+    if (zoneEvent.t >= def.dur) {
+      zoneEvent.done = true;
+      var pay = 40 * zoneNow.danger;
+      coinsRun += pay;
+      GH.music.setBoss(false);
+      if (def.weather) weatherNow = zoneEvent.savedWeather;
+      for (var hz2 = hazards.length - 1; hz2 >= 0; hz2--) {
+        if (hazards[hz2].event) { if (hazards[hz2].mesh) scene.remove(hazards[hz2].mesh); hazards.splice(hz2, 1); }
+      }
+      queueAnnounce(def.name + ' WEATHERED — +' + pay + ' SALVAGE', 26);
+      GH.audio.win();
+    }
+  }
+
   function expeditionPlan(zone) {
     var st = GH.world.stageFor(zone.id);
     // deliberate-combat tuning: fewer bodies, each one worth fighting.
@@ -3508,6 +3722,7 @@ GH.game = (function () {
       weaponLevels: JSON.parse(JSON.stringify(player.weaponLevels)),
       protocols: JSON.parse(JSON.stringify(player.protocols)),
       phoenixUsed: !!player.phoenixUsed,
+      item: player.item || null,
       x: player.x, z: player.z
     };
   }
@@ -3540,6 +3755,20 @@ GH.game = (function () {
     var prim = player.weapons[0];
     prim.sockets = savedSockets.slice();
     GH.gems.applySocketBonuses(prim);
+    // secondaries come back from their catalogue definitions at saved level
+    (saved.weapons || []).forEach(function (sw) {
+      if (sw.isPrimary) return;
+      var def = null;
+      for (var ui = 0; ui < GH.upgrades.length; ui++) if (GH.upgrades[ui].id === sw.id) def = GH.upgrades[ui];
+      if (!def || def.kind !== 'weapon') return;
+      var inst = makeWeaponInst(sw.id, def.weapon);
+      var lvl = (saved.weaponLevels || {})[sw.id] || 1;
+      for (var l = 1; l < lvl; l++) def.perLevel(inst.w);
+      inst.sockets = (sw.sockets || []).slice();
+      GH.gems.applySocketBonuses(inst);
+      player.weapons.push(inst);
+    });
+    player.item = saved.item || null;
     player.x = saved.x; player.z = saved.z;
   }
 
@@ -3561,6 +3790,8 @@ GH.game = (function () {
   // ------------------------------------------------------------
   var curZone = 'wreck';
   var travelCd = 0; // keeps a fresh arrival from bouncing back through
+  var AMBIENT = { wreck: 'wind', glacier: 'wind', cloister: 'rain', ember: 'embers', storm: 'rain', null: 'hum',
+    hive: 'city', ruins: 'wind', keep: 'wind', warrens: 'cave', sky: 'wind' };
 
   function zoneFade() {
     var f = document.getElementById('zone-fade');
@@ -3662,6 +3893,8 @@ GH.game = (function () {
     dungeonState = null;
     if (zoneNow.dungeon) initDungeon();
     if (player) camGround = gy(player.x, player.z);
+    scheduleZoneEvent();
+    GH.audio.ambient(AMBIENT[stage.id] || 'wind');
 
     if (fromZoneId) {
       announce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1], 28);
@@ -3829,8 +4062,10 @@ GH.game = (function () {
     var ds = dungeonState;
     var lay = worldH.layout;
     ds.opened = true;
-    var loot = Math.round(60 * zoneNow.danger * ds.tier * (1 + ds.mods.length * 0.15));
+    var loot = Math.round(60 * zoneNow.danger * ds.tier * (1 + ds.mods.length * 0.15) * (player.stats.salvageMult || 1));
     GH.meta.data.salvage += loot;
+    awardCards(3);
+    GH.factions.deed(curZone, 'dungeon', 6);
     coinsRun += 20 * ds.tier;
     spawnPickup('gem:' + GH.pick(GH.gems.typeIds), lay.chest.x + 1.5, lay.chest.z + 1.5);
     queueAnnounce('CACHE OPENED — +' + loot + ' SALVAGE BANKED', 26);
@@ -4105,8 +4340,12 @@ GH.game = (function () {
         if (race.lap > race.laps) {
           ds.done = true;
           announce('CHECKERED — THE CACHE UNSEALS', 30);
+          // a podium in a house's series counts with the house; their own pledges race for more
+          var owner = GH.factions.byZone(curZone);
+          GH.factions.deed(curZone, 'podium', race.pos === 1 ? 10 : 4);
+          var series = owner && GH.factions.state().pledge === owner.id ? 1.25 : 1;
           // the drift ledger pays out as style salvage
-          var styleBonus = Math.min(150, Math.round((race.style || 0) / 4));
+          var styleBonus = Math.min(150, Math.round((race.style || 0) / 4 * series));
           if (styleBonus >= 10) {
             GH.meta.data.salvage += styleBonus;
             GH.meta.save();
@@ -4584,6 +4823,11 @@ GH.game = (function () {
     // an old save's position may not fit this map — keep it in bounds
     player.x = GH.clamp(player.x, -GH.world.BOUNDS.x + 3, GH.world.BOUNDS.x - 3);
     player.z = GH.clamp(player.z, -GH.world.BOUNDS.z + 3, GH.world.BOUNDS.z - 3);
+    // a save standing where a wall, rock or sky now is steps to open ground
+    var sp0 = openSpot(player.x, player.z, 0.8);
+    if (sp0) { player.x = sp0.x; player.z = sp0.z; }
+    camGround = gy(player.x, player.z);
+    camYaw = player.facing || Math.PI;
     travelCd = 2;
     waveNum = 0;
     G.state = 'play';
@@ -4639,15 +4883,19 @@ GH.game = (function () {
   function updateExpedition(dt, input) {
     var w = GH.meta.data.world;
 
-    // dropped gems open the socketing screen (pauses the sim)
-    if (player.pendingGems.length > 0) {
-      showExpeditionRewards();
-      return;
+    // dropped gems and recovered parts open the reward screen (pauses the sim)
+    if (player.pendingGems.length > 0 || (player.pendingCards && player.pendingCards.length > 0)) {
+      if (!(dungeonState && dungeonState.race) && !siege && !zoneEvent) {
+        showExpeditionRewards();
+        return;
+      }
     }
 
     updateWeather(dt);
     updateHarrow(dt);
     updateDungeon(dt);
+    updateZoneEvent(dt);
+    updateItemPads(dt);
     if (hazards.length) updateHazards(dt);
 
     // travel gates: walk into the veil and you're through
@@ -4668,6 +4916,7 @@ GH.game = (function () {
           coinsRun += 25 * dungeonState.tier;
           GH.meta.data.world.dungeons[curZone] = true;
           GH.music.setBoss(false);
+          GH.factions.deed(curZone, 'heist', 6);
           queueAnnounce('CLEAN GETAWAY — +' + heistLoot + ' SALVAGE BANKED', 28);
           GH.audio.win();
           ascendDungeon();
@@ -4847,10 +5096,23 @@ GH.game = (function () {
     drawMinimap();
   }
 
+  // parts recovered in the field: a hand of weapon cards to choose from
+  function awardCards(n) {
+    if (!expActive || !player) return;
+    var cards = GH.rollRewards(player, 6, (n || 3) + 1).filter(function (c) { return c.kind === 'weapon'; }).slice(0, n || 3);
+    if (!cards.length) return;
+    player.pendingCards = player.pendingCards || [];
+    player.pendingCards.push(cards);
+    queueAnnounce('PARTS RECOVERED — CHOOSE AT THE NEXT LULL', 20);
+  }
+
   function showExpeditionRewards() {
     G.state = 'reward';
     rewardQueue = [];
-    document.getElementById('reward-heading').innerHTML = 'SOCKET&nbsp;GEM';
+    var hasCards = player.pendingCards && player.pendingCards.length;
+    document.getElementById('reward-heading').innerHTML = hasCards ? 'FIELD&nbsp;SALVAGE' : 'SOCKET&nbsp;GEM';
+    (player.pendingCards || []).forEach(function (cs) { rewardQueue.push({ cards: cs }); });
+    player.pendingCards = [];
     player.pendingGems.forEach(function (t) { rewardQueue.push({ gemType: t }); });
     player.pendingGems = [];
     document.getElementById('reward-screen').classList.remove('hidden');
@@ -4879,6 +5141,34 @@ GH.game = (function () {
       hive: '#262832', ruins: '#26321f', keep: '#2a2c36', warrens: '#1a1220', sky: '#2a3a5a' };
     ctx.fillStyle = zoneNow && zoneNow.dungeon ? '#0b0b12' : (tints[zoneNow ? zoneNow.parent : 'wreck'] || '#222');
     ctx.fillRect(0, 0, W2, H2);
+    // built territories: caverns, islands, streets, walls
+    var fld = GH.terrain.active, unit = W2 / (GH.world.BOUNDS.x * 2);
+    if (fld && fld.macro) {
+      ctx.fillStyle = 'rgba(255,255,255,0.10)';
+      (fld.macro.caverns || []).concat(fld.macro.islands || []).forEach(function (c) {
+        ctx.beginPath(); ctx.arc(sx(c.x), sz(c.z), c.r * unit, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 2;
+      (fld.macro.tunnels || []).concat(fld.macro.bridges || []).forEach(function (t) {
+        ctx.beginPath(); ctx.moveTo(sx(t.x1), sz(t.z1)); ctx.lineTo(sx(t.x2), sz(t.z2)); ctx.stroke();
+      });
+      ctx.lineWidth = 1;
+    }
+    var strs = worldH.layout.structures;
+    if (strs && strs.items) {
+      ctx.fillStyle = 'rgba(210,210,230,0.30)';
+      strs.items.forEach(function (it) {
+        if (it.kind === 'hab' || it.kind === 'barracks' || it.kind === 'habcave') {
+          ctx.fillRect(sx(it.x) - it.w * unit / 2, sz(it.z) - it.d * unit / 2, Math.max(1, it.w * unit), Math.max(1, it.d * unit));
+        } else if (it.kind === 'wall') {
+          ctx.fillRect(sx(it.x) - 1, sz(it.z) - 1, 2, 2);
+        } else if (it.kind === 'spire' || it.kind === 'donjon' || it.kind === 'court') {
+          ctx.beginPath(); ctx.arc(sx(it.x), sz(it.z), (it.r || 16) * unit, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.fillRect(sx(it.x) - 1.5, sz(it.z) - 1.5, 3, 3);
+        }
+      });
+    }
     // faint quarter grid: gives the dots a sense of distance
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 1;
@@ -5010,7 +5300,7 @@ GH.game = (function () {
     if (!expActive || !player) return;
     preRacePos = { x: player.x, z: player.z };
     if (!player.speederMesh) {
-      player.speederMesh = GH.models.buildSpeeder(player.def.model);
+      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.def.vector);
       scene.add(player.speederMesh);
     }
     player.mesh.visible = false;
@@ -5082,7 +5372,7 @@ GH.game = (function () {
 
   function toggleSpeeder() {
     if (!player.speederMesh) {
-      player.speederMesh = GH.models.buildSpeeder(player.def.model);
+      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.def.vector);
       scene.add(player.speederMesh);
     }
     player.speederOn = !player.speederOn;
@@ -5097,7 +5387,7 @@ GH.game = (function () {
     GH.audio.dash();
     spawnBurst(player.x, 1, player.z, 0x70c0ff, 14);
     announce(player.speederOn
-      ? 'SKIMMER FORM — SPACE DRIFTS, SHIFT BURNS NITRO' : 'FRAME FORM', 22);
+      ? (GH.VECTORS[player.def.vector] || GH.VECTORS.bike).name + ' FORM — SPACE DRIFTS, SHIFT BURNS NITRO' : 'FRAME FORM', 22);
   }
 
   function startSiege(relay) {
@@ -5960,7 +6250,8 @@ GH.game = (function () {
     }
     if (G.state === 'race') zoomTarget = Math.max(zoomTarget, 1.3);
     camZoom = GH.lerp(camZoom, zoomTarget, dt * 3);
-    var fovTarget = 48 + speedFrac * 13 +
+    var chase = camMode === 'chase';
+    var fovTarget = (chase ? 60 : 48) + speedFrac * 13 +
       (player && player.speederOn && player.drive && player.drive.nitroT > 0 ? 7 : 0);
     if (Math.abs(camera.fov - fovTarget) > 0.05) {
       camera.fov += (fovTarget - camera.fov) * Math.min(1, dt * 5);
@@ -5973,6 +6264,30 @@ GH.game = (function () {
     // the world ahead gets the screen space
     var pgy = player ? gy(tx, tz) + (player.speederOn && player.drive ? player.drive.hgt * 0.6 : 0) : 0;
     camGround += (pgy - camGround) * Math.min(1, dt * 5);
+    var xh = document.getElementById('crosshair');
+    if (chase && player) {
+      var veh = player.speederOn && player.drive;
+      if (veh) camYaw = GH.lerpAngle(camYaw, player.drive.heading, Math.min(1, dt * 4));
+      else if (G.state === 'race') {
+        var mvx = tx - camPrevX, mvz = tz - camPrevZ;
+        if (mvx * mvx + mvz * mvz > 0.002) camYaw = GH.lerpAngle(camYaw, Math.atan2(mvx, mvz), Math.min(1, dt * 4));
+      }
+      camPrevX = tx; camPrevZ = tz;
+      var driving = veh || G.state === 'race';
+      var back = (driving ? 13 + speedFrac * 7 : 10) * (mate && !mate.down ? camZoom : 1);
+      var up = driving ? 6.2 + speedFrac * 1.5 : 5.4;
+      var fx = Math.sin(camYaw), fz = Math.cos(camYaw);
+      var cx = tx - fx * back, cz = tz - fz * back;
+      var cy = camGround + up;
+      var groundAtCam = gy(cx, cz) + 2.4;
+      if (cy < groundAtCam) cy = groundAtCam;
+      var hgt = veh ? player.drive.hgt : 0;
+      camera.position.set(cx + sx, cy, cz + sz);
+      camera.lookAt(tx + fx * 5 + sx, camGround + 1.8 + hgt * 0.4, tz + fz * 5 + sz);
+      if (xh) xh.classList.toggle('hidden', !!veh || G.state !== 'play');
+      return;
+    }
+    if (xh) xh.classList.add('hidden');
     camera.position.set(tx + sx, camGround + 18 * camZoom, tz + 14.5 * camZoom + sz);
     camera.lookAt(tx + sx, camGround, tz - 1.6 + sz);
   }
@@ -6036,6 +6351,7 @@ GH.game = (function () {
         // one status word under the speedo: what the ground is doing to you
         var dstat = dvd.bog > 0.5 ? (player.speederOn && GH.terrain.surface(player.x, player.z) === 'snow' ? 'SNOWBOUND — REVERSE' : 'BOGGED — REVERSE')
           : dvd.boostT > 0 ? 'BOOST' : dvd.air ? 'AIR' : dvd.offTrack ? 'OFF TRACK' : (dvd.drift && dvd.slip > 1.2) ? 'DRIFT' : '';
+        if (!dstat && player.item) dstat = ITEM_NAMES[player.item] + ' [G]';
         el['dh-drift'].textContent = dstat;
         el['dh-drift'].classList.toggle('hidden', !dstat);
       }
@@ -6209,6 +6525,8 @@ GH.game = (function () {
     if (worldH) { scene.remove(worldH.group); worldH = null; }
     GH.terrain.clear();
     GH.atmos.clear(scene);
+    GH.audio.ambient(null);
+    zoneEvent = null;
     camGround = 0;
     if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
     if (harrowTotem) { scene.remove(harrowTotem); harrowTotem = null; }
@@ -6767,6 +7085,10 @@ GH.game = (function () {
     camGround = gy(player.x, player.z);
     return true;
   };
+  G.devEventNow = function () { zoneEventT = 0.01; return !!ZONE_EVENTS[curZone]; };
+  G.devGiveItem = function (kind) { if (player) player.item = kind; };
+  G.devUseItem = function () { useItem(); };
+  G.devCards = function () { awardCards(3); };
   G.devSpeeder = function (on) {
     if (!player) return;
     if (!!player.speederOn !== !!on) toggleSpeeder();
@@ -6783,6 +7105,10 @@ GH.game = (function () {
         rivals: dungeonState.race.rivals.map(function (r) { return { x: Math.round(r.x), z: Math.round(r.z), lap: r.raceLap, gate: r.raceGate, dead: !!r.dead }; })
       } : null,
       dungeonDone: !!(dungeonState && dungeonState.done),
+      camMode: camMode, camYaw: camYaw, item: player ? player.item : null, weapons: player ? player.weapons.length : 0,
+      cards: player && player.pendingCards ? player.pendingCards.length : 0,
+      zoneEvent: zoneEvent ? { name: zoneEvent.def.name, wave: zoneEvent.wave, done: zoneEvent.done, t: zoneEvent.t } : null, zoneEventT: zoneEventT,
+      shieldT: player ? player.shieldT : 0,
       surface: player ? GH.terrain.surface(player.x, player.z) : null
     };
   };

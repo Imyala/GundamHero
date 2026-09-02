@@ -981,6 +981,32 @@ html, body {
 }
 #mute-btn.off { color: #444; text-decoration: line-through; }
 
+/* ---- 28. factions ---- */
+#fac-head { text-align: center; color: #d8d0b8; letter-spacing: .08em; margin: 6px 0 14px; font-size: 14px; }
+#fac-cards { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 10px; max-width: 1180px; margin: 0 auto; }
+@media (max-width: 1000px) { #fac-cards { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+.fac-card { background: rgba(10, 14, 30, .85); border: 1px solid #3a4468; padding: 10px 12px; text-align: left; font-size: 12px; color: #c8c8d8; }
+.fac-card.pledged { border-color: #f0d060; box-shadow: 0 0 12px rgba(240, 208, 96, .25); }
+.fac-card.hostile { border-color: #b03030; }
+.fac-name { font-family: 'Times New Roman', serif; font-size: 15px; letter-spacing: .06em; color: #f0e8c8; }
+.fac-creed { color: #8890a8; font-style: italic; margin: 2px 0 6px; }
+.fac-bar { position: relative; height: 8px; background: #1a1e30; border: 1px solid #3a4468; margin: 6px 0; }
+.fac-bar .fb-zero { position: absolute; left: 50%; top: -2px; width: 1px; height: 12px; background: #6a7090; }
+.fac-bar .fb-fill { position: absolute; top: 0; height: 100%; background: #60c8ff; }
+.fac-bar .fb-fill.neg { background: #c04040; }
+.fac-line { margin: 3px 0; }
+.fac-line b { color: #f0e8c8; }
+.fac-btn { display: inline-block; margin-top: 6px; padding: 4px 10px; border: 1px solid #6a7090; color: #e8e8f0; cursor: pointer; letter-spacing: .08em; font-size: 11px; }
+.fac-btn:hover { border-color: #f0d060; color: #f0d060; }
+.fac-btn.off { opacity: .45; cursor: default; }
+#fac-banner { max-width: 760px; margin: 14px auto 0; background: rgba(10, 14, 30, .85); border: 1px solid #3a4468; padding: 12px 16px; font-size: 13px; color: #c8c8d8; text-align: left; }
+#fac-banner input, #fac-banner select { background: #0c1020; color: #f0e8c8; border: 1px solid #3a4468; padding: 4px 8px; margin: 4px 6px 4px 0; font-family: inherit; }
+#crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; pointer-events: none; z-index: 5;
+  border: 1px solid rgba(240, 240, 255, .6); border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
+#crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(240, 240, 255, .7); }
+#crosshair::before { left: 50%; top: -6px; width: 1px; height: 6px; }
+#crosshair::after { left: -6px; top: 50%; width: 6px; height: 1px; }
+
 </style>
 </head>
 <body>
@@ -1052,6 +1078,7 @@ html, body {
   </div>
 
   <div id="damage-layer"></div>
+  <div id="crosshair" class="hidden"></div>
 
   <!-- ===================== TITLE ===================== -->
   <div id="title-screen" class="screen">
@@ -1068,7 +1095,7 @@ html, body {
     </div>
     <div id="title-salvage"></div>
     <div id="title-memorial"></div>
-    <div class="title-foot">WASD move &nbsp;·&nbsp; CLICK attack / target &nbsp;·&nbsp; TAB cycle target &nbsp;·&nbsp; 1–4 abilities &nbsp;·&nbsp; Z X C wards &nbsp;·&nbsp; SPACE boost / drift &nbsp;·&nbsp; SHIFT special / nitro &nbsp;·&nbsp; T transform &nbsp;·&nbsp; K skill tree</div>
+    <div class="title-foot">WASD move &nbsp;·&nbsp; CLICK attack / target &nbsp;·&nbsp; TAB cycle target &nbsp;·&nbsp; 1–4 abilities &nbsp;·&nbsp; Z X C wards &nbsp;·&nbsp; SPACE boost / drift &nbsp;·&nbsp; SHIFT special / nitro &nbsp;·&nbsp; T transform &nbsp;·&nbsp; V camera &nbsp;·&nbsp; G race item &nbsp;·&nbsp; K skill tree</div>
   </div>
 
   <!-- ===================== PLAYER SELECT ===================== -->
@@ -1125,6 +1152,15 @@ html, body {
     <h2 class="select-title">HANGAR</h2>
     <div id="hub-cards"></div>
     <button id="btn-hub-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== FACTIONS ===================== -->
+  <div id="factions-screen" class="screen hidden">
+    <h2 class="select-title">THE&nbsp;HOUSES</h2>
+    <div id="fac-head"></div>
+    <div id="fac-cards"></div>
+    <div id="fac-banner"></div>
+    <button id="btn-fac-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== SAVE CODE ===================== -->
@@ -2903,17 +2939,41 @@ GH.models = (function () {
   };
 
   // transformed frame: a folded speeder / skimmer form
-  M.buildSpeeder = function (cfg) {
+  M.buildSpeeder = function (cfg, kind) {
     var g = new THREE.Group();
     var body = cfg.body, accent = cfg.accent, dark = cfg.dark || 0x30343a;
-    var hull = box(0.9, 0.4, 2.4, body); hull.position.y = 0.75;
-    var nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.1, 4), mat(accent));
-    nose.rotation.x = Math.PI / 2;
-    nose.position.set(0, 0.75, 1.6);
-    var canopy = box(0.5, 0.28, 0.8, 0x202830); canopy.position.set(0, 1.05, 0.2);
-    var finL = box(0.1, 0.5, 0.9, dark); finL.position.set(-0.55, 0.95, -0.8); finL.rotation.z = 0.5;
-    var finR = box(0.1, 0.5, 0.9, dark); finR.position.set(0.55, 0.95, -0.8); finR.rotation.z = -0.5;
-    g.add(hull, nose, canopy, finL, finR);
+    if (kind === 'tank') {
+      // hover-tank: wide hull, a turret, skirts
+      var hullT = box(1.7, 0.5, 2.6, body); hullT.position.y = 0.7; g.add(hullT);
+      var skirtL = box(0.3, 0.3, 2.4, dark); skirtL.position.set(-0.95, 0.5, 0); g.add(skirtL);
+      var skirtR = box(0.3, 0.3, 2.4, dark); skirtR.position.set(0.95, 0.5, 0); g.add(skirtR);
+      var turret = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.4, 8), mat(accent)); turret.position.set(0, 1.15, -0.2); g.add(turret);
+      var barrel = box(0.16, 0.16, 1.6, dark); barrel.position.set(0, 1.2, 0.9); g.add(barrel);
+      var canopyT = box(0.5, 0.22, 0.5, 0x202830); canopyT.position.set(0, 1.45, -0.2); g.add(canopyT);
+    } else if (kind === 'disc') {
+      // disc: a flat saucer with an underslung cannon
+      var disc = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.1, 0.35, 10), mat(body)); disc.position.y = 0.8; g.add(disc);
+      var dome = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 5), mat(0x202830)); dome.position.y = 1.05; g.add(dome);
+      var ring = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.08, 4, 12), mat(accent)); ring.rotation.x = Math.PI / 2; ring.position.y = 0.8; g.add(ring);
+      var gunD = box(0.14, 0.14, 1.2, dark); gunD.position.set(0, 0.5, 0.9); g.add(gunD);
+    } else if (kind === 'bike') {
+      // hover-bike: narrow, long, a fork and a spine
+      var spine = box(0.5, 0.36, 2.6, body); spine.position.y = 0.8; g.add(spine);
+      var fork = box(0.3, 0.3, 0.9, dark); fork.position.set(0, 0.7, 1.5); fork.rotation.x = 0.4; g.add(fork);
+      var noseB = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.9, 4), mat(accent)); noseB.rotation.x = Math.PI / 2; noseB.position.set(0, 0.8, 1.9); g.add(noseB);
+      var seat = box(0.42, 0.18, 0.9, 0x202830); seat.position.set(0, 1.05, -0.2); g.add(seat);
+      var barL = box(0.6, 0.06, 0.06, dark); barL.position.set(0, 1.15, 0.7); g.add(barL);
+      var finB = box(0.08, 0.5, 0.7, dark); finB.position.set(0, 1.1, -1.1); g.add(finB);
+    } else {
+      var hull = box(0.9, 0.4, 2.4, body); hull.position.y = 0.75;
+      var nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.1, 4), mat(accent));
+      nose.rotation.x = Math.PI / 2;
+      nose.position.set(0, 0.75, 1.6);
+      var canopy = box(0.5, 0.28, 0.8, 0x202830); canopy.position.set(0, 1.05, 0.2);
+      var finL = box(0.1, 0.5, 0.9, dark); finL.position.set(-0.55, 0.95, -0.8); finL.rotation.z = 0.5;
+      var finR = box(0.1, 0.5, 0.9, dark); finR.position.set(0.55, 0.95, -0.8); finR.rotation.z = -0.5;
+      g.add(hull, nose, canopy, finL, finR);
+    }
     var flames = [];
     [-0.28, 0.28].forEach(function (x) {
       var flame = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.9, 4),
@@ -2925,6 +2985,24 @@ GH.models = (function () {
     });
     g.userData.flames = flames;
     blobShadow(g, 2.2);
+    return g;
+  };
+
+  // race item pad: a spinning question box on the line
+  M.buildItemPad = function () {
+    var g = new THREE.Group();
+    var b = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), mat(0xffd050, { emissive: 0x806010, emissiveIntensity: 0.6, transparent: true, opacity: 0.85 }));
+    b.rotation.set(0.6, 0.6, 0);
+    g.add(b);
+    g.userData.spin = b;
+    return g;
+  };
+  // a house banner for the camp
+  M.buildBanner = function (color) {
+    var g = new THREE.Group();
+    var pole = box(0.18, 6.5, 0.18, 0x4a4038); pole.position.y = 3.25; g.add(pole);
+    var flag = box(0.08, 2.2, 3.0, color); flag.position.set(0, 5.2, 1.5); g.add(flag);
+    var top = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), mat(0xe0b050)); top.position.y = 6.8; g.add(top);
     return g;
   };
 
@@ -5198,14 +5276,270 @@ GH.structures = (function () {
 
 </script>
 <script>
+// HERO FRAME — the five houses, reputation, pledges, betrayal, and the
+// player's own banner. Rules of the house:
+//   1. Any frame line can be built by anyone; a house you stand with just
+//      sheds its parts more readily (reward rolls weight its families).
+//   2. Betrayal leaves a stain. Work it down with deeds; it fades, slowly.
+//   3. Late game you may leave the houses and raise your own banner, align
+//      with the others through work or face them all, and in the end take
+//      a seat among them.
+GH.factions = (function () {
+  var F = {};
+
+  F.LIST = [
+    { id: 'combine', name: 'SPIRE COMBINE', seat: 'hive', zones: ['hive', 'ember'], color: 0xffb050, glyph: '⚙',
+      creed: 'industry, mass production, the drone swarm',
+      doctrine: { id: 'industry', name: 'INDUSTRY', desc: '+12% salvage · +6% attack speed' },
+      troops: ['slinger', 'habbrute', 'rodsentry', 'crawler'],
+      parts: ['flakfan', 'drone', 'mortarpod'], circuit: 'hive', rivals: ['kin'] },
+    { id: 'wardens', name: 'WARDENS OF THE KEEP', seat: 'keep', zones: ['keep', 'glacier'], color: 0xb02a2a, glyph: '⛨',
+      creed: 'order, walls, the honour duel',
+      doctrine: { id: 'bulwark', name: 'BULWARK', desc: '+3 armor · +8% hull' },
+      troops: ['wardenknight', 'ballista', 'stalker', 'howler'],
+      parts: ['blades', 'javelin', 'halo'], circuit: 'glacier', rivals: ['remnant'] },
+    { id: 'remnant', name: 'CITADEL REMNANT', seat: 'ruins', zones: ['ruins', 'cloister'], color: 0x60c0a0, glyph: '☗',
+      creed: 'relics, memory, the salvage of the old war',
+      doctrine: { id: 'relic', name: 'RELIC LORE', desc: '+6% crit · +10% XP' },
+      troops: ['gravestalker', 'carrionkite', 'slaggolem', 'lurker'],
+      parts: ['tesla', 'frostcaster', 'anchor'], circuit: 'ember', rivals: ['wardens'] },
+    { id: 'kin', name: 'DEEP KIN', seat: 'warrens', zones: ['warrens', 'storm'], color: 0x60e0c0, glyph: '⛏',
+      creed: 'survival, capture, the kitbash',
+      doctrine: { id: 'scavenge', name: 'SCAVENGE', desc: '+4% lifesteal · +15% magnet' },
+      troops: ['glowmite', 'tunnelmaw', 'fungalshambler', 'bellowtoad'],
+      parts: ['mines', 'flamer', 'missiles'], circuit: 'storm', rivals: ['combine'] },
+    { id: 'court', name: 'AETHER COURT', seat: 'sky', zones: ['sky', 'null'], color: 0xe0b050, glyph: '☼',
+      creed: 'ascension, sync, the sky',
+      doctrine: { id: 'ascend', name: 'ASCENSION', desc: '+10% boost regen · +8% damage' },
+      troops: ['aetherray', 'cloudwisp', 'sentinel', 'phantom'],
+      parts: ['blades', 'drone', 'frostcaster'], circuit: 'sky', rivals: ['combine', 'kin'] }
+  ];
+  F.DOCTRINES = F.LIST.map(function (f) { return f.doctrine; });
+
+  F.byId = function (id) {
+    for (var i = 0; i < F.LIST.length; i++) if (F.LIST[i].id === id) return F.LIST[i];
+    return null;
+  };
+  F.byTroop = function (enemyId) {
+    for (var i = 0; i < F.LIST.length; i++) if (F.LIST[i].troops.indexOf(enemyId) !== -1) return F.LIST[i];
+    return null;
+  };
+  F.byZone = function (zoneId) {
+    if (!zoneId) return null;
+    var dg = GH.dungeons.parseId(zoneId);
+    if (dg) zoneId = dg.zone;
+    for (var i = 0; i < F.LIST.length; i++) if (F.LIST[i].zones.indexOf(zoneId) !== -1) return F.LIST[i];
+    return null;
+  };
+
+  // ---- state lives in the world save ----
+  F.state = function () {
+    var w = GH.meta.data.world;
+    if (!w.fac) w.fac = { rep: {}, stain: {}, pledge: null, banner: null, seated: false, deeds: 0, log: [] };
+    return w.fac;
+  };
+  F.notify = function (text, size) { /* game.js replaces this with the announce queue */ };
+
+  F.rep = function (id) { return F.state().rep[id] || 0; };
+  F.stain = function (id) { return F.state().stain[id] || 0; };
+  // a stain caps how high reputation can climb until it fades
+  F.repCap = function (id) { return 100 - F.stain(id) * 1.4; };
+
+  F.standing = function (id) {
+    var s = F.state();
+    if (s.pledge === id) return 'pledged';
+    var r = F.rep(id);
+    if (r >= 40) return 'allied';
+    if (r <= -40) return 'hostile';
+    return 'neutral';
+  };
+  F.standingLabel = function (id) {
+    return { pledged: 'PLEDGED', allied: 'ALLIED', hostile: 'HOSTILE', neutral: 'NEUTRAL' }[F.standing(id)];
+  };
+
+  F.addRep = function (id, delta, reason) {
+    var s = F.state();
+    var f = F.byId(id);
+    if (!f) return;
+    var before = F.rep(id);
+    var after = GH.clamp(before + delta, -100, F.repCap(id));
+    s.rep[id] = Math.round(after * 10) / 10;
+    // crossing a line is worth a word
+    var lines = [[40, 'ALLIED'], [-40, 'HOSTILE']];
+    lines.forEach(function (ln) {
+      if ((before < ln[0] && after >= ln[0]) || (before > ln[0] && after <= ln[0])) {
+        F.notify(f.name + ' — NOW ' + (after >= 40 ? 'ALLIED' : after <= -40 ? 'HOSTILE' : 'NEUTRAL'), 22);
+      }
+    });
+    if (s.log.length < 40) s.log.push({ id: id, d: delta, r: reason });
+  };
+
+  // a deed: a contract, a dungeon clear, a podium. Deeds wear stains down.
+  F.deed = function (zoneId, kind, amount) {
+    var s = F.state();
+    s.deeds++;
+    var owner = F.byZone(zoneId);
+    if (owner) {
+      F.addRep(owner.id, amount, kind);
+      owner.rivals.forEach(function (rv) { F.addRep(rv, -amount * 0.25, 'rival ' + kind); });
+    }
+    for (var k in s.stain) {
+      if (s.stain[k] > 0) s.stain[k] = Math.max(0, s.stain[k] - 3);
+      if (s.stain[k] === 0) delete s.stain[k];
+    }
+    if (s.banner && !s.seated) F.checkSeat();
+    GH.meta.save();
+  };
+
+  // killing a house's troops: they remember, their rivals approve
+  F.troopKilled = function (enemyId) {
+    var f = F.byTroop(enemyId);
+    if (!f) return;
+    F.addRep(f.id, -1, 'troop');
+    f.rivals.forEach(function (rv) { F.addRep(rv, 0.4, 'rival troop'); });
+  };
+
+  // ---- pledges ----
+  F.canPledge = function (id) {
+    var s = F.state();
+    if (s.banner) return false; // your own banner outranks any pledge
+    return F.rep(id) >= 40 && s.pledge !== id;
+  };
+  F.pledge = function (id) {
+    var s = F.state();
+    if (!F.canPledge(id)) return false;
+    var f = F.byId(id);
+    if (s.pledge && s.pledge !== id) F.betray(s.pledge);
+    s.pledge = id;
+    F.addRep(id, 25, 'pledge');
+    // rival houses take it personally
+    f.rivals.forEach(function (rv) { F.addRep(rv, -15, 'pledged to a rival'); });
+    F.notify('PLEDGED TO THE ' + f.name, 26);
+    GH.meta.save();
+    return true;
+  };
+  // walking away is not betrayal; walking to a rival is
+  F.renounce = function () {
+    var s = F.state();
+    if (!s.pledge) return false;
+    var old = s.pledge;
+    s.pledge = null;
+    F.addRep(old, -20, 'renounced');
+    F.notify('PLEDGE RENOUNCED — THE ' + F.byId(old).name + ' WILL REMEMBER', 22);
+    GH.meta.save();
+    return true;
+  };
+  F.betray = function (oldId) {
+    var s = F.state();
+    s.stain[oldId] = 100;
+    s.rep[oldId] = Math.min(F.rep(oldId), -60);
+    F.notify('BETRAYAL — THE ' + F.byId(oldId).name + ' BRAND YOU TRAITOR', 28);
+  };
+
+  // ---- parts and doctrine ----
+  F.partWeight = function (cardId) {
+    var s = F.state();
+    var w = 1;
+    F.LIST.forEach(function (f) {
+      if (f.parts.indexOf(cardId) === -1) return;
+      var st = F.standing(f.id);
+      if (st === 'pledged') w = Math.max(w, 2.4);
+      else if (st === 'allied') w = Math.max(w, 1.6);
+      else if (st === 'hostile') w = Math.min(w, 0.7);
+    });
+    if (s.banner && s.banner.doctrine) {
+      // your own house favours the doctrine's parent house's parts a little
+      var par = F.LIST.filter(function (f) { return f.doctrine.id === s.banner.doctrine; })[0];
+      if (par && par.parts.indexOf(cardId) !== -1) w = Math.max(w, 1.4);
+    }
+    return w;
+  };
+  F.activeDoctrine = function () {
+    var s = F.state();
+    if (s.banner && s.banner.doctrine) {
+      for (var i = 0; i < F.DOCTRINES.length; i++) if (F.DOCTRINES[i].id === s.banner.doctrine) return F.DOCTRINES[i];
+    }
+    if (s.pledge) return F.byId(s.pledge).doctrine;
+    return null;
+  };
+  F.applyDoctrine = function (stats) {
+    var d = F.activeDoctrine();
+    if (!d) return;
+    if (d.id === 'industry') { stats.salvageMult = (stats.salvageMult || 1) * 1.12; stats.atkSpdMult *= 1.06; }
+    if (d.id === 'bulwark') { stats.armor += 3; stats.maxHP = Math.round(stats.maxHP * 1.08); }
+    if (d.id === 'relic') { stats.crit += 6; stats.xpGain = (stats.xpGain || 1) * 1.10; }
+    if (d.id === 'scavenge') { stats.lifesteal += 4; stats.magnet *= 1.15; }
+    if (d.id === 'ascend') { stats.boostRegen *= 1.10; stats.damageMult *= 1.08; }
+  };
+
+  // ---- your own banner ----
+  F.canRaiseBanner = function () {
+    var s = F.state();
+    if (s.banner) return false;
+    var w = GH.meta.data.world;
+    var cleared = 0;
+    for (var k in (w.dgTier || {})) cleared++;
+    var allied = F.LIST.filter(function (f) { return F.rep(f.id) >= 60; }).length;
+    return cleared >= 10 || allied >= 2;
+  };
+  F.bannerRequirement = function () {
+    return 'Raise a banner after ascending ten dungeons, or standing at 60 with two houses.';
+  };
+  F.raiseBanner = function (name, doctrineId, paint) {
+    var s = F.state();
+    if (!F.canRaiseBanner()) return false;
+    if (s.pledge) { F.addRep(s.pledge, -20, 'left for a banner'); s.pledge = null; }
+    s.banner = { name: (name || 'THE UNBOUND').toUpperCase().slice(0, 24), doctrine: doctrineId, paint: paint || null, raised: GH.world.dayStamp() };
+    F.notify('THE ' + s.banner.name + ' RAISE THEIR BANNER', 30);
+    GH.meta.save();
+    return true;
+  };
+  // a seat: three territories held (every nest broken) and either two houses
+  // at 60, or three houses at −60. Either way the world makes room for you.
+  F.seatProgress = function () {
+    var w = GH.meta.data.world;
+    var held = 0;
+    GH.world.ZONES.forEach(function (zn) {
+      var lay = GH.world.layoutFor(zn.id);
+      if (!lay.nests.length) return;
+      var dead = lay.nests.filter(function (n) { return w.nests[n.id]; }).length;
+      if (dead === lay.nests.length) held++;
+    });
+    var friends = F.LIST.filter(function (f) { return F.rep(f.id) >= 60; }).length;
+    var foes = F.LIST.filter(function (f) { return F.rep(f.id) <= -60; }).length;
+    return { held: held, friends: friends, foes: foes, ok: held >= 3 && (friends >= 2 || foes >= 3) };
+  };
+  F.checkSeat = function () {
+    var s = F.state();
+    if (!s.banner || s.seated) return false;
+    var p = F.seatProgress();
+    if (!p.ok) return false;
+    s.seated = true;
+    F.notify('THE ' + s.banner.name + ' TAKE THEIR SEAT — THE CAMP IS YOUR COURT', 32);
+    GH.meta.save();
+    return true;
+  };
+
+  return F;
+})();
+
+</script>
+<script>
 // HERO FRAME — playable frame definitions.
 // Archetypes mirror the classic survivor-mech lineup: a block-healing paladin
 // starter, a dodge-fed light striker, an element-cycling wizard, a dagger
 // rogue, a wounded-fury reaper, plus gunner / railgun / artillery frames.
 // stats.speed is in UI units (game speed = speed * 0.42).
+// vehicle forms: what each frame folds into, and how it drives
+GH.VECTORS = {
+  bike: { name: 'HOVER-BIKE', top: 1.12, accel: 1.15, grip: 1.0, driftGrip: 0.7, jump: 1.25, ram: 0.8 },
+  tank: { name: 'HOVER-TANK', top: 0.86, accel: 0.9, grip: 1.35, driftGrip: 1.4, jump: 0.7, ram: 1.7 },
+  disc: { name: 'DISC', top: 0.96, accel: 1.0, grip: 0.8, driftGrip: 0.9, jump: 1.0, ram: 1.0, hover: true }
+};
+
 GH.mechs = [
   {
-    id: 'aegis',
+    id: 'aegis', vector: 'tank',
     name: 'AEGIS',
     role: 'Paladin frame · starter',
     icon: '⚔',
@@ -5223,7 +5557,7 @@ GH.mechs = [
     hudStats: ['block', 'armor', 'crit']
   },
   {
-    id: 'vulcan',
+    id: 'vulcan', vector: 'tank',
     name: 'VULCAN',
     role: 'Gunner frame · starter',
     icon: '◉',
@@ -5242,7 +5576,7 @@ GH.mechs = [
     hudStats: ['crit', 'atkSpd', 'damage']
   },
   {
-    id: 'fang',
+    id: 'fang', vector: 'bike',
     name: 'FANG',
     role: 'Striker frame',
     icon: '≡',
@@ -5261,7 +5595,7 @@ GH.mechs = [
     hudStats: ['atkSpd', 'crit', 'lifesteal']
   },
   {
-    id: 'hexen',
+    id: 'hexen', vector: 'disc',
     name: 'HEXEN',
     role: 'Wizard frame',
     icon: '✦',
@@ -5281,7 +5615,7 @@ GH.mechs = [
     hudStats: ['damage', 'magnet', 'crit']
   },
   {
-    id: 'viper',
+    id: 'viper', vector: 'bike',
     name: 'VIPER',
     role: 'Rogue frame',
     icon: '⌁',
@@ -5300,7 +5634,7 @@ GH.mechs = [
     hudStats: ['crit', 'atkSpd', 'damage']
   },
   {
-    id: 'morrow',
+    id: 'morrow', vector: 'disc',
     name: 'MORROW',
     role: 'Reaper frame',
     icon: '†',
@@ -5319,7 +5653,7 @@ GH.mechs = [
     hudStats: ['lifesteal', 'armor', 'damage']
   },
   {
-    id: 'strix',
+    id: 'strix', vector: 'bike',
     name: 'STRIX',
     role: 'Duelist frame',
     icon: '➳',
@@ -5337,7 +5671,7 @@ GH.mechs = [
     hudStats: ['crit', 'speed', 'damage']
   },
   {
-    id: 'titan',
+    id: 'titan', vector: 'tank',
     name: 'TITAN',
     role: 'Artillery frame',
     icon: '◆',
@@ -5441,7 +5775,8 @@ GH.meta = (function () {
         wreck: null,        // {x, z, salvage} where you last fell
         raceBest: 0,        // best circuit time in ms (0 = none)
         duelWins: 0,
-        harrowDay: null     // date stamp of the last day THE HARROW fell
+        harrowDay: null,    // date stamp of the last day THE HARROW fell
+        fac: null           // houses: reputation, stains, pledge, banner (see factions.js)
       },
       // pilot skill tree: nodeId -> rank, plus unspent points and the
       // persistent XP pool that pays them out
@@ -5789,6 +6124,8 @@ GH.rollRewards = function (player, wave, count) {
   var weighted = pool.map(function (c) {
     var w = c.w;
     if (c.kind === 'trait' && (picksCount[c.id] || 0) >= 3) w = Math.max(1, w * 0.4);
+    // parts come easier from a house you stand with
+    if (c.kind === 'weapon' && GH.factions) w *= GH.factions.partWeight(c.id);
     return { card: c, w: w };
   });
   while (picks.length < count && weighted.length) {
@@ -6942,6 +7279,48 @@ GH.audio = (function () {
     win: function () { [392, 494, 587, 784].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, 'triangle', 0.18, 15); }, i * 160); }); }
   };
 
+  // ---- ambient beds: looping filtered noise shaped per territory ----
+  var amb = null;
+  S.ambient = function (kind) {
+    if (amb) {
+      try { amb.src.stop(); } catch (e) { /* already stopped */ }
+      if (amb.timer) clearInterval(amb.timer);
+      amb = null;
+    }
+    if (!kind) return;
+    ensure();
+    if (!ctx || muted) return;
+    var len = ctx.sampleRate * 2;
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    var src = ctx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    var f = ctx.createBiquadFilter();
+    var g = ctx.createGain();
+    var cfg = {
+      wind: { type: 'lowpass', freq: 420, gain: 0.05, lfo: 0.15 },
+      rain: { type: 'bandpass', freq: 3200, gain: 0.045, lfo: 0 },
+      embers: { type: 'lowpass', freq: 900, gain: 0.03, lfo: 0.6 },
+      cave: { type: 'lowpass', freq: 180, gain: 0.04, lfo: 0.08, drip: true },
+      city: { type: 'lowpass', freq: 260, gain: 0.035, lfo: 0.02 },
+      hum: { type: 'bandpass', freq: 140, gain: 0.03, lfo: 0.05 }
+    }[kind] || { type: 'lowpass', freq: 400, gain: 0.04, lfo: 0.1 };
+    f.type = cfg.type; f.frequency.value = cfg.freq; f.Q.value = 0.7;
+    g.gain.value = cfg.gain;
+    src.connect(f); f.connect(g); g.connect(master);
+    if (cfg.lfo) {
+      var lfo = ctx.createOscillator(), lg = ctx.createGain();
+      lfo.frequency.value = cfg.lfo; lg.gain.value = cfg.gain * 0.6;
+      lfo.connect(lg); lg.connect(g.gain); lfo.start();
+    }
+    src.start();
+    amb = { src: src, gain: g };
+    if (cfg.drip) {
+      amb.timer = setInterval(function () { if (!muted) tone(GH.rand(900, 1500), 0.12, 'sine', 0.05, -500); }, 1800 + Math.random() * 1200);
+    }
+  };
+
   S.setMuted = function (m) {
     muted = m;
     if (GH.music) GH.music.setMuted(m);
@@ -6983,7 +7362,12 @@ GH.music = (function () {
     cloister:{ root: 82.4, bpm: 100, seed: 41, dense: 0.55, padGain: 0.10, drum: true },
     ember:   { root: 65.4, bpm: 116, seed: 51, dense: 0.62, padGain: 0.08, drum: true },
     storm:   { root: 61.7, bpm: 122, seed: 61, dense: 0.6, padGain: 0.09, drum: true },
-    null:    { root: 92.5, bpm: 70, seed: 71, dense: 0.32, padGain: 0.15, drum: true }
+    null:    { root: 92.5, bpm: 70, seed: 71, dense: 0.32, padGain: 0.15, drum: true },
+    hive:    { root: 58.3, bpm: 128, seed: 81, dense: 0.66, padGain: 0.07, drum: true },
+    ruins:   { root: 77.8, bpm: 78, seed: 91, dense: 0.36, padGain: 0.16, drum: true },
+    keep:    { root: 69.3, bpm: 104, seed: 101, dense: 0.5, padGain: 0.11, drum: true },
+    warrens: { root: 49.0, bpm: 88, seed: 111, dense: 0.3, padGain: 0.14, drum: true },
+    sky:     { root: 98.0, bpm: 92, seed: 121, dense: 0.45, padGain: 0.18, drum: true }
   };
 
   var arpPattern = [], bassPattern = [];
@@ -7356,38 +7740,38 @@ GH.dungeons = (function () {
   // pads (t) and how hard its corners bank. The kart-racer lesson: a lap
   // should climb, drop, leap and lean, never just turn.
   var TRACKS = {
-    wreck: { name: 'DUNE RUN', pts: [
+    wreck: { name: 'DUNE RUN', items: [0.3, 0.68, 0.95], pts: [
       [0, 0.92], [0.45, 0.9], [0.85, 0.55], [0.62, 0.15], [0.9, -0.35], [0.55, -0.88],
       [0.05, -0.72], [-0.4, -0.92], [-0.86, -0.5], [-0.55, -0.05], [-0.88, 0.45], [-0.45, 0.88]],
       profile: [[0, 0], [0.18, 0], [0.26, 7], [0.32, 7], [0.36, 0], [0.5, 0], [0.56, 5], [0.585, 5], [0.62, 0], [0.8, 2], [0.9, 0], [1, 0]],
       gaps: [[0.585, 0.615]], boosts: [0.12, 0.55, 0.74], bank: 0.35 },
-    storm: { name: 'THUNDER RIDGE', pts: [
+    storm: { name: 'THUNDER RIDGE', items: [0.3, 0.6, 0.85], pts: [
       [0, 0.92], [0.55, 0.9], [0.9, 0.5], [0.5, 0.3], [0.15, 0.5], [-0.2, 0.2], [0.25, -0.1],
       [0.75, -0.3], [0.85, -0.78], [0.3, -0.92], [-0.3, -0.75], [-0.82, -0.88], [-0.92, -0.3],
       [-0.55, 0.0], [-0.9, 0.45], [-0.55, 0.88]],
       profile: [[0, 0], [0.1, 0], [0.2, 12], [0.42, 12], [0.5, 0], [0.62, 0], [0.7, 4], [0.72, 4], [0.76, 0], [1, 0]],
       gaps: [[0.72, 0.745]], boosts: [0.15, 0.48, 0.9], bank: 0.45 },
-    ember: { name: 'CALDERA LOOP', pts: [
+    ember: { name: 'CALDERA LOOP', items: [0.2, 0.55, 0.85], pts: [
       [0, 0.92], [0.6, 0.85], [0.92, 0.3], [0.7, -0.2], [0.9, -0.7], [0.35, -0.92],
       [-0.1, -0.6], [-0.5, -0.9], [-0.92, -0.5], [-0.7, 0.0], [-0.92, 0.5], [-0.5, 0.88]],
       profile: [[0, 0], [0.3, 0], [0.38, 6], [0.44, 6], [0.5, 0], [0.62, 0], [0.66, 5], [0.68, 5], [0.72, 0], [1, 0]],
       gaps: [[0.68, 0.705]], boosts: [0.35, 0.65], bank: 0.4 },
-    glacier: { name: 'ICEFALL', pts: [
+    glacier: { name: 'ICEFALL', items: [0.35, 0.62, 0.95], pts: [
       [0, 0.92], [0.5, 0.88], [0.9, 0.6], [0.85, 0.05], [0.4, -0.2], [0.8, -0.6], [0.4, -0.92],
       [-0.2, -0.75], [-0.75, -0.9], [-0.9, -0.35], [-0.5, 0.05], [-0.9, 0.5], [-0.5, 0.9]],
       profile: [[0, 0], [0.15, 14], [0.3, 14], [0.4, 0], [0.7, 0], [0.78, 8], [0.85, 0], [1, 0]],
       gaps: [], boosts: [0.42, 0.86], bank: 0.3 },
-    hive: { name: 'SPIRE CIRCUIT', pts: [
+    hive: { name: 'SPIRE CIRCUIT', items: [0.3, 0.65, 0.95], pts: [
       [0, 0.92], [0.5, 0.9], [0.9, 0.55], [0.55, 0.2], [0.9, -0.2], [0.6, -0.9], [0.0, -0.6],
       [-0.6, -0.9], [-0.9, -0.2], [-0.55, 0.2], [-0.9, 0.55], [-0.5, 0.9]],
       profile: [[0, 0], [0.08, 0], [0.16, 18], [0.5, 18], [0.58, 0], [0.7, 0], [0.75, 6], [0.77, 6], [0.8, 0], [1, 0]],
       gaps: [[0.77, 0.795]], boosts: [0.2, 0.55, 0.9], bank: 0.5 },
-    sky: { name: 'CROWN RING', pts: [
+    sky: { name: 'CROWN RING', items: [0.42, 0.7, 0.95], pts: [
       [0, 0.92], [0.6, 0.86], [0.92, 0.3], [0.86, -0.4], [0.4, -0.92], [-0.2, -0.86],
       [-0.7, -0.9], [-0.92, -0.3], [-0.6, 0.2], [-0.9, 0.6], [-0.4, 0.92]],
       profile: [[0, 0], [0.1, 0], [0.2, 10], [0.3, 10], [0.34, 0], [0.5, 6], [0.55, 6], [0.6, 0], [0.8, 16], [0.9, 0], [1, 0]],
       gaps: [[0.3, 0.335], [0.55, 0.585]], boosts: [0.15, 0.48, 0.78], bank: 0.4 },
-    def: { name: 'RING', pts: [
+    def: { name: 'RING', items: [0.25, 0.75], pts: [
       [0, 0.9], [0.64, 0.64], [0.9, 0], [0.64, -0.64], [0, -0.9], [-0.64, -0.64], [-0.9, 0], [-0.64, 0.64]],
       profile: [[0, 0], [0.4, 5], [0.6, 5], [0.7, 0], [1, 0]], gaps: [], boosts: [0.5], bank: 0.3 }
   };
@@ -7429,6 +7813,7 @@ GH.dungeons = (function () {
       p.elev = profileAt(tpl.profile || [[0, 0], [1, 0]], t);
       p.gap = (tpl.gaps || []).some(function (gp) { return t >= gp[0] && t < gp[1]; });
       p.boost = (tpl.boosts || []).some(function (bt) { return Math.abs(t - bt) < 0.012; });
+      p.item = (tpl.items || []).some(function (it) { return Math.abs(t - it) < 0.004; });
       // banking follows the corner: the outer edge rises
       var q = path[(i + 3) % n], r = path[(i - 3 + n) % n];
       var t1x = q.x - p.x, t1z = q.z - p.z, t0x = p.x - r.x, t0z = p.z - r.z;
@@ -8323,7 +8708,7 @@ GH.world = (function () {
     }
     // RACEWAY: gate pylons, start gantry, and dense trackside furniture —
     // the NFS lesson: speed only reads when things stream PAST you
-    var raceLights = null;
+    var raceLights = null, itemPads = null;
     if (lay.raceway) {
       var rw = lay.raceway;
       for (var rg = 0; rg < rw.gates; rg++) {
@@ -8351,6 +8736,15 @@ GH.world = (function () {
       var lampGeo = new THREE.OctahedronGeometry(0.4);
       // the asphalt itself: hills, banks, jumps, rails, curbs, tyre walls
       GH.terrain.buildTrack(group, rw);
+      // item pads: a spinning box on the line, one per authored spot
+      itemPads = [];
+      rw.path.forEach(function (ip, ipi) {
+        if (!ip.item) return;
+        var im = GH.models.buildItemPad();
+        im.position.set(ip.x, gy(ip.x, ip.z) + 0.9, ip.z);
+        group.add(im);
+        itemPads.push({ x: ip.x, z: ip.z, mesh: im, cd: 0, i: ipi });
+      });
       var postEvery = Math.max(2, Math.floor(rw.path.length / 36));
       for (var tp = 0; tp < rw.path.length; tp += postEvery) {
         var pA = rw.path[tp];
@@ -8531,6 +8925,13 @@ GH.world = (function () {
         s.m.position.set(s.x, 0, s.z);
         camp.add(s.m);
       });
+      // a seated house flies its banner over the camp
+      var fac = GH.factions && GH.factions.state();
+      if (fac && fac.banner) {
+        var bn = GH.models.buildBanner(fac.seated ? 0xe0b050 : 0xb02a2a);
+        bn.position.set(0, 0, 9);
+        camp.add(bn);
+      }
       group.add(camp);
 
       var path = W.circuitPath();
@@ -8554,7 +8955,7 @@ GH.world = (function () {
       coreMeshes: coreMeshes, relicMesh: relicMesh,
       receptorMeshes: receptorMeshes, switchMeshes: switchMeshes,
       screenMeshes: screenMeshes, beamPool: beamPool,
-      raceLights: raceLights, terrain: terrain,
+      raceLights: raceLights, terrain: terrain, itemPads: itemPads,
       layout: lay, info: info
     };
   };
@@ -9137,6 +9538,19 @@ GH.game = (function () {
   // terrain height under a point (0 in the flat arenas)
   function gy(x, z) { return GH.terrain.h(x, z); }
   var camGround = 0; // smoothed ground height under the camera target
+  // CHASE: behind the frame, mouse turns you, the crosshair sits dead centre.
+  // TACTICAL: the old top-down view. V swaps them.
+  var camMode = 'chase';
+  try { camMode = localStorage.getItem('hf_cam') || 'chase'; } catch (e) { /* no storage */ }
+  var camYaw = Math.PI;
+  var camPrevX = 0, camPrevZ = 0;
+  G.camMode = function () { return camMode; };
+  G.toggleCamera = function () {
+    camMode = camMode === 'chase' ? 'top' : 'chase';
+    try { localStorage.setItem('hf_cam', camMode); } catch (e) { /* no storage */ }
+    if (player) camYaw = player.speederOn && player.drive ? player.drive.heading : (player.facing || Math.PI);
+    announce(camMode === 'chase' ? 'CHASE CAMERA — MOUSE TURNS, WASD FOLLOWS THE VIEW' : 'TACTICAL CAMERA', 20);
+  };
   var tmpV3 = new THREE.Vector3();
 
   // =================================================================
@@ -9149,6 +9563,7 @@ GH.game = (function () {
 
     scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0x9fc8dc, 18, 52);
+    GH.factions.notify = function (text, size) { if (G.state === 'play') queueAnnounce(text, size); };
     camera = new THREE.PerspectiveCamera(48, 16 / 9, 0.1, 220);
 
     hemi = new THREE.HemisphereLight(0xbfe8ff, 0x24485a, 0.95);
@@ -9341,6 +9756,8 @@ GH.game = (function () {
       weaponLevels: {},
       protocols: {},
       pendingGems: [],
+      pendingCards: [],
+      item: null, shieldT: 0,
       boost: 1, dashTime: 0, dashX: 0, dashZ: 0, dashId: 0, dashKind: 'boost',
       blocking: false,
       special: { cd: 0, active: 0 },
@@ -9356,6 +9773,7 @@ GH.game = (function () {
     };
     p.hp = p.stats.maxHP;
     p.weapons.push(makeWeaponInst('primary', mechDef.weapon, true));
+    if (GH.factions) GH.factions.applyDoctrine(p.stats);
     p.mesh.position.set(0, 0, 0);
     scene.add(p.mesh);
     return p;
@@ -9363,6 +9781,7 @@ GH.game = (function () {
 
   function playerDamage(raw, srcE, dmgType) {
     if (!player || player.hp <= 0 || player.dashTime > 0.12 || GH.devGod) return;
+    if (player.shieldT > 0) { G.dmg.spawn(player.x, 2.6, player.z, 'SHIELD', 'heal', 14); return; }
     var s = player.stats;
     if (player.speederOn) raw *= 1.25; // skimmer hull is thin — speed is the armor
     var block = s.block + (player.protocols.vents && player.hp < s.maxHP * 0.35 ? 10 : 0);
@@ -9551,6 +9970,14 @@ GH.game = (function () {
       burstLeft: 0, burstT: 0, orbitA: Math.random() * Math.PI * 2, diveT: 0
     };
     if (e.buried && mesh.userData.body) { mesh.userData.body.visible = false; }
+    // a house's troops know your name
+    var fac = expActive && !def.boss ? GH.factions.byTroop(typeId) : null;
+    if (fac) {
+      var stnd = GH.factions.standing(fac.id);
+      e.faction = fac.id;
+      if (stnd === 'allied' || stnd === 'pledged') { e.allied = true; e.aggro = false; }
+      else if (stnd === 'hostile') { e.hostileHouse = true; e.damage *= 1.2; }
+    }
     if (def.behavior === 'ambusher' && mesh.userData.body) { mesh.userData.body.visible = false; }
     if (def.behavior === 'flyer') e.hgt = 3.0;
     // elites: from wave 6, one in ten spawns carries a modifier
@@ -9589,7 +10016,15 @@ GH.game = (function () {
     if (e.phased > 0) return; // blinked out — nothing to hit
     var dmg = raw;
     if (e.def.armorMult) dmg *= e.def.armorMult;
-    if (e.buried) dmg *= 0.3;
+    if (e.buried) {
+      // shoot the plume: enough hits force it up
+      dmg *= 0.3;
+      e.buriedDmg = (e.buriedDmg || 0) + dmg;
+      if (e.buriedDmg > e.maxHp * 0.25 && e.emergeT <= 0) { e.buriedDmg = 0; e.emergeT = 0.3; }
+    }
+    if (e.def.behavior === 'flyer' && e.hgt < 1.6) dmg *= 1.5;            // caught on the dive
+    if (e.def.behavior === 'turret' && e.burstLeft === 0 &&
+      e.shootCd > (e.def.shootInterval || 3) - 1.0) dmg *= 1.8;            // hit it while it recharges
     var crit = false;
     var inst = opts.inst;
     if (opts.canCrit !== false) {
@@ -9656,6 +10091,14 @@ GH.game = (function () {
     if (e.def.boss) G.hitStop(0.14);
     else if (e.def.mass >= 3) G.hitStop(0.06);
     scene.remove(e.mesh);
+    // kill the caller and the pack it called loses heart
+    if (e.def.behavior === 'caller') {
+      for (var ci2 = 0; ci2 < enemies.length; ci2++) {
+        var cl = enemies[ci2];
+        if (!cl.dead && cl.calledBy === e) { cl.hp = 0; killEnemy(cl); }
+      }
+    }
+    if (expActive && GH.factions) GH.factions.troopKilled(e.id);
 
     // expedition world scars: broken nests stay broken, lairs fall once
     if (expActive) {
@@ -9700,6 +10143,7 @@ GH.game = (function () {
         if (GH.meta.unlockShell(shellId)) {
           queueAnnounce(GH.mechById(shellId).name + ' FRAME RECOVERED', 30);
         }
+        GH.factions.deed(curZone, 'lair', 8);
         var lairArtifacts = {
           wreck: 'bulwark_fragment', glacier: 'glacier_core', cloister: 'harvest_coil',
           ember: 'cinder_heart', storm: 'stormcap', null: 'null_lens'
@@ -9721,6 +10165,7 @@ GH.game = (function () {
     // progression hooks: collection log, contracts, trials, season, ciphers
     GH.progress.logKill(e.id);
     var cdone = GH.progress.contractKill(e.id, stage.id);
+    if (cdone && expActive) GH.factions.deed(curZone, 'contract', 8);
     if (cdone) {
       queueAnnounce('CONTRACT COMPLETE — +' + cdone.salvage + ' SALVAGE, +' + cdone.pts + ' PTS', 22);
       GH.audio.win();
@@ -9770,6 +10215,8 @@ GH.game = (function () {
       spawnPickup('coin', e.x, e.z);
       spawnPickup('spark1', e.x + 0.5, e.z);
     }
+    if (e.def.boss && expActive) awardCards(3);
+    else if (e.elite && expActive && Math.random() < 0.25) awardCards(2);
     if (e.def.boss) {
       for (var c = 0; c < (e.def.corrupt ? 24 : 12); c++) {
         spawnPickup('coin', e.x + GH.rand(-2, 2), e.z + GH.rand(-2, 2));
@@ -9896,8 +10343,13 @@ GH.game = (function () {
         if (dist < 6.5 || e.hp < e.maxHp) e.aggro = true;
         if (!e.aggro) continue;
       }
+      if (e.allied && !e.event) {
+        // an allied patrol keeps the peace until you break it
+        if (e.hp < e.maxHp) e.allied = false;
+        else e.aggro = false;
+      }
       if (expActive && !def.boss && !e.event) {
-        var aggroR = def.behavior === 'ranged' ? 16 : 11;
+        var aggroR = (def.behavior === 'ranged' ? 16 : 11) * (e.hostileHouse ? 2 : 1);
         if (!e.aggro) {
           if (dist < aggroR || e.hp < e.maxHp) {
             e.aggro = true;
@@ -9960,7 +10412,7 @@ GH.game = (function () {
           GH.audio.zap();
           for (var cc2 = 0; cc2 < (def.callCount || 2); cc2++) {
             var called = spawnEnemy(def.calls || 'husk', e.x + GH.rand(-3, 3), e.z + GH.rand(-3, 3));
-            if (called) { called.aggro = true; called.event = true; }
+            if (called) { called.aggro = true; called.event = true; called.calledBy = e; }
           }
         }
       } else if (def.behavior === 'latcher') {
@@ -10065,7 +10517,7 @@ GH.game = (function () {
         } else {
           mx = nx; mz = nz;
           e.blinkT -= dt;
-          if (e.blinkT <= 0 && dist > 5) {
+          if (e.blinkT <= 0 && dist > 5 && target !== e) { // a marked phantom cannot slip away
             e.blinkT = def.blinkInterval; e.phased = 0.7; e.mesh.visible = false;
             spawnBurst(e.x, 1, e.z, 0xc080ff, 8);
           }
@@ -11676,15 +12128,17 @@ GH.game = (function () {
   var rewardQueue = [];
 
   function showRewards() {
-    // no more power-up cards — only dropped gems still need socketing
-    if (player.pendingGems.length === 0) {
+    // every third wave hands out parts; dropped gems still need socketing
+    var cards = (waveNum % 3 === 0) ? GH.rollRewards(player, waveNum, 3) : null;
+    if (player.pendingGems.length === 0 && !cards) {
       startWave(waveNum + 1);
       updateHUDStatic();
       return;
     }
     G.state = 'reward';
     rewardQueue = [];
-    document.getElementById('reward-heading').innerHTML = 'SOCKET&nbsp;GEM';
+    document.getElementById('reward-heading').innerHTML = cards ? 'WAVE&nbsp;SALVAGE' : 'SOCKET&nbsp;GEM';
+    if (cards) rewardQueue.push({ cards: cards });
     player.pendingGems.forEach(function (t) { rewardQueue.push({ gemType: t }); });
     player.pendingGems = [];
     document.getElementById('reward-screen').classList.remove('hidden');
@@ -11859,6 +12313,16 @@ GH.game = (function () {
     player.dashKind = 'boost';
     GH.audio.dash();
     spawnBurst(player.x, 0.6, player.z, player.trailColor || 0xa0c8ff, 6);
+    // a dash shakes leeches and skitters loose
+    for (var li = 0; li < enemies.length; li++) {
+      var le = enemies[li];
+      if (le.dead || le.def.behavior !== 'latcher') continue;
+      if (GH.dist2(player.x, player.z, le.x, le.z) < 2.4 * 2.4) {
+        le.stun = 1.0;
+        var la = GH.angleTo(player.x, player.z, le.x, le.z);
+        le.vx += Math.sin(la) * 12 / le.def.mass; le.vz += Math.cos(la) * 12 / le.def.mass;
+      }
+    }
     if (cipherRun) cipherRun.boosts++;
     // artifact-charged boosts
     if (artOn('stormcap')) {
@@ -11988,7 +12452,8 @@ GH.game = (function () {
     var d = player.drive;
     if (!d || d.bog === undefined) d = player.drive = freshDrive();
     player.dashTime = 0; // no frame-dash on the throttle
-    var top = spd * 3.3;
+    var V = GH.VECTORS[player.def.vector] || GH.VECTORS.bike;
+    var top = spd * 3.3 * V.top;
     // the bottle: SHIFT burns while there's charge
     var wantNitro = !!input.special && d.nitro > 0.03 && !d.air;
     if (wantNitro) {
@@ -12020,7 +12485,7 @@ GH.game = (function () {
       } else if (dot < -0.55) {
         d.spd = Math.max(-top * 0.22, d.spd - 14 * dt); // reverse gear
       } else if (!d.air) {
-        d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * dt);
+        d.spd = Math.min(top, d.spd + (nitroOn ? 40 : 22) * V.accel * dt);
       }
     } else {
       d.spd = d.spd > 0 ? Math.max(0, d.spd - (d.drift ? 6 : 12) * dt) : Math.min(0, d.spd + 12 * dt);
@@ -12058,11 +12523,11 @@ GH.game = (function () {
       player.velZ += Math.cos(runTime * 0.45) * 9 * dt;
     }
     // soft ground on a steep face: blast over it with momentum, or bog down
-    var steepSoft = !d.air && soft > 0.5 && slope > 0.26;
+    var steepSoft = !d.air && soft > 0.5 && slope > 0.26 && !V.hover;
     if (steepSoft) {
       if (d.fwd > top * 0.58) {
         d.air = true; d.hgt = 0.02; d.absY = gNow + 0.02;
-        d.vy = Math.max(5, d.fwd * slope * 1.05);
+        d.vy = Math.max(5, d.fwd * slope * 1.05) * V.jump;
         if (d.jumpMsgT <= 0) { d.jumpMsgT = 6; announce(surf === 'snow' ? 'DRIFT JUMP' : 'DUNE JUMP', 18); }
         GH.audio.dash();
       } else if (d.fwd < top * 0.48 && d.spd > 0) {
@@ -12104,7 +12569,7 @@ GH.game = (function () {
       }
     }
     // water and lava under the skids: hydroplane, scald
-    if (surf === 'water') { onIce = true; d.spd = Math.min(d.spd, top * 0.7); }
+    if (surf === 'water' && !V.hover) { onIce = true; d.spd = Math.min(d.spd, top * 0.7); }
     if (surf === 'lava') {
       player.lavaT = (player.lavaT || 0) - dt;
       if (player.lavaT <= 0) {
@@ -12126,7 +12591,7 @@ GH.game = (function () {
     var fx = fx0, fz = fz0;
     var fwd = player.velX * fx + player.velZ * fz;
     var latX = player.velX - fx * fwd, latZ = player.velZ - fz * fwd;
-    var grip = d.drift ? 1.5 : (onIce ? 2.4 : 7.5);
+    var grip = d.drift ? 1.5 * V.driftGrip : (onIce ? 2.4 : 7.5 * V.grip);
     if (d.air) grip = 0.6;
     var gk = Math.min(1, grip * dt);
     latX -= latX * gk;
@@ -12174,7 +12639,19 @@ GH.game = (function () {
     }
 
     // aim priority: right stick / touch aim > mouse
-    if (input.padAimActive) {
+    if (camMode === 'chase' && !player.speederOn) {
+      // the frame faces where the camera looks; the mouse's offset from
+      // centre turns both (a stick or touch aim turns them too)
+      var turn = 0;
+      if (input.padAimActive) turn = input.padAimX;
+      else if (input.touchAimActive) turn = input.touchAimX;
+      else {
+        var mxn = input.mouseNDC.x, dz0 = 0.1;
+        if (Math.abs(mxn) > dz0) turn = (mxn > 0 ? 1 : -1) * Math.pow((Math.abs(mxn) - dz0) / (1 - dz0), 1.4);
+      }
+      camYaw -= turn * 3.2 * dt;
+      player.facing = camYaw;
+    } else if (input.padAimActive) {
       player.facing = Math.atan2(input.padAimX, input.padAimY);
     } else if (input.touchAimActive) {
       player.facing = Math.atan2(input.touchAimX, input.touchAimY);
@@ -12187,6 +12664,14 @@ GH.game = (function () {
 
     var mx = (input.keys.d ? 1 : 0) - (input.keys.a ? 1 : 0) + input.padMoveX + input.touchMoveX;
     var mz = (input.keys.s ? 1 : 0) - (input.keys.w ? 1 : 0) + input.padMoveY + input.touchMoveY;
+    if (camMode === 'chase') {
+      // WASD is relative to the view: W goes where the camera looks
+      var yr = camYaw - Math.PI, cyr = Math.cos(yr), syr = Math.sin(yr);
+      var rmx = mx * cyr + mz * syr, rmz = -mx * syr + mz * cyr;
+      mx = rmx; mz = rmz;
+    }
+    if (input.itemPressed) { input.itemPressed = false; useItem(); }
+    if (player.shieldT > 0) player.shieldT -= dt;
     var len = Math.sqrt(mx * mx + mz * mz);
     if (len > 0.001) {
       var nlen = Math.max(1, len);
@@ -12200,6 +12685,9 @@ GH.game = (function () {
     if (artOn('circuit_laurel')) spd *= 1.08;
     // a shouldered power core weighs on the servos
     if (dungeonState && dungeonState.carrying) spd *= 0.8;
+    // race servos: a walker on the circuit sprints, so a hairpin can be taken on foot
+    var inRace = !!(dungeonState && dungeonState.race);
+    if (inRace && !player.speederOn) spd *= 1.5;
 
     // hazards underfoot: vines snare, ice steals traction
     if (inHazard('vines', player.x, player.z)) spd *= 0.65;
@@ -12316,7 +12804,7 @@ GH.game = (function () {
       player.z = GH.clamp(player.z, -ARENA_R, ARENA_R);
     }
 
-    player.boost = Math.min(1, player.boost + s.boostRegen * dt);
+    player.boost = Math.min(1, player.boost + s.boostRegen * dt * (inRace && !player.speederOn ? 2 : 1));
     if (input.boostPressed) { tryBoost(); input.boostPressed = false; }
     if (input.specialPressed) { trySpecial(); input.specialPressed = false; }
 
@@ -12447,7 +12935,7 @@ GH.game = (function () {
           if (GH.dist2(player.x, player.z, re2.x, re2.z) < rr2b * rr2b &&
             (!re2.ramT || re2.ramT < runTime)) {
             re2.ramT = runTime + 0.8;
-            damageEnemy(re2, (8 + s.flatDamage) * s.damageMult, { canCrit: false, noRes: true });
+            damageEnemy(re2, (8 + s.flatDamage) * s.damageMult * ((GH.VECTORS[player.def.vector] || GH.VECTORS.bike).ram), { canCrit: false, noRes: true });
             var ra2 = GH.angleTo(player.x, player.z, re2.x, re2.z);
             re2.vx += Math.sin(ra2) * 15 / re2.def.mass;
             re2.vz += Math.cos(ra2) * 15 / re2.def.mass;
@@ -12512,6 +13000,133 @@ GH.game = (function () {
   var harrowTotem = null;
   var harrowUp = false;
 
+  // ---- race items: pads on the line hand out a shield, a mine, a missile, a bottle ----
+  var ITEM_NAMES = { shield: 'SHIELD', mine: 'MINE', missile: 'SEEKER', nitro: 'BOTTLE' };
+  function updateItemPads(dt) {
+    if (!worldH || !worldH.itemPads) return;
+    for (var i = 0; i < worldH.itemPads.length; i++) {
+      var pad = worldH.itemPads[i];
+      pad.cd = Math.max(0, pad.cd - dt);
+      pad.mesh.visible = pad.cd <= 0;
+      if (pad.mesh.userData.spin) pad.mesh.userData.spin.rotation.y += dt * 2.4;
+      if (pad.cd <= 0 && !player.item && player.speederOn &&
+        GH.dist2(player.x, player.z, pad.x, pad.z) < 2.8 * 2.8) {
+        pad.cd = 7;
+        player.item = GH.pick(['shield', 'mine', 'missile', 'nitro']);
+        announce('ITEM — ' + ITEM_NAMES[player.item] + ' [G]', 20);
+        GH.audio.gem();
+      }
+    }
+  }
+  function useItem() {
+    if (!player || !player.item) return;
+    var it = player.item;
+    player.item = null;
+    var s = player.stats;
+    if (it === 'shield') {
+      player.shieldT = 6;
+      announce('SHIELD UP — 6s', 18);
+    } else if (it === 'nitro') {
+      if (player.drive) player.drive.nitro = 1;
+      announce('BOTTLE FULL', 18);
+    } else if (it === 'mine') {
+      var h = player.drive ? player.drive.heading : player.facing;
+      var mx = player.x - Math.sin(h) * 2.6, mz = player.z - Math.cos(h) * 2.6;
+      var m = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 0.2, 8),
+        GH.assets.mat(0xff5030, { emissive: 0x802010 }));
+      m.position.set(mx, gy(mx, mz) + 0.1, mz);
+      scene.add(m);
+      mines.push({ mesh: m, x: mx, z: mz, life: 25, damage: 60 * s.damageMult, aoe: 3.2, inst: null });
+      announce('MINE DROPPED', 16);
+    } else if (it === 'missile') {
+      var tgt = null;
+      if (dungeonState && dungeonState.race) {
+        var best = -1;
+        dungeonState.race.rivals.forEach(function (rr) {
+          if (rr.dead) return;
+          var pg = racewayProgress(rr.raceLap, rr.raceGate);
+          if (pg > best) { best = pg; tgt = rr; }
+        });
+      }
+      if (!tgt) tgt = nearestEnemy(player.x, player.z, 40);
+      if (tgt) {
+        var tmp = makeWeaponInst('seeker', {
+          type: 'shot', damage: 90, speed: 30, life: 4, size: 1.3, color: 0xff5030, spread: 0, count: 1, homing: 9, aoe: 2.2
+        });
+        fireShot(tmp, player.x, player.z, GH.angleTo(player.x, player.z, tgt.x, tgt.z));
+        announce('SEEKER AWAY', 16);
+      } else {
+        announce('NO TARGET FOR THE SEEKER', 16);
+        player.item = 'missile';
+        return;
+      }
+    }
+    GH.audio.card();
+  }
+
+  // ---- zone events: a built territory answers an intruder ----
+  var zoneEvent = null, zoneEventT = 0;
+  var ZONE_EVENTS = {
+    hive: { name: 'LOCKDOWN', line: 'THE SPIRE SEALS THE STREETS — HOLD UNTIL THE SIREN STOPS', types: ['slinger', 'habbrute', 'rodsentry'], waves: 3, gap: 9, dur: 34 },
+    keep: { name: 'SIEGE', line: 'THE WALLS WAKE — BALLISTAE AND KNIGHTS', types: ['wardenknight', 'ballista', 'stalker'], waves: 3, gap: 10, dur: 36 },
+    ruins: { name: 'AWAKENING', line: 'THE STATUES REMEMBER HOW TO WALK', types: ['slaggolem', 'gravestalker', 'carrionkite'], waves: 2, gap: 12, dur: 32 },
+    warrens: { name: 'CAVE-IN', line: 'THE TUNNELS SHIFT — RIFTS OPEN UNDERFOOT', types: ['tunnelmaw', 'glowmite', 'fungalshambler'], waves: 3, gap: 8, dur: 30, hazard: 'rifts' },
+    sky: { name: 'GALE', line: 'THE WIND TURNS — THE BRIDGES ARE NO PLACE TO STAND', types: ['aetherray', 'cloudwisp', 'sentinel'], waves: 3, gap: 9, dur: 30, weather: 'gale' }
+  };
+  function scheduleZoneEvent() {
+    zoneEvent = null;
+    zoneEventT = ZONE_EVENTS[curZone] && zoneNow && !zoneNow.dungeon ? 40 + Math.random() * 35 : 0;
+  }
+  function updateZoneEvent(dt) {
+    var def = ZONE_EVENTS[curZone];
+    if (!def || !zoneNow || zoneNow.dungeon) return;
+    if (!zoneEvent) {
+      if (zoneEventT <= 0) return;
+      zoneEventT -= dt;
+      if (zoneEventT > 0 || siege || dungeonState) return;
+      zoneEvent = { def: def, t: 0, wave: 0, waveT: 1.5, done: false, savedWeather: weatherNow };
+      announce(def.name + ' — ' + def.line, 26);
+      GH.music.setBoss(true);
+      GH.audio.boss();
+      if (def.weather) weatherNow = { id: def.weather, name: def.name };
+      if (def.hazard) {
+        for (var hi = 0; hi < 5; hi++) {
+          var ha = Math.random() * Math.PI * 2, hr = 8 + Math.random() * 14;
+          var hz = makeHazard(def.hazard, player.x + Math.cos(ha) * hr, player.z + Math.sin(ha) * hr);
+          hz.event = true;
+          hazards.push(hz);
+        }
+      }
+      return;
+    }
+    if (zoneEvent.done) return;
+    zoneEvent.t += dt;
+    zoneEvent.waveT -= dt;
+    if (zoneEvent.waveT <= 0 && zoneEvent.wave < def.waves) {
+      zoneEvent.wave++;
+      zoneEvent.waveT = def.gap;
+      var n = 3 + zoneNow.danger + zoneEvent.wave;
+      for (var i = 0; i < n; i++) {
+        var a = Math.random() * Math.PI * 2, r = 13 + Math.random() * 9;
+        var ev = spawnEnemy(GH.pick(def.types), player.x + Math.cos(a) * r, player.z + Math.sin(a) * r);
+        if (ev) { ev.aggro = true; ev.event = true; ev.allied = false; }
+      }
+      queueAnnounce(def.name + ' — WAVE ' + zoneEvent.wave + '/' + def.waves, 20);
+    }
+    if (zoneEvent.t >= def.dur) {
+      zoneEvent.done = true;
+      var pay = 40 * zoneNow.danger;
+      coinsRun += pay;
+      GH.music.setBoss(false);
+      if (def.weather) weatherNow = zoneEvent.savedWeather;
+      for (var hz2 = hazards.length - 1; hz2 >= 0; hz2--) {
+        if (hazards[hz2].event) { if (hazards[hz2].mesh) scene.remove(hazards[hz2].mesh); hazards.splice(hz2, 1); }
+      }
+      queueAnnounce(def.name + ' WEATHERED — +' + pay + ' SALVAGE', 26);
+      GH.audio.win();
+    }
+  }
+
   function expeditionPlan(zone) {
     var st = GH.world.stageFor(zone.id);
     // deliberate-combat tuning: fewer bodies, each one worth fighting.
@@ -12539,6 +13154,7 @@ GH.game = (function () {
       weaponLevels: JSON.parse(JSON.stringify(player.weaponLevels)),
       protocols: JSON.parse(JSON.stringify(player.protocols)),
       phoenixUsed: !!player.phoenixUsed,
+      item: player.item || null,
       x: player.x, z: player.z
     };
   }
@@ -12571,6 +13187,20 @@ GH.game = (function () {
     var prim = player.weapons[0];
     prim.sockets = savedSockets.slice();
     GH.gems.applySocketBonuses(prim);
+    // secondaries come back from their catalogue definitions at saved level
+    (saved.weapons || []).forEach(function (sw) {
+      if (sw.isPrimary) return;
+      var def = null;
+      for (var ui = 0; ui < GH.upgrades.length; ui++) if (GH.upgrades[ui].id === sw.id) def = GH.upgrades[ui];
+      if (!def || def.kind !== 'weapon') return;
+      var inst = makeWeaponInst(sw.id, def.weapon);
+      var lvl = (saved.weaponLevels || {})[sw.id] || 1;
+      for (var l = 1; l < lvl; l++) def.perLevel(inst.w);
+      inst.sockets = (sw.sockets || []).slice();
+      GH.gems.applySocketBonuses(inst);
+      player.weapons.push(inst);
+    });
+    player.item = saved.item || null;
     player.x = saved.x; player.z = saved.z;
   }
 
@@ -12592,6 +13222,8 @@ GH.game = (function () {
   // ------------------------------------------------------------
   var curZone = 'wreck';
   var travelCd = 0; // keeps a fresh arrival from bouncing back through
+  var AMBIENT = { wreck: 'wind', glacier: 'wind', cloister: 'rain', ember: 'embers', storm: 'rain', null: 'hum',
+    hive: 'city', ruins: 'wind', keep: 'wind', warrens: 'cave', sky: 'wind' };
 
   function zoneFade() {
     var f = document.getElementById('zone-fade');
@@ -12693,6 +13325,8 @@ GH.game = (function () {
     dungeonState = null;
     if (zoneNow.dungeon) initDungeon();
     if (player) camGround = gy(player.x, player.z);
+    scheduleZoneEvent();
+    GH.audio.ambient(AMBIENT[stage.id] || 'wind');
 
     if (fromZoneId) {
       announce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1], 28);
@@ -12860,8 +13494,10 @@ GH.game = (function () {
     var ds = dungeonState;
     var lay = worldH.layout;
     ds.opened = true;
-    var loot = Math.round(60 * zoneNow.danger * ds.tier * (1 + ds.mods.length * 0.15));
+    var loot = Math.round(60 * zoneNow.danger * ds.tier * (1 + ds.mods.length * 0.15) * (player.stats.salvageMult || 1));
     GH.meta.data.salvage += loot;
+    awardCards(3);
+    GH.factions.deed(curZone, 'dungeon', 6);
     coinsRun += 20 * ds.tier;
     spawnPickup('gem:' + GH.pick(GH.gems.typeIds), lay.chest.x + 1.5, lay.chest.z + 1.5);
     queueAnnounce('CACHE OPENED — +' + loot + ' SALVAGE BANKED', 26);
@@ -13136,8 +13772,12 @@ GH.game = (function () {
         if (race.lap > race.laps) {
           ds.done = true;
           announce('CHECKERED — THE CACHE UNSEALS', 30);
+          // a podium in a house's series counts with the house; their own pledges race for more
+          var owner = GH.factions.byZone(curZone);
+          GH.factions.deed(curZone, 'podium', race.pos === 1 ? 10 : 4);
+          var series = owner && GH.factions.state().pledge === owner.id ? 1.25 : 1;
           // the drift ledger pays out as style salvage
-          var styleBonus = Math.min(150, Math.round((race.style || 0) / 4));
+          var styleBonus = Math.min(150, Math.round((race.style || 0) / 4 * series));
           if (styleBonus >= 10) {
             GH.meta.data.salvage += styleBonus;
             GH.meta.save();
@@ -13615,6 +14255,11 @@ GH.game = (function () {
     // an old save's position may not fit this map — keep it in bounds
     player.x = GH.clamp(player.x, -GH.world.BOUNDS.x + 3, GH.world.BOUNDS.x - 3);
     player.z = GH.clamp(player.z, -GH.world.BOUNDS.z + 3, GH.world.BOUNDS.z - 3);
+    // a save standing where a wall, rock or sky now is steps to open ground
+    var sp0 = openSpot(player.x, player.z, 0.8);
+    if (sp0) { player.x = sp0.x; player.z = sp0.z; }
+    camGround = gy(player.x, player.z);
+    camYaw = player.facing || Math.PI;
     travelCd = 2;
     waveNum = 0;
     G.state = 'play';
@@ -13670,15 +14315,19 @@ GH.game = (function () {
   function updateExpedition(dt, input) {
     var w = GH.meta.data.world;
 
-    // dropped gems open the socketing screen (pauses the sim)
-    if (player.pendingGems.length > 0) {
-      showExpeditionRewards();
-      return;
+    // dropped gems and recovered parts open the reward screen (pauses the sim)
+    if (player.pendingGems.length > 0 || (player.pendingCards && player.pendingCards.length > 0)) {
+      if (!(dungeonState && dungeonState.race) && !siege && !zoneEvent) {
+        showExpeditionRewards();
+        return;
+      }
     }
 
     updateWeather(dt);
     updateHarrow(dt);
     updateDungeon(dt);
+    updateZoneEvent(dt);
+    updateItemPads(dt);
     if (hazards.length) updateHazards(dt);
 
     // travel gates: walk into the veil and you're through
@@ -13699,6 +14348,7 @@ GH.game = (function () {
           coinsRun += 25 * dungeonState.tier;
           GH.meta.data.world.dungeons[curZone] = true;
           GH.music.setBoss(false);
+          GH.factions.deed(curZone, 'heist', 6);
           queueAnnounce('CLEAN GETAWAY — +' + heistLoot + ' SALVAGE BANKED', 28);
           GH.audio.win();
           ascendDungeon();
@@ -13878,10 +14528,23 @@ GH.game = (function () {
     drawMinimap();
   }
 
+  // parts recovered in the field: a hand of weapon cards to choose from
+  function awardCards(n) {
+    if (!expActive || !player) return;
+    var cards = GH.rollRewards(player, 6, (n || 3) + 1).filter(function (c) { return c.kind === 'weapon'; }).slice(0, n || 3);
+    if (!cards.length) return;
+    player.pendingCards = player.pendingCards || [];
+    player.pendingCards.push(cards);
+    queueAnnounce('PARTS RECOVERED — CHOOSE AT THE NEXT LULL', 20);
+  }
+
   function showExpeditionRewards() {
     G.state = 'reward';
     rewardQueue = [];
-    document.getElementById('reward-heading').innerHTML = 'SOCKET&nbsp;GEM';
+    var hasCards = player.pendingCards && player.pendingCards.length;
+    document.getElementById('reward-heading').innerHTML = hasCards ? 'FIELD&nbsp;SALVAGE' : 'SOCKET&nbsp;GEM';
+    (player.pendingCards || []).forEach(function (cs) { rewardQueue.push({ cards: cs }); });
+    player.pendingCards = [];
     player.pendingGems.forEach(function (t) { rewardQueue.push({ gemType: t }); });
     player.pendingGems = [];
     document.getElementById('reward-screen').classList.remove('hidden');
@@ -13910,6 +14573,34 @@ GH.game = (function () {
       hive: '#262832', ruins: '#26321f', keep: '#2a2c36', warrens: '#1a1220', sky: '#2a3a5a' };
     ctx.fillStyle = zoneNow && zoneNow.dungeon ? '#0b0b12' : (tints[zoneNow ? zoneNow.parent : 'wreck'] || '#222');
     ctx.fillRect(0, 0, W2, H2);
+    // built territories: caverns, islands, streets, walls
+    var fld = GH.terrain.active, unit = W2 / (GH.world.BOUNDS.x * 2);
+    if (fld && fld.macro) {
+      ctx.fillStyle = 'rgba(255,255,255,0.10)';
+      (fld.macro.caverns || []).concat(fld.macro.islands || []).forEach(function (c) {
+        ctx.beginPath(); ctx.arc(sx(c.x), sz(c.z), c.r * unit, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 2;
+      (fld.macro.tunnels || []).concat(fld.macro.bridges || []).forEach(function (t) {
+        ctx.beginPath(); ctx.moveTo(sx(t.x1), sz(t.z1)); ctx.lineTo(sx(t.x2), sz(t.z2)); ctx.stroke();
+      });
+      ctx.lineWidth = 1;
+    }
+    var strs = worldH.layout.structures;
+    if (strs && strs.items) {
+      ctx.fillStyle = 'rgba(210,210,230,0.30)';
+      strs.items.forEach(function (it) {
+        if (it.kind === 'hab' || it.kind === 'barracks' || it.kind === 'habcave') {
+          ctx.fillRect(sx(it.x) - it.w * unit / 2, sz(it.z) - it.d * unit / 2, Math.max(1, it.w * unit), Math.max(1, it.d * unit));
+        } else if (it.kind === 'wall') {
+          ctx.fillRect(sx(it.x) - 1, sz(it.z) - 1, 2, 2);
+        } else if (it.kind === 'spire' || it.kind === 'donjon' || it.kind === 'court') {
+          ctx.beginPath(); ctx.arc(sx(it.x), sz(it.z), (it.r || 16) * unit, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.fillRect(sx(it.x) - 1.5, sz(it.z) - 1.5, 3, 3);
+        }
+      });
+    }
     // faint quarter grid: gives the dots a sense of distance
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 1;
@@ -14041,7 +14732,7 @@ GH.game = (function () {
     if (!expActive || !player) return;
     preRacePos = { x: player.x, z: player.z };
     if (!player.speederMesh) {
-      player.speederMesh = GH.models.buildSpeeder(player.def.model);
+      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.def.vector);
       scene.add(player.speederMesh);
     }
     player.mesh.visible = false;
@@ -14113,7 +14804,7 @@ GH.game = (function () {
 
   function toggleSpeeder() {
     if (!player.speederMesh) {
-      player.speederMesh = GH.models.buildSpeeder(player.def.model);
+      player.speederMesh = GH.models.buildSpeeder(player.def.model, player.def.vector);
       scene.add(player.speederMesh);
     }
     player.speederOn = !player.speederOn;
@@ -14128,7 +14819,7 @@ GH.game = (function () {
     GH.audio.dash();
     spawnBurst(player.x, 1, player.z, 0x70c0ff, 14);
     announce(player.speederOn
-      ? 'SKIMMER FORM — SPACE DRIFTS, SHIFT BURNS NITRO' : 'FRAME FORM', 22);
+      ? (GH.VECTORS[player.def.vector] || GH.VECTORS.bike).name + ' FORM — SPACE DRIFTS, SHIFT BURNS NITRO' : 'FRAME FORM', 22);
   }
 
   function startSiege(relay) {
@@ -14991,7 +15682,8 @@ GH.game = (function () {
     }
     if (G.state === 'race') zoomTarget = Math.max(zoomTarget, 1.3);
     camZoom = GH.lerp(camZoom, zoomTarget, dt * 3);
-    var fovTarget = 48 + speedFrac * 13 +
+    var chase = camMode === 'chase';
+    var fovTarget = (chase ? 60 : 48) + speedFrac * 13 +
       (player && player.speederOn && player.drive && player.drive.nitroT > 0 ? 7 : 0);
     if (Math.abs(camera.fov - fovTarget) > 0.05) {
       camera.fov += (fovTarget - camera.fov) * Math.min(1, dt * 5);
@@ -15004,6 +15696,30 @@ GH.game = (function () {
     // the world ahead gets the screen space
     var pgy = player ? gy(tx, tz) + (player.speederOn && player.drive ? player.drive.hgt * 0.6 : 0) : 0;
     camGround += (pgy - camGround) * Math.min(1, dt * 5);
+    var xh = document.getElementById('crosshair');
+    if (chase && player) {
+      var veh = player.speederOn && player.drive;
+      if (veh) camYaw = GH.lerpAngle(camYaw, player.drive.heading, Math.min(1, dt * 4));
+      else if (G.state === 'race') {
+        var mvx = tx - camPrevX, mvz = tz - camPrevZ;
+        if (mvx * mvx + mvz * mvz > 0.002) camYaw = GH.lerpAngle(camYaw, Math.atan2(mvx, mvz), Math.min(1, dt * 4));
+      }
+      camPrevX = tx; camPrevZ = tz;
+      var driving = veh || G.state === 'race';
+      var back = (driving ? 13 + speedFrac * 7 : 10) * (mate && !mate.down ? camZoom : 1);
+      var up = driving ? 6.2 + speedFrac * 1.5 : 5.4;
+      var fx = Math.sin(camYaw), fz = Math.cos(camYaw);
+      var cx = tx - fx * back, cz = tz - fz * back;
+      var cy = camGround + up;
+      var groundAtCam = gy(cx, cz) + 2.4;
+      if (cy < groundAtCam) cy = groundAtCam;
+      var hgt = veh ? player.drive.hgt : 0;
+      camera.position.set(cx + sx, cy, cz + sz);
+      camera.lookAt(tx + fx * 5 + sx, camGround + 1.8 + hgt * 0.4, tz + fz * 5 + sz);
+      if (xh) xh.classList.toggle('hidden', !!veh || G.state !== 'play');
+      return;
+    }
+    if (xh) xh.classList.add('hidden');
     camera.position.set(tx + sx, camGround + 18 * camZoom, tz + 14.5 * camZoom + sz);
     camera.lookAt(tx + sx, camGround, tz - 1.6 + sz);
   }
@@ -15067,6 +15783,7 @@ GH.game = (function () {
         // one status word under the speedo: what the ground is doing to you
         var dstat = dvd.bog > 0.5 ? (player.speederOn && GH.terrain.surface(player.x, player.z) === 'snow' ? 'SNOWBOUND — REVERSE' : 'BOGGED — REVERSE')
           : dvd.boostT > 0 ? 'BOOST' : dvd.air ? 'AIR' : dvd.offTrack ? 'OFF TRACK' : (dvd.drift && dvd.slip > 1.2) ? 'DRIFT' : '';
+        if (!dstat && player.item) dstat = ITEM_NAMES[player.item] + ' [G]';
         el['dh-drift'].textContent = dstat;
         el['dh-drift'].classList.toggle('hidden', !dstat);
       }
@@ -15240,6 +15957,8 @@ GH.game = (function () {
     if (worldH) { scene.remove(worldH.group); worldH = null; }
     GH.terrain.clear();
     GH.atmos.clear(scene);
+    GH.audio.ambient(null);
+    zoneEvent = null;
     camGround = 0;
     if (wreckMesh) { scene.remove(wreckMesh); wreckMesh = null; }
     if (harrowTotem) { scene.remove(harrowTotem); harrowTotem = null; }
@@ -15798,6 +16517,10 @@ GH.game = (function () {
     camGround = gy(player.x, player.z);
     return true;
   };
+  G.devEventNow = function () { zoneEventT = 0.01; return !!ZONE_EVENTS[curZone]; };
+  G.devGiveItem = function (kind) { if (player) player.item = kind; };
+  G.devUseItem = function () { useItem(); };
+  G.devCards = function () { awardCards(3); };
   G.devSpeeder = function (on) {
     if (!player) return;
     if (!!player.speederOn !== !!on) toggleSpeeder();
@@ -15814,6 +16537,10 @@ GH.game = (function () {
         rivals: dungeonState.race.rivals.map(function (r) { return { x: Math.round(r.x), z: Math.round(r.z), lap: r.raceLap, gate: r.raceGate, dead: !!r.dead }; })
       } : null,
       dungeonDone: !!(dungeonState && dungeonState.done),
+      camMode: camMode, camYaw: camYaw, item: player ? player.item : null, weapons: player ? player.weapons.length : 0,
+      cards: player && player.pendingCards ? player.pendingCards.length : 0,
+      zoneEvent: zoneEvent ? { name: zoneEvent.def.name, wave: zoneEvent.wave, done: zoneEvent.done, t: zoneEvent.t } : null, zoneEventT: zoneEventT,
+      shieldT: player ? player.shieldT : 0,
       surface: player ? GH.terrain.surface(player.x, player.z) : null
     };
   };
@@ -15990,8 +16717,10 @@ GH.game = (function () {
         if (e.code === 'KeyQ') input.wardCycle = true;
         if (e.code === 'KeyE') input.interactPressed = true;
         if (e.code === 'KeyT') input.transformPressed = true;
+        if (e.code === 'KeyG') input.itemPressed = true;
         if (e.code === 'Tab') { GH.game.tabTarget(); e.preventDefault(); }
       }
+      if (e.code === 'KeyV' && (GH.game.state === 'play' || GH.game.state === 'race')) GH.game.toggleCamera();
       if (e.code === 'KeyK' &&
         (GH.game.state === 'play' || GH.game.state === 'title')) {
         openSkills(GH.game.state === 'play');
@@ -16140,7 +16869,7 @@ GH.game = (function () {
   // ----------------------------------------------------------------
   var SCREENS = ['title-screen', 'select-screen', 'stage-screen', 'hangar-screen',
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
-    'trials-screen', 'season-screen', 'hub-screen', 'save-screen',
+    'trials-screen', 'season-screen', 'hub-screen', 'save-screen', 'factions-screen',
     'reward-screen', 'pause-screen', 'end-screen', 'skills-screen', 'map-screen'];
 
   function show(id) {
@@ -16498,7 +17227,9 @@ GH.game = (function () {
         sub: GH.meta.isIron() ? 'sealed on iron profiles' : GH.meta.data.salvage + ' salvage to spend',
         open: openHangar },
       { id: 'hub-save', glyph: '⛃', name: 'SAVE CODE',
-        sub: 'back up or restore progress', open: openSave }
+        sub: 'back up or restore progress', open: openSave },
+      { id: 'hub-factions', glyph: '⚑', name: 'THE HOUSES',
+        sub: factionsSub(), open: openFactions }
     ];
     var wrap = document.getElementById('hub-cards');
     wrap.innerHTML = '';
@@ -16512,6 +17243,98 @@ GH.game = (function () {
       wrap.appendChild(div);
     });
     show('hub-screen');
+  }
+
+  // ----------------------------------------------------------------
+  // THE HOUSES — reputation, pledges, your own banner
+  function factionsSub() {
+    var f = GH.factions.state();
+    if (f.banner) return f.seated ? 'THE ' + f.banner.name + ' — SEATED' : 'your banner: THE ' + f.banner.name;
+    if (f.pledge) return 'pledged to the ' + GH.factions.byId(f.pledge).name;
+    var best = null;
+    GH.factions.LIST.forEach(function (h) { if (!best || GH.factions.rep(h.id) > GH.factions.rep(best.id)) best = h; });
+    return best ? best.name + ' ' + Math.round(GH.factions.rep(best.id)) : 'no standing yet';
+  }
+  function openFactions() {
+    GH.audio.card();
+    GH.game.state = 'hangar';
+    renderFactions();
+    show('factions-screen');
+  }
+  function renderFactions() {
+    var F = GH.factions, st = F.state();
+    var head = st.banner
+      ? 'YOUR BANNER: <b>THE ' + st.banner.name + '</b> · doctrine ' + (F.activeDoctrine() ? F.activeDoctrine().name : '—') + (st.seated ? ' · <b>SEATED</b>' : '')
+      : st.pledge ? 'PLEDGED TO THE <b>' + F.byId(st.pledge).name + '</b> · doctrine ' + F.byId(st.pledge).doctrine.name
+        : 'Unpledged. Contracts, dungeon clears and podiums in a house\'s lands raise its regard; killing its troops lowers it. Pledge at 40.';
+    document.getElementById('fac-head').innerHTML = head;
+    var wrap = document.getElementById('fac-cards');
+    wrap.innerHTML = '';
+    F.LIST.forEach(function (h) {
+      var rep = F.rep(h.id), stain = F.stain(h.id), standing = F.standing(h.id);
+      var card = document.createElement('div');
+      card.className = 'fac-card ' + standing;
+      var pct = Math.abs(rep) / 2;
+      var bar = '<div class="fac-bar"><div class="fb-zero"></div><div class="fb-fill' + (rep < 0 ? ' neg' : '') + '" style="' +
+        (rep < 0 ? 'right:50%;width:' + pct + '%' : 'left:50%;width:' + pct + '%') + '"></div></div>';
+      var seat = GH.world.stageFor(h.seat).name;
+      var parts = h.parts.map(function (pid) {
+        for (var i = 0; i < GH.upgrades.length; i++) if (GH.upgrades[i].id === pid) return GH.upgrades[i].name;
+        return pid;
+      }).join(', ');
+      var btn = '';
+      if (standing === 'pledged') btn = '<span class="fac-btn" data-act="renounce">RENOUNCE</span>';
+      else if (F.canPledge(h.id)) btn = '<span class="fac-btn" data-act="pledge" data-id="' + h.id + '">PLEDGE</span>';
+      else if (!st.banner) btn = '<span class="fac-btn off">PLEDGE AT 40</span>';
+      card.innerHTML =
+        '<div class="fac-name">' + h.glyph + ' ' + h.name + '</div>' +
+        '<div class="fac-creed">' + h.creed + '</div>' +
+        '<div class="fac-line">seat: <b>' + seat + '</b></div>' +
+        bar +
+        '<div class="fac-line">regard <b>' + Math.round(rep) + '</b> · <b>' + F.standingLabel(h.id) + '</b>' +
+        (stain > 0 ? ' · stain ' + Math.round(stain) : '') + '</div>' +
+        '<div class="fac-line">doctrine: <b>' + h.doctrine.name + '</b> — ' + h.doctrine.desc + '</div>' +
+        '<div class="fac-line">parts favoured: ' + parts + '</div>' +
+        '<div class="fac-line">circuit: ' + GH.world.stageFor(h.circuit).name + '</div>' +
+        btn;
+      wrap.appendChild(card);
+    });
+    wrap.querySelectorAll('.fac-btn[data-act]').forEach(function (b) {
+      b.onclick = function () {
+        if (b.dataset.act === 'pledge') F.pledge(b.dataset.id);
+        else F.renounce();
+        GH.audio.card();
+        if (GH.game.refreshPilot) GH.game.refreshPilot();
+        renderFactions();
+      };
+    });
+    // the banner
+    var bw = document.getElementById('fac-banner');
+    if (st.banner) {
+      var sp = F.seatProgress();
+      bw.innerHTML = '<b>THE ' + st.banner.name + '</b> — raised ' + st.banner.raised + '. ' +
+        (st.seated ? 'Seated: the camp is your court, and every house treats you by your regard.' :
+          'A seat needs three territories held (every nest broken) and two houses at 60, or three at −60. ' +
+          'Held <b>' + sp.held + '/3</b> · friends <b>' + sp.friends + '</b> · foes <b>' + sp.foes + '</b>.');
+    } else if (F.canRaiseBanner()) {
+      var opts = F.DOCTRINES.map(function (d) { return '<option value="' + d.id + '">' + d.name + ' — ' + d.desc + '</option>'; }).join('');
+      var paints = GH.progress.cosmetics.filter(function (c) { return c.kind === 'paint' && GH.meta.data.style.owned[c.id]; })
+        .map(function (c) { return '<option value="' + c.id + '">' + c.name + '</option>'; }).join('');
+      bw.innerHTML = '<b>RAISE YOUR OWN BANNER.</b> Leaving a pledge this way is not betrayal, but the house will mark it. ' +
+        '<div><input id="fac-name" maxlength="24" placeholder="house name"> <select id="fac-doc">' + opts + '</select> ' +
+        '<select id="fac-paint"><option value="">standard paint</option>' + paints + '</select> ' +
+        '<span class="fac-btn" id="fac-raise">RAISE</span></div>';
+      document.getElementById('fac-raise').onclick = function () {
+        var nm = document.getElementById('fac-name').value.trim();
+        if (!nm) { document.getElementById('fac-name').focus(); return; }
+        F.raiseBanner(nm, document.getElementById('fac-doc').value, document.getElementById('fac-paint').value || null);
+        GH.audio.win();
+        if (GH.game.refreshPilot) GH.game.refreshPilot();
+        renderFactions();
+      };
+    } else {
+      bw.innerHTML = F.bannerRequirement();
+    }
   }
 
   // ----------------------------------------------------------------
@@ -17028,6 +17851,7 @@ GH.game = (function () {
     // meta screens live under the hub now (or under a camp station)
     document.getElementById('btn-season-back').onclick = openHub;
     document.getElementById('btn-map-back').onclick = metaBack('map', openHub);
+    document.getElementById('btn-fac-back').onclick = metaBack('factions', openHub);
     document.getElementById('btn-skills-back').onclick = metaBack('skills', openHub);
     document.getElementById('btn-respec').onclick = function () {
       if (GH.skills.respec()) {

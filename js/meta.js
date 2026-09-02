@@ -59,7 +59,8 @@ GH.meta = (function () {
         wreck: null,        // {x, z, salvage} where you last fell
         raceBest: 0,        // best circuit time in ms (0 = none)
         duelWins: 0,
-        harrowDay: null     // date stamp of the last day THE HARROW fell
+        harrowDay: null,    // date stamp of the last day THE HARROW fell
+        fac: null           // houses: reputation, stains, pledge, banner (see factions.js)
       },
       // pilot skill tree: nodeId -> rank, plus unspent points and the
       // persistent XP pool that pays them out

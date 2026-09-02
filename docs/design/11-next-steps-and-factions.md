@@ -88,3 +88,24 @@ the seats. The hub camp on the dune coast stays neutral.
 - Should factions gate frames (you can only fly a house's line while pledged) or only discount them?
 - Is betrayal permanent within a profile, or does a season reset it?
 - Do you want the hub camp to become a faction seat too, or stay neutral forever?
+
+---
+
+## Decisions taken (this round)
+
+Your three rules are now the design, and the build follows them:
+
+1. **Any frame line can be built by anyone.** Houses never gate parts. A house you stand with sheds
+   its favoured weapon families more readily: reward rolls weight a pledged house's parts ×2.4, an
+   allied house's ×1.6, and a hostile house's ×0.7. Nothing is ever locked.
+2. **Betrayal stains.** Pledging to a rival while pledged drops the old house to −60 and leaves a
+   stain of 100, which caps how high regard can climb (cap = 100 − 1.4 × stain). Every deed (a
+   contract, a dungeon clear, a podium) wears every stain down by 3. Roughly thirty-five deeds to
+   clear it fully: not easy, never impossible. Renouncing without a new pledge is not betrayal, just −20.
+3. **Your own banner, then a seat.** After ascending ten dungeons, or standing at 60 with two houses,
+   you may raise a banner: a name, a doctrine (one of the five stat lines, replacing the pledge's),
+   and a paint. Leaving a pledge this way costs −20, not a stain. From there you align through work
+   or face them all. A seat needs three territories held (every nest broken) and either two houses
+   at 60 or three at −60; the camp becomes your court and flies your banner.
+
+Everything else from the recommendation list also shipped; see doc 10's "round three" section.

@@ -541,7 +541,7 @@ GH.world = (function () {
     }
     // RACEWAY: gate pylons, start gantry, and dense trackside furniture —
     // the NFS lesson: speed only reads when things stream PAST you
-    var raceLights = null;
+    var raceLights = null, itemPads = null;
     if (lay.raceway) {
       var rw = lay.raceway;
       for (var rg = 0; rg < rw.gates; rg++) {
@@ -569,6 +569,15 @@ GH.world = (function () {
       var lampGeo = new THREE.OctahedronGeometry(0.4);
       // the asphalt itself: hills, banks, jumps, rails, curbs, tyre walls
       GH.terrain.buildTrack(group, rw);
+      // item pads: a spinning box on the line, one per authored spot
+      itemPads = [];
+      rw.path.forEach(function (ip, ipi) {
+        if (!ip.item) return;
+        var im = GH.models.buildItemPad();
+        im.position.set(ip.x, gy(ip.x, ip.z) + 0.9, ip.z);
+        group.add(im);
+        itemPads.push({ x: ip.x, z: ip.z, mesh: im, cd: 0, i: ipi });
+      });
       var postEvery = Math.max(2, Math.floor(rw.path.length / 36));
       for (var tp = 0; tp < rw.path.length; tp += postEvery) {
         var pA = rw.path[tp];
@@ -749,6 +758,13 @@ GH.world = (function () {
         s.m.position.set(s.x, 0, s.z);
         camp.add(s.m);
       });
+      // a seated house flies its banner over the camp
+      var fac = GH.factions && GH.factions.state();
+      if (fac && fac.banner) {
+        var bn = GH.models.buildBanner(fac.seated ? 0xe0b050 : 0xb02a2a);
+        bn.position.set(0, 0, 9);
+        camp.add(bn);
+      }
       group.add(camp);
 
       var path = W.circuitPath();
@@ -772,7 +788,7 @@ GH.world = (function () {
       coreMeshes: coreMeshes, relicMesh: relicMesh,
       receptorMeshes: receptorMeshes, switchMeshes: switchMeshes,
       screenMeshes: screenMeshes, beamPool: beamPool,
-      raceLights: raceLights, terrain: terrain,
+      raceLights: raceLights, terrain: terrain, itemPads: itemPads,
       layout: lay, info: info
     };
   };

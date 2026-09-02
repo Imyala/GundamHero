@@ -3,9 +3,16 @@
 // starter, a dodge-fed light striker, an element-cycling wizard, a dagger
 // rogue, a wounded-fury reaper, plus gunner / railgun / artillery frames.
 // stats.speed is in UI units (game speed = speed * 0.42).
+// vehicle forms: what each frame folds into, and how it drives
+GH.VECTORS = {
+  bike: { name: 'HOVER-BIKE', top: 1.12, accel: 1.15, grip: 1.0, driftGrip: 0.7, jump: 1.25, ram: 0.8 },
+  tank: { name: 'HOVER-TANK', top: 0.86, accel: 0.9, grip: 1.35, driftGrip: 1.4, jump: 0.7, ram: 1.7 },
+  disc: { name: 'DISC', top: 0.96, accel: 1.0, grip: 0.8, driftGrip: 0.9, jump: 1.0, ram: 1.0, hover: true }
+};
+
 GH.mechs = [
   {
-    id: 'aegis',
+    id: 'aegis', vector: 'tank',
     name: 'AEGIS',
     role: 'Paladin frame · starter',
     icon: '⚔',
@@ -23,7 +30,7 @@ GH.mechs = [
     hudStats: ['block', 'armor', 'crit']
   },
   {
-    id: 'vulcan',
+    id: 'vulcan', vector: 'tank',
     name: 'VULCAN',
     role: 'Gunner frame · starter',
     icon: '◉',
@@ -42,7 +49,7 @@ GH.mechs = [
     hudStats: ['crit', 'atkSpd', 'damage']
   },
   {
-    id: 'fang',
+    id: 'fang', vector: 'bike',
     name: 'FANG',
     role: 'Striker frame',
     icon: '≡',
@@ -61,7 +68,7 @@ GH.mechs = [
     hudStats: ['atkSpd', 'crit', 'lifesteal']
   },
   {
-    id: 'hexen',
+    id: 'hexen', vector: 'disc',
     name: 'HEXEN',
     role: 'Wizard frame',
     icon: '✦',
@@ -81,7 +88,7 @@ GH.mechs = [
     hudStats: ['damage', 'magnet', 'crit']
   },
   {
-    id: 'viper',
+    id: 'viper', vector: 'bike',
     name: 'VIPER',
     role: 'Rogue frame',
     icon: '⌁',
@@ -100,7 +107,7 @@ GH.mechs = [
     hudStats: ['crit', 'atkSpd', 'damage']
   },
   {
-    id: 'morrow',
+    id: 'morrow', vector: 'disc',
     name: 'MORROW',
     role: 'Reaper frame',
     icon: '†',
@@ -119,7 +126,7 @@ GH.mechs = [
     hudStats: ['lifesteal', 'armor', 'damage']
   },
   {
-    id: 'strix',
+    id: 'strix', vector: 'bike',
     name: 'STRIX',
     role: 'Duelist frame',
     icon: '➳',
@@ -137,7 +144,7 @@ GH.mechs = [
     hudStats: ['crit', 'speed', 'damage']
   },
   {
-    id: 'titan',
+    id: 'titan', vector: 'tank',
     name: 'TITAN',
     role: 'Artillery frame',
     icon: '◆',

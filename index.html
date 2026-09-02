@@ -75,6 +75,7 @@
   </div>
 
   <div id="damage-layer"></div>
+  <div id="crosshair" class="hidden"></div>
 
   <!-- ===================== TITLE ===================== -->
   <div id="title-screen" class="screen">
@@ -91,7 +92,7 @@
     </div>
     <div id="title-salvage"></div>
     <div id="title-memorial"></div>
-    <div class="title-foot">WASD move &nbsp;·&nbsp; CLICK attack / target &nbsp;·&nbsp; TAB cycle target &nbsp;·&nbsp; 1–4 abilities &nbsp;·&nbsp; Z X C wards &nbsp;·&nbsp; SPACE boost / drift &nbsp;·&nbsp; SHIFT special / nitro &nbsp;·&nbsp; T transform &nbsp;·&nbsp; K skill tree</div>
+    <div class="title-foot">WASD move &nbsp;·&nbsp; CLICK attack / target &nbsp;·&nbsp; TAB cycle target &nbsp;·&nbsp; 1–4 abilities &nbsp;·&nbsp; Z X C wards &nbsp;·&nbsp; SPACE boost / drift &nbsp;·&nbsp; SHIFT special / nitro &nbsp;·&nbsp; T transform &nbsp;·&nbsp; V camera &nbsp;·&nbsp; G race item &nbsp;·&nbsp; K skill tree</div>
   </div>
 
   <!-- ===================== PLAYER SELECT ===================== -->
@@ -148,6 +149,15 @@
     <h2 class="select-title">HANGAR</h2>
     <div id="hub-cards"></div>
     <button id="btn-hub-back" class="menu-btn tiny back-btn">◄ BACK</button>
+  </div>
+
+  <!-- ===================== FACTIONS ===================== -->
+  <div id="factions-screen" class="screen hidden">
+    <h2 class="select-title">THE&nbsp;HOUSES</h2>
+    <div id="fac-head"></div>
+    <div id="fac-cards"></div>
+    <div id="fac-banner"></div>
+    <button id="btn-fac-back" class="menu-btn tiny back-btn">◄ BACK</button>
   </div>
 
   <!-- ===================== SAVE CODE ===================== -->
@@ -261,6 +271,7 @@
 <script src="js/terrain.js"></script>
 <script src="js/atmos.js"></script>
 <script src="js/structures.js"></script>
+<script src="js/factions.js"></script>
 <script src="js/mechs.js"></script>
 <script src="js/meta.js"></script>
 <script src="js/upgrades.js"></script>

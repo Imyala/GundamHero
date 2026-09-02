@@ -152,3 +152,37 @@ turrets), Eye Cluster (three-way spread), Masked Slinger, Hab Brute, Warden Knig
 Carrion Kite, Glow Mite, Tunnel Maw, Fungal Shambler, Aether Ray, Cloud Wisp. New behaviours:
 slammer, turret, caller, latcher (snares on contact), spread volleys. Spawns search for open ground,
 never inside rock, a building, or over the sky.
+
+---
+
+## Round three: the recommendation list and the houses
+
+- **Chase camera** (default; V toggles the tactical top-down view). Behind the frame at 10 units,
+  behind a vehicle at 13 to 20 with speed, riding over hills. In frame form the mouse's offset from
+  centre turns you and a centre crosshair aims; WASD is view-relative. In vehicle form the camera
+  follows the heading and WASD steers. Sky islands and hive spires are now something you look up at.
+- **Transform mid-race.** T works during a race; a walker on the circuit gets race servos (150%
+  stride, double boost regen), so hairpins can be run on foot and jumps still need the vehicle.
+- **The weapon economy is back.** Dungeon caches, bosses and a quarter of elites hand out a choice
+  of three weapon cards from the thirteen secondaries; classic mode deals cards every third wave.
+  Secondaries persist through expedition saves at their levels and sockets.
+- **Counters.** Shooting a buried Sand Maw's plume forces it up; a diving drake takes ×1.5; a
+  turret takes ×1.8 while it recharges after a burst; a marked phantom cannot blink; killing a
+  Howler drops the pack it called; a dash throws leeches and skitters off you.
+- **Zone events**, once per visit to a built territory, after 40 to 75 seconds: LOCKDOWN (hive),
+  SIEGE (keep), AWAKENING (ruins), CAVE-IN (warrens, rifts open), GALE (sky, wind shoves vehicles).
+  Two or three waves, a salvage purse for weathering it.
+- **Minimap** draws streets, walls, towers, caverns, tunnels, islands and bridges.
+- **Vehicle variety.** Bike (fang, viper, strix): fast, loose, jumps high. Hover-tank (aegis,
+  vulcan, titan): slow, planted, rams hard. Disc (hexen, morrow): hovers over sand, snow and water,
+  never bogs. Each has its own hull.
+- **Kart items.** Item pads on every circuit hand out a shield (6 s), a mine dropped behind you, a
+  seeker that hunts the leading rival, or a full bottle. G uses the item.
+- **Audio.** Five new generative songs and a looping ambient bed per territory: wind, rain, embers,
+  cavern drips, city hum.
+- **Save migration.** A pilot restored onto a wall, rock or sky steps to open ground.
+- **The houses** (`js/factions.js`, hangar → THE HOUSES): five houses with seats, creeds, doctrines,
+  troops, favoured parts and circuits. Regard from −100 to 100 moves with deeds and troop kills;
+  allied patrols keep the peace, hostile patrols hunt you from twice the range with a fifth more
+  bite. Pledge at 40; a rival pledge is betrayal and leaves a stain that deeds wear down. Raise
+  your own banner after ten dungeons or two houses at 60; take a seat with three territories held.

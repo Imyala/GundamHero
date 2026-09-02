@@ -28,7 +28,12 @@ GH.music = (function () {
     cloister:{ root: 82.4, bpm: 100, seed: 41, dense: 0.55, padGain: 0.10, drum: true },
     ember:   { root: 65.4, bpm: 116, seed: 51, dense: 0.62, padGain: 0.08, drum: true },
     storm:   { root: 61.7, bpm: 122, seed: 61, dense: 0.6, padGain: 0.09, drum: true },
-    null:    { root: 92.5, bpm: 70, seed: 71, dense: 0.32, padGain: 0.15, drum: true }
+    null:    { root: 92.5, bpm: 70, seed: 71, dense: 0.32, padGain: 0.15, drum: true },
+    hive:    { root: 58.3, bpm: 128, seed: 81, dense: 0.66, padGain: 0.07, drum: true },
+    ruins:   { root: 77.8, bpm: 78, seed: 91, dense: 0.36, padGain: 0.16, drum: true },
+    keep:    { root: 69.3, bpm: 104, seed: 101, dense: 0.5, padGain: 0.11, drum: true },
+    warrens: { root: 49.0, bpm: 88, seed: 111, dense: 0.3, padGain: 0.14, drum: true },
+    sky:     { root: 98.0, bpm: 92, seed: 121, dense: 0.45, padGain: 0.18, drum: true }
   };
 
   var arpPattern = [], bassPattern = [];

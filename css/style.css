@@ -973,3 +973,29 @@ html, body {
   background: rgba(0,0,0,0.5);
 }
 #mute-btn.off { color: #444; text-decoration: line-through; }
+
+/* ---- 28. factions ---- */
+#fac-head { text-align: center; color: #d8d0b8; letter-spacing: .08em; margin: 6px 0 14px; font-size: 14px; }
+#fac-cards { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 10px; max-width: 1180px; margin: 0 auto; }
+@media (max-width: 1000px) { #fac-cards { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+.fac-card { background: rgba(10, 14, 30, .85); border: 1px solid #3a4468; padding: 10px 12px; text-align: left; font-size: 12px; color: #c8c8d8; }
+.fac-card.pledged { border-color: #f0d060; box-shadow: 0 0 12px rgba(240, 208, 96, .25); }
+.fac-card.hostile { border-color: #b03030; }
+.fac-name { font-family: 'Times New Roman', serif; font-size: 15px; letter-spacing: .06em; color: #f0e8c8; }
+.fac-creed { color: #8890a8; font-style: italic; margin: 2px 0 6px; }
+.fac-bar { position: relative; height: 8px; background: #1a1e30; border: 1px solid #3a4468; margin: 6px 0; }
+.fac-bar .fb-zero { position: absolute; left: 50%; top: -2px; width: 1px; height: 12px; background: #6a7090; }
+.fac-bar .fb-fill { position: absolute; top: 0; height: 100%; background: #60c8ff; }
+.fac-bar .fb-fill.neg { background: #c04040; }
+.fac-line { margin: 3px 0; }
+.fac-line b { color: #f0e8c8; }
+.fac-btn { display: inline-block; margin-top: 6px; padding: 4px 10px; border: 1px solid #6a7090; color: #e8e8f0; cursor: pointer; letter-spacing: .08em; font-size: 11px; }
+.fac-btn:hover { border-color: #f0d060; color: #f0d060; }
+.fac-btn.off { opacity: .45; cursor: default; }
+#fac-banner { max-width: 760px; margin: 14px auto 0; background: rgba(10, 14, 30, .85); border: 1px solid #3a4468; padding: 12px 16px; font-size: 13px; color: #c8c8d8; text-align: left; }
+#fac-banner input, #fac-banner select { background: #0c1020; color: #f0e8c8; border: 1px solid #3a4468; padding: 4px 8px; margin: 4px 6px 4px 0; font-family: inherit; }
+#crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; pointer-events: none; z-index: 5;
+  border: 1px solid rgba(240, 240, 255, .6); border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
+#crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(240, 240, 255, .7); }
+#crosshair::before { left: 50%; top: -6px; width: 1px; height: 6px; }
+#crosshair::after { left: -6px; top: 50%; width: 6px; height: 1px; }
