@@ -140,7 +140,8 @@ html, body {
 .dmg-num.elem   { color: #90d8ff; }
 .dmg-num.dot    { color: #ff9040; }
 
-/* CRT scanline overlay (toggle with F) */
+/* CRT fallback overlay: only shown when the WebGL CRT pass (js/crt.js)
+   can't run; toggled with the CRT filter setting / H key */
 #crt-overlay {
   position: absolute; inset: 0;
   pointer-events: none;

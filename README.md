@@ -39,6 +39,7 @@ MMO-style: **W/S** walk, **A/D** turn, **Q/E** strafe, **hold RIGHT MOUSE** to l
 **LEFT CLICK** attacks and marks a target, **TAB** cycles targets, **1–4** abilities, **Z/X/C** wards,
 **SPACE** boost / drift, **SHIFT** special / nitro, **T** transform (W throttle, S brake, A/D steer),
 **F** interact, **V** tactical camera, **K** training, **M** map, **P** pilot sheet, **ESC** pause / close any menu.
+**H** toggles the CRT shader (scanlines, phosphor mask, glow, curve); pick Subtle or Strong under CONTROLS.
 
 ## The 135 frames
 

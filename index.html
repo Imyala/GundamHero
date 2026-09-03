@@ -318,7 +318,8 @@
         <label class="ct-set">Mouse look sensitivity <input type="range" id="set-sens" min="20" max="300" step="10"> <span id="set-sens-val">100%</span></label>
         <label class="ct-set"><input type="checkbox" id="set-invert"> Invert vertical look</label>
         <label class="ct-set">Camera <select id="set-cam"><option value="chase">Chase (MMO)</option><option value="top">Tactical (top-down)</option></select></label>
-        <label class="ct-set"><input type="checkbox" id="set-crt"> CRT scanline filter</label>
+        <label class="ct-set"><input type="checkbox" id="set-crt"> CRT shader (scanlines, phosphor mask, glow, curve)</label>
+        <label class="ct-set">CRT strength <select id="set-crt-level"><option value="subtle">Subtle</option><option value="strong">Strong</option></select></label>
         <label class="ct-set"><input type="checkbox" id="set-mute"> Mute sound</label>
         <label class="ct-set">Music volume <input type="range" id="set-music" min="0" max="100" step="5"> <span id="set-music-val"></span></label>
         <label class="ct-set">Effects volume <input type="range" id="set-sfx" min="0" max="100" step="5"> <span id="set-sfx-val"></span></label>
@@ -387,6 +388,7 @@
 <script src="js/world.js"></script>
 <script src="js/race.js"></script>
 <script src="js/game.js"></script>
+<script src="js/crt.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

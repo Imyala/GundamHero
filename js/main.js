@@ -33,6 +33,7 @@
     resize();
     window.addEventListener('resize', resize);
 
+    GH.crt.onFail = applySettings;
     applySettings();
     bindInput();
     bindUI();
@@ -44,7 +45,14 @@
   function resize() {
     var w = window.innerWidth, h = window.innerHeight;
     var rw = Math.max(2, Math.floor(w / PIXEL_SCALE)), rh = Math.max(2, Math.floor(h / PIXEL_SCALE));
-    renderer.setSize(rw, rh, false);
+    if (GH.crt.active()) {
+      // the scene renders into a low-res texture; the CRT pass draws it at
+      // canvas resolution so scanlines and the phosphor mask land on real pixels
+      renderer.setSize(w, h, false);
+      GH.crt.resize(rw, rh, w, h);
+    } else {
+      renderer.setSize(rw, rh, false);
+    }
     GH.assets.setSnap(rw, rh);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
@@ -56,7 +64,10 @@
   // settings that live outside the pilot profile (CRT filter, camera)
   function applySettings() {
     var st = GH.controls.settings;
-    document.getElementById('crt-overlay').classList.toggle('off', !st.crt);
+    GH.crt.setLevel(st.crtLevel || 'subtle');
+    var shader = GH.crt.setEnabled(!!st.crt);
+    document.getElementById('crt-overlay').classList.toggle('off', !st.crt || shader);
+    resize();
     GH.music.setVolume(0.12 * (st.music === undefined ? 1 : st.music));
     GH.audio.setVolume(0.25 * (st.sfx === undefined ? 1 : st.sfx));
   }
@@ -1911,6 +1922,7 @@
     document.getElementById('set-sens-val').textContent = Math.round(st.sens * 100) + '%';
     document.getElementById('set-invert').checked = !!st.invertY;
     document.getElementById('set-crt').checked = !!st.crt;
+    document.getElementById('set-crt-level').value = st.crtLevel || 'subtle';
     document.getElementById('set-cam').value = GH.game.camMode();
     document.getElementById('set-mute').checked = GH.audio.isMuted();
     document.getElementById('set-music').value = Math.round((st.music === undefined ? 1 : st.music) * 100);
@@ -2089,6 +2101,7 @@
     };
     byId('set-invert').onchange = function () { GH.controls.settings.invertY = this.checked; GH.controls.save(); };
     byId('set-crt').onchange = function () { GH.controls.settings.crt = this.checked; GH.controls.save(); applySettings(); };
+    byId('set-crt-level').onchange = function () { GH.controls.settings.crtLevel = this.value; GH.controls.save(); applySettings(); };
     byId('set-cam').onchange = function () { GH.game.setCamMode(this.value); };
     byId('set-music').oninput = function () {
       GH.controls.settings.music = parseInt(this.value, 10) / 100;
@@ -2223,7 +2236,7 @@
         GH.game.state !== 'play' && GH.game.state !== 'race');
     }
     GH.game.update(dt, input, window.innerWidth, window.innerHeight);
-    renderer.render(GH.game.scene(), GH.game.camera());
+    GH.crt.render(renderer, GH.game.scene(), GH.game.camera());
     wsTick(dt);
   }
 
