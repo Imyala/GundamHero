@@ -81,6 +81,11 @@ higher off crests and keeps burning in the air. The Reach has zone diaries (WORL
 From the pause menu: **EXIT RUN** saves (the Reach keeps your pilot; an arena climb is parked at its current
 wave and offered as CONTINUE RUN on the title), **NEW RUN** or **ABANDON RUN** delete it after a confirm.
 
+## Play online
+
+The latest `main` is deployed by GitHub Pages at <https://imyala.github.io/StaalReus/>. Bug reports and feedback:
+<https://github.com/Imyala/StaalReus/issues> (also linked from the title screen).
+
 ## Play Locally
 
 No complex setup required.
