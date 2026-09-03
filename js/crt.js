@@ -13,7 +13,7 @@ GH.crt = (function () {
 
   var LEVELS = {
     // maskType 0: two-phase magenta/green grille (soft), 1: full RGB aperture grille
-    subtle: { curve: 0.025, scan: 0.40, mask: 0.12, maskType: 0, glow: 0.08, aberr: 0.15, vig: 0.08 },
+    subtle: { curve: 0.025, scan: 0.40, mask: 0.12, maskType: 0, glow: 0.05, aberr: 0.10, vig: 0.08 },
     strong: { curve: 0.06, scan: 0.80, mask: 0.35, maskType: 1, glow: 0.20, aberr: 0.60, vig: 0.16 }
   };
   var level = 'subtle';
@@ -47,13 +47,9 @@ GH.crt = (function () {
     '  return uv * 0.5 + 0.5;',
     '}',
     '',
-    // one source row, sampled "sharp bilinear": texel steps horizontally with a
-    // one-output-pixel blend at each edge (phosphor smear, not razor pixels)
+    // one source texel, point-sampled: the low-res pixels stay razor sharp
     'vec3 tap(float x, float rowV) {',
-    '  float fx = fract(x);',
-    '  float sharp = uOut.x / uSrc.x;',
-    '  float sx = clamp((fx - 0.5) * sharp + 0.5, 0.0, 1.0);',
-    '  return texture2D(tDiffuse, vec2((floor(x) + sx) / uSrc.x, rowV)).rgb;',
+    '  return texture2D(tDiffuse, vec2((floor(x) + 0.5) / uSrc.x, rowV)).rgb;',
     '}',
     '',
     // colour fringing that grows toward the edges of the tube
@@ -69,13 +65,14 @@ GH.crt = (function () {
     '',
     'float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }',
     '',
-    // beam profile: gaussian across the row, fatter for bright pixels so
-    // highlights stay bright and dark areas get the deepest gaps. `box` is
-    // the plain nearest-row weight the gaussian blends against.
-    'float beam(float d, float l, float box) {',
-    '  float w = mix(0.22, 0.34, l);',
+    // beam profile: gaussian falloff from the row centre (d = 0) to the row
+    // boundary (d = 0.5), fatter for bright pixels so highlights stay bright
+    // and dark areas get the deepest gaps. Only the nearest row is drawn, so
+    // vertical edges stay as hard as the horizontal ones.
+    'float beam(float d, float l) {',
+    '  float w = mix(0.24, 0.36, l);',
     '  float g = exp(-d * d / (2.0 * w * w));',
-    '  return mix(box, g, uScan);',
+    '  return mix(1.0, g, uScan);',
     '}',
     '',
     'void main() {',
@@ -85,17 +82,10 @@ GH.crt = (function () {
     '',
     '  float px = uv.x * uSrc.x;',
     '  float ab = uAberr * (uv.x - 0.5) * 2.0;',
-    '  float py = uv.y * uSrc.y - 0.5;',
-    '  float r0 = floor(py);',
-    '  float d0 = py - r0;',
-    '  vec3 c0 = rowRGB(px, r0, ab);',
-    '  vec3 c1 = rowRGB(px, r0 + 1.0, ab);',
-    // nearest-row weights are complements of one step, so they always sum to
-    // one: an output row sitting exactly on the boundary used to get neither
-    // row and drew a black line (full width at the screen's vertical centre)
-    '  float b1 = step(0.5, d0);',
-    '  float b0 = 1.0 - b1;',
-    '  vec3 col = c0 * beam(d0, luma(c0), b0) + c1 * beam(1.0 - d0, luma(c1), b1);',
+    '  float py = uv.y * uSrc.y;',
+    '  float d = abs(fract(py) - 0.5);',
+    '  vec3 c = rowRGB(px, floor(py), ab);',
+    '  vec3 col = c * beam(d, luma(c));',
     '',
     // halation: bright pixels bleed a soft glow into their neighbours
     '  vec2 t = 1.5 / uSrc;',
@@ -151,7 +141,7 @@ GH.crt = (function () {
     uniforms.uMaskType.value = L.maskType;
     // gain roughly restores mid-tone brightness lost to the gaps and the mask,
     // held a little under 1:1 so highlights keep their contrast
-    var scanAvg = 1.0 - 0.28 * L.scan;
+    var scanAvg = 1.0 - 0.32 * L.scan;
     var maskAvg = L.maskType ? 1.0 - L.mask * 2 / 3 : 1.0 - L.mask / 2;
     uniforms.uGain.value = 0.92 / (scanAvg * maskAvg);
   }

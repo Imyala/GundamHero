@@ -56,13 +56,17 @@
       renderer.setSize(dw, dh, false);
       GH.crt.resize(rw, rh, dw, dh);
       canvas.style.imageRendering = 'auto';
+      // CSS size chosen so it maps 1:1 onto device pixels (may be fractional
+      // CSS px); any mismatch would make the browser resample and blur it
+      canvas.style.width = (dw / dpr) + 'px';
+      canvas.style.height = (dh / dpr) + 'px';
     } else {
       renderer.setSize(rw, rh, false);
       canvas.style.imageRendering = '';
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
     }
     GH.assets.setSnap(rw, rh);
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
     var cam = GH.game.camera();
     cam.aspect = w / h;
     cam.updateProjectionMatrix();
