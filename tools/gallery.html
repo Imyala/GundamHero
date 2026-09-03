@@ -33,7 +33,8 @@
 <script src="../js/worldlife.js"></script>
 <script>
 // Renders every frame and vehicle to its own thumbnail so silhouettes can
-// be checked side by side. ?what=frames|vehicles|base  ?size=150
+// be checked side by side. ?what=frames|vehicles|base  ?size=150  ?pose=aim
+// (pose=aim raises the arms the way the game does for a ranged frame)
 (function () {
   var q = new URLSearchParams(location.search);
   var what = q.get('what') || 'base';
@@ -64,6 +65,10 @@
   var wrap = document.getElementById('wrap');
   list.forEach(function (it) {
     var g = it.build();
+    if (q.get('pose') === 'aim' && g.userData.parts && g.userData.parts.armR) {
+      g.userData.parts.armR.rotation.x = -1.35;
+      GH.models.aimMounts(g.userData.parts, true);
+    }
     g.rotation.y = it.veh ? -0.7 : 0.5;
     scene.add(g);
     if (it.veh) { cam.position.set(3.2, 2.6, 4.2); cam.lookAt(0, 0.8, 0); }

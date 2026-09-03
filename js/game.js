@@ -4000,8 +4000,10 @@ GH.game = (function () {
     parts.legR.rotation.x = -sw;
     parts.torso.position.y = 1.72 + Math.abs(Math.sin(t)) * (moving ? 0.06 : 0.02);
     if (!poseMeleeSwing(player, parts, dt)) {
-      if (parts.armR && player.def.weapon.type !== 'melee') parts.armR.rotation.x = -1.35;
+      var aimingP = player.def.weapon.type !== 'melee';
+      if (parts.armR && aimingP) parts.armR.rotation.x = -1.35;
       else if (parts.armR) parts.armR.rotation.x = GH.lerp(parts.armR.rotation.x, -0.2, dt * 6);
+      GH.models.aimMounts(parts, aimingP);
       if (parts.armL) {
         if (player.def.model.prop === 'guns') parts.armL.rotation.x = -1.35;
         else if (player.def.model.prop === 'claws' || player.def.model.prop === 'daggers')
@@ -6979,8 +6981,10 @@ GH.game = (function () {
     parts.legL.rotation.x = sw;
     parts.legR.rotation.x = -sw;
     if (!poseMeleeSwing(mate, parts, dt)) {
-      if (parts.armR && mate.def.weapon.type !== 'melee') parts.armR.rotation.x = -1.35;
+      var aimingM = mate.def.weapon.type !== 'melee';
+      if (parts.armR && aimingM) parts.armR.rotation.x = -1.35;
       else if (parts.armR) parts.armR.rotation.x = GH.lerp(parts.armR.rotation.x, -0.2, dt * 6);
+      GH.models.aimMounts(parts, aimingM);
       if (parts.torso) parts.torso.rotation.y = GH.lerp(parts.torso.rotation.y, 0, dt * 8);
     }
     if (parts.flames) {

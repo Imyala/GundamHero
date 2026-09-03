@@ -355,8 +355,38 @@ GH.models = (function () {
     }
   }
 
+  // Held weapons hang off a mount group at the fist. The mount carries two
+  // orientations: REST (hangar, select screen, gallery, corrupt bosses —
+  // the arm hangs and the weapon reads as a silhouette) and AIM (the game
+  // raises a ranged frame's arm straight forward, and the mount swings the
+  // weapon to run along the arm so it points where the arm points instead
+  // of skyward or back through the pauldron). Anything long is offset to
+  // the outside of the fist and leaned outward so it clears the forearm
+  // and shoulder pad in both poses.
+  function mountAt(arm, parts, weapon, x, y, z, o) {
+    o = o || {};
+    var m = new THREE.Group();
+    m.position.set(x, y, z);
+    m.rotation.set(o.rest || 0, 0, o.tilt || 0);
+    m.userData.rest = o.rest || 0;
+    m.userData.aim = o.aim === undefined ? (o.rest || 0) : o.aim;
+    m.add(weapon);
+    arm.add(m);
+    if (!parts.mounts) parts.mounts = [];
+    parts.mounts.push(m);
+    return m;
+  }
+  M.aimMounts = function (parts, aiming) {
+    if (!parts || !parts.mounts) return;
+    for (var i = 0; i < parts.mounts.length; i++) {
+      var m = parts.mounts[i];
+      m.rotation.x = aiming ? m.userData.aim : m.userData.rest;
+    }
+  };
+
   function addProp(prop, parts, accent, trim) {
     var armL = parts.armL, armR = parts.armR;
+    var FIST = -0.88;
     if (prop === 'sword') {
       var sword = new THREE.Group();
       var blade = box(0.12, 1.7, 0.3, 0xd8dce8); blade.position.y = 1.05;
@@ -364,9 +394,8 @@ GH.models = (function () {
       var guard = box(0.4, 0.1, 0.4, accent); guard.position.y = 0.18;
       var grip = box(0.1, 0.34, 0.1, 0x503820); grip.position.y = -0.04;
       sword.add(blade, edge, guard, grip);
-      sword.position.set(0.08, -0.88, 0.2);
-      sword.rotation.x = 0.35; // resting cant so the blade clears the pauldron
-      armR.add(sword);
+      // resting cant so the blade clears the pauldron
+      mountAt(armR, parts, sword, 0.08, FIST, 0.2, { rest: 0.35 });
       parts.weapon = sword;
       // forearm heater shield: small, outboard, riding the left forearm
       var shield = new THREE.Group();
@@ -381,6 +410,9 @@ GH.models = (function () {
       armL.add(shield);
       parts.shield = shield;
     } else if (prop === 'guns') {
+      // gauntlet autocannons: barrels run forward off the forearm at rest;
+      // when the arms come up to fire, the mount turns them to run along
+      // the arm so they fire down the line of the arm, not at the sky
       [armL, armR].forEach(function (arm) {
         var gun = new THREE.Group();
         var housing = box(0.24, 0.26, 0.5, 0x383840); housing.position.set(0, 0, 0.15);
@@ -388,8 +420,6 @@ GH.models = (function () {
         var barrel2 = box(0.1, 0.1, 0.8, 0x1c1c22); barrel2.position.set(0.05, -0.04, 0.7);
         var muzzle = box(0.24, 0.24, 0.1, accent); muzzle.position.set(0, 0, 1.05);
         gun.add(housing, barrel, barrel2, muzzle);
-        gun.position.set(0, -0.88, 0.1);
-        arm.add(gun);
         if (!parts.muzzles) parts.muzzles = [];
         var mz = new THREE.Sprite(new THREE.SpriteMaterial({
           map: GH.assets.flashTex, transparent: true, depthWrite: false
@@ -399,28 +429,33 @@ GH.models = (function () {
         mz.visible = false;
         gun.add(mz);
         parts.muzzles.push(mz);
+        mountAt(arm, parts, gun, 0, FIST, 0.1, { rest: 0, aim: Math.PI / 2 });
       });
       parts.weapon = armR;
     } else if (prop === 'staff') {
+      // held by the middle at the outside of the fist, gem up at rest;
+      // flipped gem-forward when the arm comes up to cast
       var staff = new THREE.Group();
       var pole = box(0.1, 2.1, 0.1, 0x403050); pole.position.y = 0.45;
       var cage = box(0.3, 0.34, 0.3, trim); cage.position.y = 1.5;
       var gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.3),
         mat(accent, { emissive: accent, emissiveIntensity: 0.7 }));
       gem.position.y = 1.52;
-      staff.add(pole, cage, gem);
-      staff.position.set(0, -0.88, 0.12);
-      armR.add(staff);
+      var wrap = box(0.24, 0.2, 0.28, trim); wrap.position.set(-0.08, 0, -0.1);
+      staff.add(pole, cage, gem, wrap);
+      mountAt(armR, parts, staff, 0.16, FIST, 0.22, { rest: 0, aim: Math.PI, tilt: -0.2 });
       parts.weapon = staff; parts.gem = gem;
     } else if (prop === 'scythe') {
+      // pole up at the outside of the fist at rest, blade over the head;
+      // flipped to run out past the fist when raised, then spun by the game
       var scy = new THREE.Group();
       var pole2 = box(0.1, 2.3, 0.1, 0x22222a); pole2.position.y = 0.55;
       var neck = box(0.16, 0.16, 0.3, accent); neck.position.set(0.07, 1.65, 0);
       var bladeArm = box(0.95, 0.12, 0.24, 0xc8ccd8); bladeArm.position.set(0.5, 1.65, 0);
       var tip = box(0.4, 0.1, 0.18, 0xdfe4f0); tip.position.set(1.0, 1.5, 0); tip.rotation.z = -0.75;
-      scy.add(pole2, neck, bladeArm, tip);
-      scy.position.set(0, -0.88, 0.12);
-      armR.add(scy);
+      var wrap2 = box(0.24, 0.2, 0.28, trim); wrap2.position.set(-0.08, 0, -0.1);
+      scy.add(pole2, neck, bladeArm, tip, wrap2);
+      mountAt(armR, parts, scy, 0.16, FIST, 0.22, { rest: 0, aim: Math.PI, tilt: -0.25 });
       parts.weapon = scy;
     } else if (prop === 'lance') {
       var lance = new THREE.Group();
@@ -431,8 +466,7 @@ GH.models = (function () {
         mat(accent, { emissive: accent, emissiveIntensity: 0.5 }));
       point.rotation.x = Math.PI / 2; point.position.z = 1.95;
       lance.add(shaft, coil1, coil2, point);
-      lance.position.set(0, -0.88, 0);
-      armR.add(lance);
+      mountAt(armR, parts, lance, 0, FIST, 0, { rest: 0 });
       parts.weapon = lance;
     } else if (prop === 'claws') {
       [armL, armR].forEach(function (arm) {
@@ -445,30 +479,39 @@ GH.models = (function () {
         }
         var wrist = box(0.28, 0.2, 0.2, accent);
         claw.add(wrist);
-        claw.position.set(0, -0.9, 0.15);
-        arm.add(claw);
+        mountAt(arm, parts, claw, 0, -0.9, 0.15, { rest: 0 });
       });
       parts.weapon = armR;
     } else if (prop === 'daggers') {
+      // forward grip: hilt in the fist, blade out past the knuckles and
+      // hanging beside the leg at rest, sweeping forward in the flurry
       [armL, armR].forEach(function (arm) {
         var dg = new THREE.Group();
-        var bladeD = box(0.07, 0.55, 0.16, 0xe8ecf8); bladeD.position.y = -0.3;
-        var hilt = box(0.2, 0.07, 0.2, accent); hilt.position.y = 0;
-        dg.add(bladeD, hilt);
-        dg.rotation.x = Math.PI;
-        dg.position.set(0, -0.95, 0.14);
-        arm.add(dg);
+        var hilt = box(0.1, 0.28, 0.1, 0x2a2a30); hilt.position.y = 0.02;
+        var guard = box(0.24, 0.06, 0.2, accent); guard.position.y = -0.14;
+        var bladeD = box(0.07, 0.72, 0.16, 0xe8ecf8); bladeD.position.y = -0.53;
+        var bladeEdge = box(0.04, 0.72, 0.19, 0xf6f8ff); bladeEdge.position.y = -0.53;
+        dg.add(hilt, guard, bladeD, bladeEdge);
+        mountAt(arm, parts, dg, 0, FIST, 0.04, { rest: 0 });
       });
       parts.weapon = armR;
     } else if (prop === 'mortar') {
+      // siege mortar on a pylon over the right shoulder, breech clear of
+      // the pauldron, firing up and over the head instead of through it
       var tube = new THREE.Group();
-      var barrel3 = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 1.3, 7), mat(0x3a4048));
-      barrel3.rotation.x = Math.PI / 2 - 0.5;
-      barrel3.position.set(0, 0.3, 0.3);
-      var baseP = box(0.5, 0.3, 0.5, accent); baseP.position.y = -0.05;
-      tube.add(barrel3, baseP);
-      tube.position.set(0, 0.62, -0.15);
-      parts.torso.add(tube);
+      var barrel3 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 1.1, 7), mat(0x3a4048));
+      barrel3.rotation.x = Math.PI / 2 - 0.9;
+      barrel3.position.set(0, 0.35, 0.2);
+      var band = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.12, 7), mat(accent));
+      band.rotation.x = Math.PI / 2 - 0.9;
+      band.position.set(0, 0.62, 0.42);
+      var baseP = box(0.5, 0.28, 0.5, accent); baseP.position.y = 0;
+      var yoke = box(0.16, 0.2, 0.36, 0x2a3038); yoke.position.set(0, 0.2, 0.05);
+      tube.add(barrel3, band, baseP, yoke);
+      tube.position.set(0.8, 1.3, -0.25);
+      var strut = box(0.22, 0.7, 0.22, 0x2a3038); strut.position.set(0.8, 0.9, -0.5);
+      var beam = box(0.62, 0.16, 0.2, trim); beam.position.set(0.5, 0.65, -0.55);
+      parts.torso.add(tube, strut, beam);
       parts.weapon = tube;
     }
   }
