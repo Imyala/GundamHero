@@ -57,6 +57,7 @@
       <div id="boss-name">???</div>
       <div class="bar-frame boss-frame"><div id="boss-fill" class="bar-fill boss-fill"></div></div>
     </div>
+    <div id="objective" class="hidden"><div id="objective-title">ZERO HOUR</div><div id="objective-text"></div></div>
     <div id="announce" class="hidden"></div>
     <div id="hint-line" class="hidden"></div>
     <div id="interact-line" class="hidden"></div>
@@ -84,6 +85,8 @@
     <h1 class="game-title">HERO&nbsp;FRAME</h1>
     <div class="title-sub">A MECH ARENA SURVIVOR</div>
     <div class="title-menu">
+      <button id="btn-play-first" class="menu-btn hidden">PLAY — ZERO HOUR</button>
+      <div id="first-desc" class="menu-desc hidden">Your first sortie: ten guided minutes that teach the controls, the vehicle, and the workshop.</div>
       <button id="btn-continue" class="menu-btn small continue-btn hidden">CONTINUE RUN</button>
       <button id="btn-expedition" class="menu-btn">THE SHATTERED REACH</button>
       <div id="exp-desc" class="menu-desc"></div>
@@ -98,13 +101,16 @@
         <button id="btn-title-pilot" class="menu-btn small">PILOT</button>
         <button id="btn-title-controls" class="menu-btn small">CONTROLS</button>
         <button id="btn-title-help" class="menu-btn small">HOW TO PLAY</button>
+        <button id="btn-tutorial" class="menu-btn tiny">REPLAY ZERO HOUR</button>
         <button id="btn-profile" class="menu-btn tiny profile-btn">PROFILE: STANDARD</button>
       </div>
+      <div id="backup-nudge" class="menu-desc hidden"></div>
       <div class="menu-desc">HANGAR: build frames, train your pilot, devotions, contracts, collection · PILOT: your character sheet &amp; inventory</div>
     </div>
     <div id="title-salvage"></div>
     <div id="title-memorial"></div>
     <div id="title-foot" class="title-foot"></div>
+    <div id="title-version"></div>
   </div>
 
   <!-- ===================== PLAYER SELECT ===================== -->
@@ -138,6 +144,7 @@
   <!-- ===================== WEEKLY CHALLENGE ===================== -->
   <div id="weekly-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-weekly-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">WEEKLY&nbsp;CHALLENGE</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">One fixed frame, stage and set of modifiers for everyone this week. Compare your best wave with friends.</div>
     <div id="weekly-brief"></div>
     <button id="btn-weekly-go" class="menu-btn">DEPLOY</button>
   </div>
@@ -145,14 +152,15 @@
   <!-- ===================== STAGE SELECT ===================== -->
   <div id="stage-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-stage-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;&nbsp;SELECT</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Pick a stage. CLASSIC ends on a wave-20 boss that pays a frame or blueprint data and opens the next stage. ARENA never ends.</div>
     <div id="stage-list"></div>
   </div>
 
   <!-- ===================== HANGAR / DEVOTIONS ===================== -->
   <div id="hangar-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">DEVOTIONS</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Spend SALVAGE on permanent paths. Each rank is a small stat you keep forever; the ACTIVE path also grows every level-up in a run. Why: this is the cheapest permanent power in the game.</div>
     <div id="hangar-salvage"></div>
-    <div id="hangar-note">Spend salvage on permanent paths. The ACTIVE path also grows every level-up in a run.</div>
     <div id="devotion-list"></div>
   </div>
 
@@ -165,6 +173,7 @@
   <!-- ===================== FACTIONS ===================== -->
   <div id="factions-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-fac-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;HOUSES</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Five houses rule the Reach. Contracts, dungeon clears and podiums in their lands raise your standing; killing their troops lowers it. Why: a pledge gives you a doctrine bonus and, at 40, a seat in their court.</div>
     <div id="fac-head"></div>
     <div id="fac-cards"></div>
     <div id="fac-banner"></div>
@@ -173,17 +182,25 @@
   <!-- ===================== SAVE CODE ===================== -->
   <div id="save-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-save-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">SAVE&nbsp;CODE</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Your progress lives in this browser. Back it up: copy the code or download the file, and keep it somewhere safe. Restore from a code, a file, or one of the automatic backups below.</div>
     <div class="save-note">Your progress lives in this browser. Copy this code somewhere safe, or paste one to restore.</div>
     <textarea id="save-export" readonly spellcheck="false"></textarea>
     <button id="btn-save-copy" class="menu-btn small">COPY CODE</button>
     <textarea id="save-import" placeholder="paste a save code here…" spellcheck="false"></textarea>
     <button id="btn-save-import" class="menu-btn small">IMPORT</button>
+    <div class="title-row">
+      <button id="btn-save-file" class="menu-btn small">⬇ DOWNLOAD SAVE FILE</button>
+      <button id="btn-load-file" class="menu-btn small">⬆ LOAD SAVE FILE</button>
+      <input type="file" id="save-file-input" accept=".json,.txt" class="gone">
+    </div>
     <div id="save-feedback"></div>
+    <div id="save-backups"></div>
   </div>
 
   <!-- ===================== RELIC SEASON ===================== -->
   <div id="season-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-season-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">RELIC&nbsp;SEASON</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">A month-long ladder of tasks. Points unlock RELICS: run-wide modifiers with a real downside. Why: relics are the strongest optional power, and they reset each season.</div>
     <div id="season-head"></div>
     <div id="season-meter"></div>
     <div id="season-relics"></div>
@@ -194,6 +211,7 @@
   <!-- ===================== BROKER ===================== -->
   <div id="broker-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-broker-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;BROKER</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Today\'s DAILY TASKS pay alloy and cores; a CONTRACT is a slayer-style hunt that pays salvage and broker points. Why: points buy permanent contract perks below.</div>
     <div id="broker-status"></div>
     <div id="broker-daily"></div>
     <div id="broker-contract"></div>
@@ -203,6 +221,7 @@
   <!-- ===================== COLLECTION LOG ===================== -->
   <div id="collection-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-collection-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">COLLECTION&nbsp;LOG</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Everything you have seen, used and found. Why: ARTIFACTS live here — click one to equip it (one at a time), each is a run-wide perk.</div>
     <div id="log-head"></div>
     <div id="log-body"></div>
   </div>
@@ -210,6 +229,7 @@
   <!-- ===================== WORLD MAP ===================== -->
   <div id="map-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-map-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;SHATTERED&nbsp;REACH</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Every territory, its dungeons, today\'s weather and its DIARY. Why: diary tiers pay alloy and cores, and HARD/ELITE add a permanent perk in that zone.</div>
     <div id="map-head"></div>
     <div id="map-zones"></div>
   </div>
@@ -217,6 +237,7 @@
   <!-- ===================== SKILL TREE ===================== -->
   <div id="skills-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-skills-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">PILOT&nbsp;TRAINING</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Every pilot level pays one point. Spend across three disciplines; deeper rows need points already spent in that discipline. Why: unlocks ability slots 2–4 and permanent stats. Respec costs salvage.</div>
     <div id="skills-head"></div>
     <div id="skills-tree"></div>
     <div class="title-row">
@@ -227,6 +248,7 @@
   <!-- ===================== STAGE TRIALS ===================== -->
   <div id="trials-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-trials-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;TRIALS</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Per-stage challenges for CLASSIC runs. Why: each tier is a permanent perk on that stage (more salvage, XP, damage, gem drops).</div>
     <div id="trials-body"></div>
   </div>
 
@@ -246,6 +268,7 @@
       <button id="btn-pause-controls" class="menu-btn small">CONTROLS</button>
       <button id="btn-pause-help" class="menu-btn small">HOW TO PLAY</button>
     </div>
+    <button id="btn-skip-tutorial" class="menu-btn tiny hidden">SKIP ZERO HOUR</button>
     <button id="btn-exit-run" class="menu-btn small">EXIT RUN — SAVE &amp; RETURN TO MENU</button>
     <div class="title-row">
       <button id="btn-new-run" class="menu-btn tiny">NEW RUN (abandon this one)</button>
@@ -293,6 +316,8 @@
         <label class="ct-set">Camera <select id="set-cam"><option value="chase">Chase (MMO)</option><option value="top">Tactical (top-down)</option></select></label>
         <label class="ct-set"><input type="checkbox" id="set-crt"> CRT scanline filter</label>
         <label class="ct-set"><input type="checkbox" id="set-mute"> Mute sound</label>
+        <label class="ct-set">Music volume <input type="range" id="set-music" min="0" max="100" step="5"> <span id="set-music-val"></span></label>
+        <label class="ct-set">Effects volume <input type="range" id="set-sfx" min="0" max="100" step="5"> <span id="set-sfx-val"></span></label>
         <div class="ct-group">DEFAULT SCHEME</div>
         <div class="ct-note">W/S walk · A/D turn · Q/E strafe · hold RIGHT MOUSE to look · WHEEL zoom · LEFT CLICK attack · 1–4 abilities · Z/X/C wards · SPACE boost · SHIFT special · T transform · F interact · V camera · K training · M map · P pilot</div>
         <button id="btn-controls-reset" class="menu-btn tiny">RESET TO DEFAULTS</button>

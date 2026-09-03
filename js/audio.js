@@ -1,13 +1,13 @@
 // HERO FRAME — tiny procedural WebAudio SFX
 GH.audio = (function () {
-  var ctx = null, master = null, muted = false;
+  var ctx = null, master = null, muted = false, volume = 0.25;
 
   function ensure() {
     if (!ctx) {
       try {
         ctx = new (window.AudioContext || window.webkitAudioContext)();
         master = ctx.createGain();
-        master.gain.value = 0.25;
+        master.gain.value = volume;
         master.connect(ctx.destination);
       } catch (e) { /* audio unavailable */ }
     }
@@ -64,7 +64,18 @@ GH.audio = (function () {
     wave: function () { tone(330, 0.16, 'square', 0.14, 60); setTimeout(function () { tone(440, 0.2, 'square', 0.14, 60); }, 140); },
     boss: function () { tone(70, 0.8, 'sawtooth', 0.3, 25); noise(0.6, 0.22, 500); },
     die: function () { tone(220, 0.6, 'sawtooth', 0.28, -160); noise(0.6, 0.3, 800); },
-    win: function () { [392, 494, 587, 784].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, 'triangle', 0.18, 15); }, i * 160); }); }
+    win: function () { [392, 494, 587, 784].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, 'triangle', 0.18, 15); }, i * 160); }); },
+    // world-life and driving cues
+    turbo: function (tier) {
+      var base = 300 + (tier || 1) * 120;
+      tone(base, 0.18, 'sawtooth', 0.16, base * 1.5); noise(0.25, 0.14, 2600);
+      if (tier >= 3) setTimeout(function () { tone(base * 2, 0.2, 'square', 0.12, 200); }, 90);
+    },
+    vein: function () { noise(0.08, 0.16, 5000); [1100, 1500, 1900].forEach(function (f, i) { setTimeout(function () { tone(f, 0.08, 'sine', 0.12, 80); }, i * 60); }); },
+    signal: function () { [1500, 1500, 2100].forEach(function (f, i) { setTimeout(function () { tone(f, 0.09, 'sine', 0.14, 0); }, i * 130); }); },
+    diary: function () { [523, 659, 784, 1046].forEach(function (f, i) { setTimeout(function () { tone(f, 0.22, 'triangle', 0.16, 10); }, i * 110); }); },
+    step: function () { tone(660, 0.08, 'square', 0.12, 120); setTimeout(function () { tone(990, 0.12, 'square', 0.1, 60); }, 80); },
+    build: function () { noise(0.12, 0.18, 1600); [330, 440, 660, 880].forEach(function (f, i) { setTimeout(function () { tone(f, 0.16, 'square', 0.13, 20); }, 60 + i * 90); }); }
   };
 
   // ---- ambient beds: looping filtered noise shaped per territory ----
@@ -114,6 +125,11 @@ GH.audio = (function () {
     if (GH.music) GH.music.setMuted(m);
   };
   S.isMuted = function () { return muted; };
+  S.setVolume = function (v) {
+    volume = Math.max(0, Math.min(0.6, v));
+    if (master) master.gain.value = volume;
+  };
+  S.volume = function () { return volume; };
   S.ctx = function () { ensure(); return ctx; };
   return S;
 })();

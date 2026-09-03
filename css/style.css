@@ -1189,3 +1189,20 @@ body.looking #crosshair { opacity: 0.4; }
 .mp-diary-tasks span { margin-right: 8px; }
 .dt-done { color: #60c890; }
 .vec-btn { border-color: #80d8ff; }
+
+/* ---------------- objective (Zero Hour), title extras, backups ---------------- */
+#objective {
+  position: absolute; top: 96px; left: 50%; transform: translateX(-50%);
+  min-width: 320px; max-width: 620px; padding: 8px 16px;
+  background: rgba(6, 12, 30, 0.9); border: 2px solid #ffd050; box-shadow: 0 0 0 2px #000, 0 0 18px rgba(255, 208, 80, 0.3);
+  text-align: center; pointer-events: none; z-index: 6;
+}
+#objective-title { font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px; letter-spacing: 3px; color: #ffd050; }
+#objective-text { font-size: 13px; color: #f0f0f6; margin-top: 3px; line-height: 1.4; }
+#title-version { position: absolute; bottom: 6px; right: 10px; font-size: 10px; color: #506090; z-index: 1; }
+#title-version a { color: #8098d0; }
+.screen-sub.wide { max-width: 760px; line-height: 1.5; color: #b8c4e8; }
+#backup-nudge { color: #ffd050; }
+#save-backups { width: min(92vw, 640px); font-size: 12px; }
+.bk-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid #1c2236; }
+.bk-row span { flex: 1; color: #c0c8e0; }

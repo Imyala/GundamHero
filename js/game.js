@@ -744,6 +744,8 @@ GH.game = (function () {
       }
     }
 
+    if (e.tut) tutorialEvent('kill', 1);
+    if (e.tutBoss) tutorialEvent('boss', 1);
     // world life: diaries and the daily board
     if (!e.nestId) {
       lifeEvent('kills', 1);
@@ -1751,6 +1753,7 @@ GH.game = (function () {
     }
     player.energy -= ab.cost;
     player.abilityCds[slot] = ab.cd * bon.cdMult;
+    tutorialEvent('ability', 1);
 
     if (slot === 1) {          // RUPTURE — focused strike
       player.facing = GH.angleTo(player.x, player.z, target.x, target.z);
@@ -2420,7 +2423,9 @@ GH.game = (function () {
         var sgPerk = expActive ? GH.worldlife.zonePerk(curZone).alloy : 1;
         grantMats(Math.round((18 + (zoneNow ? zoneNow.danger * 8 : 0)) * sgPerk), zoneNow && zoneNow.danger >= 3 && Math.random() < 0.4 ? 1 : 0, true);
         queueAnnounce('SIGNAL CACHE RECOVERED', 22);
+        GH.audio.signal();
         lifeEvent('signals', 1);
+        tutorialEvent('signal', 1);
       }
       if (loot.unique) {
         queueAnnounce('CACHE — ' + loot.unique.name.toUpperCase() + ' UNLOCKED', 24);
@@ -3198,6 +3203,8 @@ GH.game = (function () {
           d.nitro = Math.min(1, d.nitro + [0, 0.06, 0.12, 0.2][d.driftTier]);
           announce(['', 'TURBO', 'SUPER TURBO', 'ULTRA TURBO'][d.driftTier], 16 + d.driftTier * 2);
           lifeEvent('drift', 1);
+          tutorialEvent('drift', 1);
+          GH.audio.turbo(d.driftTier);
           spawnBurst(player.x, 0.4, player.z, [0, 0x70c0ff, 0xffa020, 0xc060ff][d.driftTier], 6 + d.driftTier * 4);
           GH.audio.dash();
         }
@@ -3381,6 +3388,7 @@ GH.game = (function () {
       }
       if (input.zoomDelta) camDist = GH.clamp(camDist + input.zoomDelta * 0.12, 0.55, 1.9);
     }
+    if (tutorial) tutorial.lookAcc += Math.abs(input.lookDX) + Math.abs(input.lookDY);
     input.lookDX = 0; input.lookDY = 0; input.zoomDelta = 0;
     input.mmoDrive = null;
     if (chaseNow && !player.speederOn) {
@@ -3742,6 +3750,7 @@ GH.game = (function () {
   // diary / daily payouts announced in the field
   function payDiary(list) {
     (list || []).forEach(function (pd) {
+      GH.audio.diary();
       queueAnnounce('DIARY — ' + pd.name + ' ' + pd.tier.name + ' COMPLETE · +' + pd.tier.reward.alloy + ' ALLOY' +
         (pd.tier.reward.cores ? ' +' + pd.tier.reward.cores + ' CORES' : '') + (pd.tier.perk ? ' · ' + pd.tier.perk.label.toUpperCase() : ''), 26);
       GH.audio.win();
@@ -3771,7 +3780,9 @@ GH.game = (function () {
     spawnBurst(v.x, 0.8, v.z, 0xc8d8f0, 14);
     GH.audio.coin();
     queueAnnounce('VEIN MINED — +' + got + ' ALLOY' + (v.core ? ' · A FRAME CORE INSIDE' : ''), 20);
+    GH.audio.vein();
     lifeEvent('nodes', 1);
+    tutorialEvent('vein', 1);
     saveExpedition();
   }
   var zoneNow = null;
@@ -5023,7 +5034,171 @@ GH.game = (function () {
     }
   }
 
-  G.startExpedition = function (mechIndex) {
+  // =================================================================
+  // ZERO HOUR — the guided first ten minutes. A scripted ladder on top
+  // of the survivor camp: walk, look, fight, cast, ward, transform, drive,
+  // drift, mine, chase a signal, drop a warden, build a frame. Each step
+  // has one sentence, one check, and a beacon where it matters.
+  // =================================================================
+  var tutorial = null, tutMarker = null;
+  var TUT_STEPS = [
+    { id: 'move', text: function () { var L = GH.controls.label; return 'Walk 12 m: ' + L('forward') + '/' + L('back') + ' walk, ' + L('turnLeft') + '/' + L('turnRight') + ' turn, ' + L('strafeLeft') + '/' + L('strafeRight') + ' strafe.'; },
+      prog: function (t) { return Math.min(12, t.walked) + '/12 m'; }, done: function (t) { return t.walked >= 12; } },
+    { id: 'look', text: function () { return 'Hold RIGHT MOUSE and drag to look around. The mouse wheel zooms.'; },
+      prog: function (t) { return Math.min(100, Math.round(t.lookAcc / 3)) + '%'; }, done: function (t) { return t.lookAcc >= 300; } },
+    { id: 'fight', text: function () { return 'Hostiles ahead. LEFT CLICK one to target and attack it; hold to keep swinging.'; },
+      enter: function (t) { t.kills = 0; spawnTutorialPack(3, 12); }, prog: function (t) { return t.kills + '/3 destroyed'; }, done: function (t) { return t.kills >= 3; } },
+    { id: 'ability', text: function () { return 'Press ' + GH.controls.label('ability1') + ' to cast RUPTURE on your target. Abilities spend the blue ENERGY bar.'; },
+      enter: function (t) { t.casts = 0; player.energy = player.stats.energyMax; spawnTutorialPack(2, 10); }, prog: function (t) { return t.casts + '/1 cast'; }, done: function (t) { return t.casts >= 1; } },
+    { id: 'ward', text: function () { var L = GH.controls.label; return 'Raise a WARD with ' + L('ward1') + ' / ' + L('ward2') + ' / ' + L('ward3') + '. A ward matching the incoming damage cuts it by 75%.'; },
+      enter: function (t) { t.wards = 0; }, prog: function (t) { return t.wards + '/1 raised'; }, done: function (t) { return t.wards >= 1; } },
+    { id: 'transform', text: function () { return 'Press ' + GH.controls.label('transform') + ' to fold into your vehicle.'; },
+      enter: function (t) { t.transforms = 0; }, prog: function () { return ''; }, done: function (t) { return t.transforms >= 1; } },
+    { id: 'drive', text: function () { var L = GH.controls.label; return 'Drive 60 m: ' + L('forward') + ' throttle, ' + L('back') + ' brake, ' + L('turnLeft') + '/' + L('turnRight') + ' steer. ' + L('special') + ' burns nitro.'; },
+      enter: function (t) { t.driven = 0; }, prog: function (t) { return Math.min(60, Math.round(t.driven)) + '/60 m'; }, done: function (t) { return t.driven >= 60; } },
+    { id: 'drift', text: function () { return 'Hold ' + GH.controls.label('boost') + ' while steering at speed to DRIFT, then let go for a TURBO. Pay out one turbo.'; },
+      enter: function (t) { t.turbos = 0; }, prog: function (t) { return t.turbos + '/1 turbo'; }, done: function (t) { return t.turbos >= 1; } },
+    { id: 'vein', text: function () { return 'Alloy builds new frames. Follow the beacon to the vein and press ' + GH.controls.label('interact') + ' to mine it (any form).'; },
+      enter: function (t) { t.veins = 0; t.beacon = nearestVein(); }, prog: function (t) { return beaconDist(t) + ' m'; }, done: function (t) { return t.veins >= 1; } },
+    { id: 'signal', text: function () { return 'A CACHE SIGNAL. Treasure sites ping every few minutes and show gold on the minimap. Follow the beacon and pick it up.'; },
+      enter: function (t) { t.signals = 0; t.beacon = spawnTutorialSignal(); }, prog: function (t) { return beaconDist(t) + ' m'; }, done: function (t) { return t.signals >= 1; } },
+    { id: 'boss', text: function () { return 'A RUST WARDEN is hunting you. Bosses drop FRAME CORES. Target it, ward against it, and bring it down.'; },
+      enter: function (t) { t.bosses = 0; t.beacon = spawnTutorialBoss(); }, prog: function (t) { return t.bosses ? 'DOWN' : 'hunt it'; }, done: function (t) { return t.bosses >= 1; } },
+    { id: 'build', text: function () { return 'Return to camp, use the CONSOLE (' + GH.controls.label('interact') + ') → FRAME WORKSHOP → build your first frame. The bill is covered.'; },
+      enter: function (t) {
+        t.builds = 0; t.beacon = { x: GH.world.CAMP.x - 5, z: GH.world.CAMP.z + 4 };
+        var m = GH.meta.data.mats;
+        if (m.alloy < 60) m.alloy = 60;
+        if (GH.meta.data.salvage < 80) GH.meta.data.salvage = 80;
+        GH.meta.save();
+      }, prog: function (t) { return beaconDist(t) + ' m to camp'; }, done: function (t) { return t.builds >= 1; } }
+  ];
+  function nearestVein() {
+    var best = null, bd = 1e9;
+    for (var i = 0; i < veins.length; i++) {
+      if (veins[i].mined) continue;
+      var d2 = GH.dist2(player.x, player.z, veins[i].x, veins[i].z);
+      if (d2 < bd) { bd = d2; best = veins[i]; }
+    }
+    return best ? { x: best.x, z: best.z } : null;
+  }
+  function beaconDist(t) { return t.beacon ? Math.round(Math.sqrt(GH.dist2(player.x, player.z, t.beacon.x, t.beacon.z))) : 0; }
+  function aheadSpot(dist) {
+    var a = player.facing || 0;
+    var x = player.x + Math.sin(a) * dist, z = player.z + Math.cos(a) * dist;
+    var sp = openSpot(x, z, 1.0);
+    return sp ? sp : { x: x, z: z };
+  }
+  function spawnTutorialPack(n, dist) {
+    for (var i = 0; i < n; i++) {
+      var sp = aheadSpot(dist + i * 2);
+      var e = spawnEnemy('husk', sp.x + (i - 1) * 2.2, sp.z);
+      if (e) { e.tut = true; e.aggro = true; e.hp = e.maxHp = Math.round(e.maxHp * 0.7); }
+    }
+  }
+  function spawnTutorialSignal() {
+    var sp = aheadSpot(40);
+    spawnPickup('cache', sp.x, sp.z);
+    var pk = pickups[pickups.length - 1];
+    pk.signal = true; pk.vx = 0; pk.vz = 0;
+    signalSpot = { x: sp.x, z: sp.z, t: 0 };
+    GH.audio.signal();
+    return { x: sp.x, z: sp.z };
+  }
+  function spawnTutorialBoss() {
+    var sp = aheadSpot(22);
+    var e = spawnEnemy('warden', sp.x, sp.z);
+    if (e) { e.tutBoss = true; e.aggro = true; e.hp = e.maxHp = Math.round(e.maxHp * 0.45); }
+    GH.audio.boss();
+    return e ? { x: sp.x, z: sp.z, e: e } : { x: sp.x, z: sp.z };
+  }
+  function tutorialEvent(kind, n) {
+    if (!tutorial) return;
+    var t = tutorial;
+    var map = { kill: 'kills', ability: 'casts', ward: 'wards', transform: 'transforms', drift: 'turbos', vein: 'veins', signal: 'signals', boss: 'bosses', build: 'builds' };
+    var key = map[kind];
+    if (key) t[key] = (t[key] || 0) + (n || 1);
+  }
+  G.tutorialEvent = tutorialEvent;
+  G.tutorialActive = function () { return !!tutorial; };
+
+  function startTutorial() {
+    tutorial = { step: -1, walked: 0, lookAcc: 0, driven: 0, lastX: player.x, lastZ: player.z, doneT: 0, beacon: null, stepT: 0 };
+    if (!tutMarker) {
+      tutMarker = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 14, 8, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xffd050, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }));
+    }
+    scene.add(tutMarker);
+    tutMarker.visible = false;
+    nextTutorialStep();
+    var ob = document.getElementById('objective');
+    if (ob) ob.classList.remove('hidden');
+  }
+  function nextTutorialStep() {
+    var t = tutorial;
+    t.step++;
+    t.stepT = 0;
+    if (t.step >= TUT_STEPS.length) { finishTutorial(false); return; }
+    var st = TUT_STEPS[t.step];
+    t.beacon = null;
+    if (st.enter) st.enter(t);
+    queueAnnounce('ZERO HOUR ' + (t.step + 1) + '/' + TUT_STEPS.length, 22);
+    GH.audio.step();
+  }
+  function finishTutorial(skipped) {
+    var ob = document.getElementById('objective');
+    if (ob) ob.classList.add('hidden');
+    if (tutMarker) scene.remove(tutMarker);
+    if (!skipped) {
+      grantMats(100, 2, true);
+      GH.meta.data.salvage += 200;
+      GH.meta.data.skillPoints += 1;
+      queueAnnounce('ZERO HOUR COMPLETE — +100 ALLOY · +2 CORES · +200 SALVAGE · +1 SKILL POINT', 26);
+      GH.audio.win();
+    }
+    GH.meta.data.tutorial = { done: true, when: new Date().toISOString().slice(0, 10), skipped: !!skipped };
+    GH.meta.save();
+    tutorial = null;
+    lastDom['objective-text'] = null;
+  }
+  G.skipTutorial = function () { if (tutorial) finishTutorial(true); };
+
+  function updateTutorial(dt, input) {
+    var t = tutorial;
+    if (!t) return;
+    t.stepT += dt;
+    // distance on foot / on skids
+    var dx = player.x - t.lastX, dz = player.z - t.lastZ;
+    var moved = Math.sqrt(dx * dx + dz * dz);
+    if (moved < 5) { if (player.speederOn) t.driven += moved; else t.walked += moved; }
+    t.lastX = player.x; t.lastZ = player.z;
+    if (t.step < 0 || t.step >= TUT_STEPS.length) return;
+    var st = TUT_STEPS[t.step];
+    // the beacon: a tall light where the step wants you
+    if (t.beacon && t.beacon.e && !t.beacon.e.dead) { t.beacon.x = t.beacon.e.x; t.beacon.z = t.beacon.e.z; }
+    if (tutMarker) {
+      tutMarker.visible = !!t.beacon;
+      if (t.beacon) tutMarker.position.set(t.beacon.x, gy(t.beacon.x, t.beacon.z) + 7, t.beacon.z);
+      tutMarker.rotation.y += dt;
+    }
+    if (st.id === 'fight' || st.id === 'ability') {
+      // the pack always finds you: respawn a straggler that wandered off
+      var alive = enemies.filter(function (e) { return e.tut && !e.dead; }).length;
+      if (alive === 0 && !st.done(t)) spawnTutorialPack(1, 8);
+    }
+    if (st.id === 'boss' && t.beacon && t.beacon.e && t.beacon.e.dead && !t.bosses) t.bosses = 1;
+    setText(document.getElementById('objective-title'), 'ZERO HOUR · ' + (t.step + 1) + '/' + TUT_STEPS.length + (st.prog(t) ? ' · ' + st.prog(t) : ''));
+    setText(document.getElementById('objective-text'), st.text(t));
+    if (st.done(t)) {
+      if (t.doneT === 0) { GH.audio.levelup(); }
+      t.doneT += dt;
+      if (t.doneT > 0.8) { t.doneT = 0; nextTutorialStep(); }
+    }
+  }
+
+  G.playtime = function () { return runTime; };
+  G.startExpedition = function (mechIndex, opts) {
+    opts = opts || {};
     clearWorld();
     weekly = null;
     G.mode = 'expedition';
@@ -5085,6 +5260,9 @@ GH.game = (function () {
     if (harrowSpot) {
       queueAnnounce('THE HARROW STALKS ' + GH.world.stageFor(harrowSpot.zone).name, 22);
     }
+    tutorial = null;
+    if (opts.tutorial) startTutorial();
+    else { var ob0 = document.getElementById('objective'); if (ob0) ob0.classList.add('hidden'); }
   };
 
   function nestById(id) {
@@ -5134,6 +5312,7 @@ GH.game = (function () {
       }
     }
 
+    updateTutorial(dt, input);
     updateWeather(dt);
     updateHarrow(dt);
     updateDungeon(dt);
@@ -5591,6 +5770,7 @@ GH.game = (function () {
     enemyShots.length = 0;
     document.getElementById('interact-line').classList.add('hidden');
     G.state = 'race';
+    GH.music.play('race');
     announce(kind === 'duel' ? 'TRACE DUEL' : 'SUNSPIRE CIRCUIT', 30);
     GH.race.start(kind, {
       scene: scene, player: player, speeder: player.speederMesh, model: player.def.model,
@@ -5600,6 +5780,7 @@ GH.game = (function () {
 
   function finishRace(kind, res) {
     G.state = 'play';
+    GH.music.play(zoneNow ? GH.worldlife.rootZone(curZone) : 'wreck');
     player.speederOn = false;
     player.mesh.visible = true;
     player.speederMesh.visible = false;
@@ -5654,6 +5835,7 @@ GH.game = (function () {
       scene.add(player.speederMesh);
     }
     player.speederOn = !player.speederOn;
+    if (player.speederOn) tutorialEvent('transform', 1);
     player.mesh.visible = !player.speederOn;
     player.speederMesh.visible = player.speederOn;
     if (player.speederOn) {
@@ -6013,6 +6195,7 @@ GH.game = (function () {
     } else {
       player.ward = kind;
       GH.audio.block();
+      tutorialEvent('ward', 1);
     }
     updateWardDome();
   }
@@ -6577,6 +6760,20 @@ GH.game = (function () {
   // HUD
   // =================================================================
   var el = {};
+  // DOM writes only when the string actually changed (the HUD runs every frame)
+  var lastDom = {};
+  function setHTML(node, html) {
+    if (!node) return;
+    var k = node.id || node;
+    if (lastDom[k] === html) return;
+    lastDom[k] = html; node.innerHTML = html;
+  }
+  function setText(node, text) {
+    if (!node) return;
+    var k = node.id || node;
+    if (lastDom[k] === text) return;
+    lastDom[k] = text; node.textContent = text;
+  }
   function cacheEls() {
     ['hp-fill', 'hp-text', 'xp-fill', 'lvl-text', 'wave-label', 'wave-timer',
       'coin-count', 'boost-fill', 'stat-icons', 'boss-bar-wrap', 'boss-name',
@@ -6608,17 +6805,17 @@ GH.game = (function () {
   function updateHUD() {
     var s = player.stats;
     el['hp-fill'].style.width = GH.clamp(player.hp / s.maxHP * 100, 0, 100) + '%';
-    el['hp-text'].textContent = Math.ceil(player.hp) + '/' + Math.round(s.maxHP);
+    setText(el['hp-text'], Math.ceil(player.hp) + '/' + Math.round(s.maxHP));
     el['xp-fill'].style.width = GH.clamp(player.xp / player.xpNeed * 100, 0, 100) + '%';
-    el['lvl-text'].textContent = 'LVL ' + player.level;
+    setText(el['lvl-text'], 'LVL ' + player.level);
     if (expActive) {
       var dst = dungeonStatusText();
-      el['wave-timer'].textContent = dst ||
-        (zoneNow ? 'DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] : '');
+      setText(el['wave-timer'], dst ||
+        (zoneNow ? 'DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] : ''));
     } else {
-      el['wave-timer'].textContent = GH.fmt1(Math.max(0, waveTimer));
+      setText(el['wave-timer'], GH.fmt1(Math.max(0, waveTimer)));
     }
-    el['coin-count'].textContent = '×' + coinsRun + '   ⬡ ' + GH.meta.data.mats.alloy + ' ALLOY · ◈ ' + GH.meta.data.mats.cores + ' CORES';
+    setText(el['coin-count'], '×' + coinsRun + '   ⬡ ' + GH.meta.data.mats.alloy + ' ALLOY · ◈ ' + GH.meta.data.mats.cores + ' CORES');
     el['boost-fill'].style.width = (player.boost * 100) + '%';
     // skimmer drive cluster: velocity readout, the bottle, the drift call
     if (el['drive-hud']) {
@@ -6626,7 +6823,7 @@ GH.game = (function () {
       el['drive-hud'].classList.toggle('hidden', !driving);
       if (driving) {
         var dvd = player.drive;
-        el['dh-speed'].textContent = Math.round(Math.max(0, dvd.fwd) * 11);
+        setText(el['dh-speed'], Math.round(Math.max(0, dvd.fwd) * 11));
         el['dh-nitro-fill'].style.width = Math.round(dvd.nitro * 100) + '%';
         el['dh-nitro-fill'].classList.toggle('dh-burning', dvd.nitroT > 0);
         // one status word under the speedo: what the ground is doing to you
@@ -6635,7 +6832,7 @@ GH.game = (function () {
           : dvd.offTrack ? 'OFF TRACK' : dvd.driftHeat > 0.5 ? 'SKIDS HOT' : dvd.drift
             ? (dvd.driftTier >= 3 ? 'DRIFT ●●● RELEASE!' : dvd.driftTier === 2 ? 'DRIFT ●●' : dvd.driftTier === 1 ? 'DRIFT ●' : 'DRIFT') : '';
         if (!dstat && player.item) dstat = ITEM_NAMES[player.item] + ' [G]';
-        el['dh-drift'].textContent = dstat;
+        setText(el['dh-drift'], dstat);
         el['dh-drift'].classList.toggle('hidden', !dstat);
       }
     }
@@ -6657,14 +6854,14 @@ GH.game = (function () {
           (known && cd > 0 ? '<div class="hb-cd">' + Math.ceil(cd) + '</div>' : '') +
           '</div>';
       }
-      hb.innerHTML = hh;
+      setHTML(hb, hh);
     }
     // target readout
     var tp = document.getElementById('target-panel');
     if (tp) {
       if (target && !target.dead) {
         tp.classList.remove('hidden');
-        document.getElementById('target-name').textContent = target.def.name;
+        setText(document.getElementById('target-name'), target.def.name);
         document.getElementById('target-fill').style.width =
           GH.clamp(target.hp / target.maxHp * 100, 0, 100) + '%';
       } else {
@@ -6689,7 +6886,7 @@ GH.game = (function () {
       Math.round(player.wardEnergy * 100) + '%"></span></span>';
     if (player.counter.length) wh += '<span class="ward-counter">COUNTER ×' + player.counter.length + '</span>';
     if (player.wardCd > 0) wh += '<span class="ward-counter" style="color:#ff8080">COLLAPSED</span>';
-    wardEl.innerHTML = wh;
+    setHTML(wardEl, wh);
 
     var buffs = [];
     if (player.speederOn) {
@@ -6707,7 +6904,7 @@ GH.game = (function () {
     }
     if (player.edgeT > 0) buffs.push('EDGE');
     if (player.special.active > 0) buffs.push(player.def.special.toUpperCase());
-    el['buff-line'].innerHTML = buffs.join(' · ');
+    setHTML(el['buff-line'], buffs.join(' · '));
     el['reload-line'].textContent = player.suppressed ? 'SIGNAL LOST — LEAVE THE RIFT' :
       (prim.reloading > 0 ? 'RELOADING' :
         (prim.w.clip ? prim.clip + '/' + prim.w.clip : ''));
@@ -6827,6 +7024,7 @@ GH.game = (function () {
     interactables = [];
     veins = [];
     signalSpot = null;
+    if (tutorial) { tutorial = null; if (tutMarker) scene.remove(tutMarker); var obx = document.getElementById('objective'); if (obx) obx.classList.add('hidden'); }
     wallRing.visible = true;
     floor.visible = true;
     var il = document.getElementById('interact-line');
@@ -7067,6 +7265,7 @@ GH.game = (function () {
     if (won) GH.audio.win(); else GH.audio.die();
     if (!won) spawnBurst(player.x, 1.2, player.z, 0xff6030, 30);
     GH.music.play('title');
+    if (won) GH.music.sting('victory', 7);
     GH.music.setBoss(false);
 
     var meta = GH.meta;

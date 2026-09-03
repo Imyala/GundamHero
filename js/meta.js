@@ -3,6 +3,7 @@
 // stage unlocks, devotions, contracts, collection log, stage trials, records.
 GH.meta = (function () {
   var M = {};
+  M.VERSION = '0.9.0';
 
   M.PROFILES = {
     standard: { key: 'hf_meta_v2', name: 'STANDARD', desc: 'Full hangar support.' },
@@ -28,6 +29,12 @@ GH.meta = (function () {
       diary: {},
       daily: null,
       nodesMined: {},
+      // onboarding
+      tutorial: { done: false },
+      // save hygiene: minutes played, when a code/file was last exported
+      playtimeMin: 0,
+      lastExport: null,
+      saveVersion: 2,
       stages: 1,
       devotion: { sol: 0, pyre: 0, keen: 0, verd: 0, ruin: 0 },
       activeDevotion: 'sol',
@@ -131,6 +138,87 @@ GH.meta = (function () {
     try { localStorage.setItem(storageKey(), JSON.stringify(M.data)); } catch (e) { /* ignore */ }
   };
 
+  // ---------------------------------------------------------------
+  // Backups: a rolling ring of snapshots per profile, written every few
+  // minutes of play and whenever a run ends, so a bad save or a mistaken
+  // ABANDON can be undone from the SAVE screen.
+  // ---------------------------------------------------------------
+  var BACKUP_SLOTS = 4;
+  function backupKey(i) { return storageKey() + '_bak' + i; }
+  M.backup = function (label) {
+    try {
+      var list = M.backups();
+      var entry = { when: new Date().toISOString(), label: label || 'auto', data: M.data };
+      // newest first; drop the oldest
+      var raws = [JSON.stringify(entry)];
+      for (var i = 0; i < list.length && raws.length < BACKUP_SLOTS; i++) raws.push(localStorage.getItem(backupKey(list[i].slot)));
+      for (var j = 0; j < BACKUP_SLOTS; j++) {
+        if (raws[j]) localStorage.setItem(backupKey(j), raws[j]); else localStorage.removeItem(backupKey(j));
+      }
+      return true;
+    } catch (e) { return false; }
+  };
+  M.backups = function () {
+    var out = [];
+    for (var i = 0; i < BACKUP_SLOTS; i++) {
+      try {
+        var raw = localStorage.getItem(backupKey(i));
+        if (!raw) continue;
+        var e = JSON.parse(raw);
+        out.push({ slot: i, when: e.when, label: e.label, salvage: e.data.salvage, frames: Object.keys(e.data.shells || {}).length, pilotXP: e.data.pilotXP || 0 });
+      } catch (e2) { /* skip */ }
+    }
+    return out;
+  };
+  M.restoreBackup = function (slot) {
+    try {
+      var raw = localStorage.getItem(backupKey(slot));
+      if (!raw) return false;
+      var e = JSON.parse(raw);
+      M.backup('before restore');
+      localStorage.setItem(storageKey(), JSON.stringify(e.data));
+      M.load(M.profile);
+      return true;
+    } catch (e3) { return false; }
+  };
+
+  // file export / import: the same blob as the save code, as a download
+  M.exportBlob = function () {
+    M.save();
+    var blob = { v: 1, saved: new Date().toISOString().slice(0, 10), profiles: {} };
+    for (var p in M.PROFILES) {
+      try { var raw = localStorage.getItem(M.PROFILES[p].key); if (raw) blob.profiles[p] = JSON.parse(raw); } catch (e) { /* skip */ }
+    }
+    blob.memorial = M.memorial();
+    M.data.lastExport = new Date().toISOString();
+    M.save();
+    return JSON.stringify(blob);
+  };
+  M.importBlob = function (text) {
+    try {
+      var t = (text || '').trim();
+      if (t.indexOf('HF1.') === 0) return M.importCode(t);
+      var blob = JSON.parse(t);
+      if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Not a HERO FRAME save file.' };
+      M.backup('before import');
+      var count = 0;
+      for (var p in blob.profiles) {
+        if (!M.PROFILES[p]) continue;
+        localStorage.setItem(M.PROFILES[p].key, JSON.stringify(blob.profiles[p]));
+        count++;
+      }
+      if (blob.memorial) localStorage.setItem('hf_memorial', JSON.stringify(blob.memorial));
+      M.load(M.profile);
+      return { ok: true, profiles: count, saved: blob.saved };
+    } catch (e) { return { ok: false, error: 'File is damaged or truncated.' }; }
+  };
+  // should the title nag about backing up? an hour played and nothing exported in 3 days
+  M.wantsBackup = function () {
+    if ((M.data.playtimeMin || 0) < 60) return false;
+    if (!M.data.lastExport) return true;
+    return (Date.now() - new Date(M.data.lastExport).getTime()) > 3 * 86400000;
+  };
+
   M.isIron = function () { return M.profile === 'iron' || M.profile === 'hardcore'; };
   M.isHardcore = function () { return M.profile === 'hardcore'; };
 
@@ -204,6 +292,7 @@ GH.meta = (function () {
   // portable string, so browser storage is never the only copy.
   // ---------------------------------------------------------------
   M.exportCode = function () {
+    M.data.lastExport = new Date().toISOString();
     M.save(); // flush the active profile so the code matches live state
     var blob = { v: 1, saved: new Date().toISOString().slice(0, 10), profiles: {} };
     for (var p in M.PROFILES) {
@@ -224,6 +313,7 @@ GH.meta = (function () {
       if (code.indexOf('HF1.') !== 0) return { ok: false, error: 'Not a HERO FRAME save code.' };
       var blob = JSON.parse(decodeURIComponent(escape(atob(code.slice(4)))));
       if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Code is damaged or truncated.' };
+      M.backup('before import');
       var count = 0;
       for (var p in blob.profiles) {
         if (!M.PROFILES[p]) continue;

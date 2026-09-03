@@ -40,7 +40,7 @@ GH.controls = (function () {
   var ARROW_ALIASES = { ArrowUp: 'forward', ArrowDown: 'back', ArrowLeft: 'turnLeft', ArrowRight: 'turnRight' };
 
   C.binds = {};
-  C.settings = { sens: 1.0, invertY: false, crt: true, mouseTurn: true };
+  C.settings = { sens: 1.0, invertY: false, crt: true, mouseTurn: true, music: 1.0, sfx: 1.0 };
 
   var STORE_KEY = 'hf_controls_v1';
 
@@ -63,7 +63,7 @@ GH.controls = (function () {
 
   C.reset = function () {
     C.ACTIONS.forEach(function (a) { C.binds[a.id] = a.def; });
-    C.settings = { sens: 1.0, invertY: false, crt: true, mouseTurn: true };
+    C.settings = { sens: 1.0, invertY: false, crt: true, mouseTurn: true, music: 1.0, sfx: 1.0 };
     C.save();
   };
 

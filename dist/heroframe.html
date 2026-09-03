@@ -1198,6 +1198,23 @@ body.looking #crosshair { opacity: 0.4; }
 .dt-done { color: #60c890; }
 .vec-btn { border-color: #80d8ff; }
 
+/* ---------------- objective (Zero Hour), title extras, backups ---------------- */
+#objective {
+  position: absolute; top: 96px; left: 50%; transform: translateX(-50%);
+  min-width: 320px; max-width: 620px; padding: 8px 16px;
+  background: rgba(6, 12, 30, 0.9); border: 2px solid #ffd050; box-shadow: 0 0 0 2px #000, 0 0 18px rgba(255, 208, 80, 0.3);
+  text-align: center; pointer-events: none; z-index: 6;
+}
+#objective-title { font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px; letter-spacing: 3px; color: #ffd050; }
+#objective-text { font-size: 13px; color: #f0f0f6; margin-top: 3px; line-height: 1.4; }
+#title-version { position: absolute; bottom: 6px; right: 10px; font-size: 10px; color: #506090; z-index: 1; }
+#title-version a { color: #8098d0; }
+.screen-sub.wide { max-width: 760px; line-height: 1.5; color: #b8c4e8; }
+#backup-nudge { color: #ffd050; }
+#save-backups { width: min(92vw, 640px); font-size: 12px; }
+.bk-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid #1c2236; }
+.bk-row span { flex: 1; color: #c0c8e0; }
+
 </style>
 </head>
 <body>
@@ -1250,6 +1267,7 @@ body.looking #crosshair { opacity: 0.4; }
       <div id="boss-name">???</div>
       <div class="bar-frame boss-frame"><div id="boss-fill" class="bar-fill boss-fill"></div></div>
     </div>
+    <div id="objective" class="hidden"><div id="objective-title">ZERO HOUR</div><div id="objective-text"></div></div>
     <div id="announce" class="hidden"></div>
     <div id="hint-line" class="hidden"></div>
     <div id="interact-line" class="hidden"></div>
@@ -1277,6 +1295,8 @@ body.looking #crosshair { opacity: 0.4; }
     <h1 class="game-title">HERO&nbsp;FRAME</h1>
     <div class="title-sub">A MECH ARENA SURVIVOR</div>
     <div class="title-menu">
+      <button id="btn-play-first" class="menu-btn hidden">PLAY — ZERO HOUR</button>
+      <div id="first-desc" class="menu-desc hidden">Your first sortie: ten guided minutes that teach the controls, the vehicle, and the workshop.</div>
       <button id="btn-continue" class="menu-btn small continue-btn hidden">CONTINUE RUN</button>
       <button id="btn-expedition" class="menu-btn">THE SHATTERED REACH</button>
       <div id="exp-desc" class="menu-desc"></div>
@@ -1291,13 +1311,16 @@ body.looking #crosshair { opacity: 0.4; }
         <button id="btn-title-pilot" class="menu-btn small">PILOT</button>
         <button id="btn-title-controls" class="menu-btn small">CONTROLS</button>
         <button id="btn-title-help" class="menu-btn small">HOW TO PLAY</button>
+        <button id="btn-tutorial" class="menu-btn tiny">REPLAY ZERO HOUR</button>
         <button id="btn-profile" class="menu-btn tiny profile-btn">PROFILE: STANDARD</button>
       </div>
+      <div id="backup-nudge" class="menu-desc hidden"></div>
       <div class="menu-desc">HANGAR: build frames, train your pilot, devotions, contracts, collection · PILOT: your character sheet &amp; inventory</div>
     </div>
     <div id="title-salvage"></div>
     <div id="title-memorial"></div>
     <div id="title-foot" class="title-foot"></div>
+    <div id="title-version"></div>
   </div>
 
   <!-- ===================== PLAYER SELECT ===================== -->
@@ -1331,6 +1354,7 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== WEEKLY CHALLENGE ===================== -->
   <div id="weekly-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-weekly-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">WEEKLY&nbsp;CHALLENGE</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">One fixed frame, stage and set of modifiers for everyone this week. Compare your best wave with friends.</div>
     <div id="weekly-brief"></div>
     <button id="btn-weekly-go" class="menu-btn">DEPLOY</button>
   </div>
@@ -1338,14 +1362,15 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== STAGE SELECT ===================== -->
   <div id="stage-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-stage-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;&nbsp;SELECT</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Pick a stage. CLASSIC ends on a wave-20 boss that pays a frame or blueprint data and opens the next stage. ARENA never ends.</div>
     <div id="stage-list"></div>
   </div>
 
   <!-- ===================== HANGAR / DEVOTIONS ===================== -->
   <div id="hangar-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">DEVOTIONS</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Spend SALVAGE on permanent paths. Each rank is a small stat you keep forever; the ACTIVE path also grows every level-up in a run. Why: this is the cheapest permanent power in the game.</div>
     <div id="hangar-salvage"></div>
-    <div id="hangar-note">Spend salvage on permanent paths. The ACTIVE path also grows every level-up in a run.</div>
     <div id="devotion-list"></div>
   </div>
 
@@ -1358,6 +1383,7 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== FACTIONS ===================== -->
   <div id="factions-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-fac-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;HOUSES</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Five houses rule the Reach. Contracts, dungeon clears and podiums in their lands raise your standing; killing their troops lowers it. Why: a pledge gives you a doctrine bonus and, at 40, a seat in their court.</div>
     <div id="fac-head"></div>
     <div id="fac-cards"></div>
     <div id="fac-banner"></div>
@@ -1366,17 +1392,25 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== SAVE CODE ===================== -->
   <div id="save-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-save-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">SAVE&nbsp;CODE</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Your progress lives in this browser. Back it up: copy the code or download the file, and keep it somewhere safe. Restore from a code, a file, or one of the automatic backups below.</div>
     <div class="save-note">Your progress lives in this browser. Copy this code somewhere safe, or paste one to restore.</div>
     <textarea id="save-export" readonly spellcheck="false"></textarea>
     <button id="btn-save-copy" class="menu-btn small">COPY CODE</button>
     <textarea id="save-import" placeholder="paste a save code here…" spellcheck="false"></textarea>
     <button id="btn-save-import" class="menu-btn small">IMPORT</button>
+    <div class="title-row">
+      <button id="btn-save-file" class="menu-btn small">⬇ DOWNLOAD SAVE FILE</button>
+      <button id="btn-load-file" class="menu-btn small">⬆ LOAD SAVE FILE</button>
+      <input type="file" id="save-file-input" accept=".json,.txt" class="gone">
+    </div>
     <div id="save-feedback"></div>
+    <div id="save-backups"></div>
   </div>
 
   <!-- ===================== RELIC SEASON ===================== -->
   <div id="season-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-season-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">RELIC&nbsp;SEASON</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">A month-long ladder of tasks. Points unlock RELICS: run-wide modifiers with a real downside. Why: relics are the strongest optional power, and they reset each season.</div>
     <div id="season-head"></div>
     <div id="season-meter"></div>
     <div id="season-relics"></div>
@@ -1387,6 +1421,7 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== BROKER ===================== -->
   <div id="broker-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-broker-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;BROKER</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Today\'s DAILY TASKS pay alloy and cores; a CONTRACT is a slayer-style hunt that pays salvage and broker points. Why: points buy permanent contract perks below.</div>
     <div id="broker-status"></div>
     <div id="broker-daily"></div>
     <div id="broker-contract"></div>
@@ -1396,6 +1431,7 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== COLLECTION LOG ===================== -->
   <div id="collection-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-collection-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">COLLECTION&nbsp;LOG</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Everything you have seen, used and found. Why: ARTIFACTS live here — click one to equip it (one at a time), each is a run-wide perk.</div>
     <div id="log-head"></div>
     <div id="log-body"></div>
   </div>
@@ -1403,6 +1439,7 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== WORLD MAP ===================== -->
   <div id="map-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-map-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;SHATTERED&nbsp;REACH</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Every territory, its dungeons, today\'s weather and its DIARY. Why: diary tiers pay alloy and cores, and HARD/ELITE add a permanent perk in that zone.</div>
     <div id="map-head"></div>
     <div id="map-zones"></div>
   </div>
@@ -1410,6 +1447,7 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== SKILL TREE ===================== -->
   <div id="skills-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-skills-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">PILOT&nbsp;TRAINING</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Every pilot level pays one point. Spend across three disciplines; deeper rows need points already spent in that discipline. Why: unlocks ability slots 2–4 and permanent stats. Respec costs salvage.</div>
     <div id="skills-head"></div>
     <div id="skills-tree"></div>
     <div class="title-row">
@@ -1420,6 +1458,7 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== STAGE TRIALS ===================== -->
   <div id="trials-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-trials-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;TRIALS</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Per-stage challenges for CLASSIC runs. Why: each tier is a permanent perk on that stage (more salvage, XP, damage, gem drops).</div>
     <div id="trials-body"></div>
   </div>
 
@@ -1439,6 +1478,7 @@ body.looking #crosshair { opacity: 0.4; }
       <button id="btn-pause-controls" class="menu-btn small">CONTROLS</button>
       <button id="btn-pause-help" class="menu-btn small">HOW TO PLAY</button>
     </div>
+    <button id="btn-skip-tutorial" class="menu-btn tiny hidden">SKIP ZERO HOUR</button>
     <button id="btn-exit-run" class="menu-btn small">EXIT RUN — SAVE &amp; RETURN TO MENU</button>
     <div class="title-row">
       <button id="btn-new-run" class="menu-btn tiny">NEW RUN (abandon this one)</button>
@@ -1486,6 +1526,8 @@ body.looking #crosshair { opacity: 0.4; }
         <label class="ct-set">Camera <select id="set-cam"><option value="chase">Chase (MMO)</option><option value="top">Tactical (top-down)</option></select></label>
         <label class="ct-set"><input type="checkbox" id="set-crt"> CRT scanline filter</label>
         <label class="ct-set"><input type="checkbox" id="set-mute"> Mute sound</label>
+        <label class="ct-set">Music volume <input type="range" id="set-music" min="0" max="100" step="5"> <span id="set-music-val"></span></label>
+        <label class="ct-set">Effects volume <input type="range" id="set-sfx" min="0" max="100" step="5"> <span id="set-sfx-val"></span></label>
         <div class="ct-group">DEFAULT SCHEME</div>
         <div class="ct-note">W/S walk · A/D turn · Q/E strafe · hold RIGHT MOUSE to look · WHEEL zoom · LEFT CLICK attack · 1–4 abilities · Z/X/C wards · SPACE boost · SHIFT special · T transform · F interact · V camera · K training · M map · P pilot</div>
         <button id="btn-controls-reset" class="menu-btn tiny">RESET TO DEFAULTS</button>
@@ -6495,7 +6537,7 @@ GH.controls = (function () {
   var ARROW_ALIASES = { ArrowUp: 'forward', ArrowDown: 'back', ArrowLeft: 'turnLeft', ArrowRight: 'turnRight' };
 
   C.binds = {};
-  C.settings = { sens: 1.0, invertY: false, crt: true, mouseTurn: true };
+  C.settings = { sens: 1.0, invertY: false, crt: true, mouseTurn: true, music: 1.0, sfx: 1.0 };
 
   var STORE_KEY = 'hf_controls_v1';
 
@@ -6518,7 +6560,7 @@ GH.controls = (function () {
 
   C.reset = function () {
     C.ACTIONS.forEach(function (a) { C.binds[a.id] = a.def; });
-    C.settings = { sens: 1.0, invertY: false, crt: true, mouseTurn: true };
+    C.settings = { sens: 1.0, invertY: false, crt: true, mouseTurn: true, music: 1.0, sfx: 1.0 };
     C.save();
   };
 
@@ -6587,6 +6629,7 @@ GH.controls = (function () {
 // stage unlocks, devotions, contracts, collection log, stage trials, records.
 GH.meta = (function () {
   var M = {};
+  M.VERSION = '0.9.0';
 
   M.PROFILES = {
     standard: { key: 'hf_meta_v2', name: 'STANDARD', desc: 'Full hangar support.' },
@@ -6612,6 +6655,12 @@ GH.meta = (function () {
       diary: {},
       daily: null,
       nodesMined: {},
+      // onboarding
+      tutorial: { done: false },
+      // save hygiene: minutes played, when a code/file was last exported
+      playtimeMin: 0,
+      lastExport: null,
+      saveVersion: 2,
       stages: 1,
       devotion: { sol: 0, pyre: 0, keen: 0, verd: 0, ruin: 0 },
       activeDevotion: 'sol',
@@ -6715,6 +6764,87 @@ GH.meta = (function () {
     try { localStorage.setItem(storageKey(), JSON.stringify(M.data)); } catch (e) { /* ignore */ }
   };
 
+  // ---------------------------------------------------------------
+  // Backups: a rolling ring of snapshots per profile, written every few
+  // minutes of play and whenever a run ends, so a bad save or a mistaken
+  // ABANDON can be undone from the SAVE screen.
+  // ---------------------------------------------------------------
+  var BACKUP_SLOTS = 4;
+  function backupKey(i) { return storageKey() + '_bak' + i; }
+  M.backup = function (label) {
+    try {
+      var list = M.backups();
+      var entry = { when: new Date().toISOString(), label: label || 'auto', data: M.data };
+      // newest first; drop the oldest
+      var raws = [JSON.stringify(entry)];
+      for (var i = 0; i < list.length && raws.length < BACKUP_SLOTS; i++) raws.push(localStorage.getItem(backupKey(list[i].slot)));
+      for (var j = 0; j < BACKUP_SLOTS; j++) {
+        if (raws[j]) localStorage.setItem(backupKey(j), raws[j]); else localStorage.removeItem(backupKey(j));
+      }
+      return true;
+    } catch (e) { return false; }
+  };
+  M.backups = function () {
+    var out = [];
+    for (var i = 0; i < BACKUP_SLOTS; i++) {
+      try {
+        var raw = localStorage.getItem(backupKey(i));
+        if (!raw) continue;
+        var e = JSON.parse(raw);
+        out.push({ slot: i, when: e.when, label: e.label, salvage: e.data.salvage, frames: Object.keys(e.data.shells || {}).length, pilotXP: e.data.pilotXP || 0 });
+      } catch (e2) { /* skip */ }
+    }
+    return out;
+  };
+  M.restoreBackup = function (slot) {
+    try {
+      var raw = localStorage.getItem(backupKey(slot));
+      if (!raw) return false;
+      var e = JSON.parse(raw);
+      M.backup('before restore');
+      localStorage.setItem(storageKey(), JSON.stringify(e.data));
+      M.load(M.profile);
+      return true;
+    } catch (e3) { return false; }
+  };
+
+  // file export / import: the same blob as the save code, as a download
+  M.exportBlob = function () {
+    M.save();
+    var blob = { v: 1, saved: new Date().toISOString().slice(0, 10), profiles: {} };
+    for (var p in M.PROFILES) {
+      try { var raw = localStorage.getItem(M.PROFILES[p].key); if (raw) blob.profiles[p] = JSON.parse(raw); } catch (e) { /* skip */ }
+    }
+    blob.memorial = M.memorial();
+    M.data.lastExport = new Date().toISOString();
+    M.save();
+    return JSON.stringify(blob);
+  };
+  M.importBlob = function (text) {
+    try {
+      var t = (text || '').trim();
+      if (t.indexOf('HF1.') === 0) return M.importCode(t);
+      var blob = JSON.parse(t);
+      if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Not a HERO FRAME save file.' };
+      M.backup('before import');
+      var count = 0;
+      for (var p in blob.profiles) {
+        if (!M.PROFILES[p]) continue;
+        localStorage.setItem(M.PROFILES[p].key, JSON.stringify(blob.profiles[p]));
+        count++;
+      }
+      if (blob.memorial) localStorage.setItem('hf_memorial', JSON.stringify(blob.memorial));
+      M.load(M.profile);
+      return { ok: true, profiles: count, saved: blob.saved };
+    } catch (e) { return { ok: false, error: 'File is damaged or truncated.' }; }
+  };
+  // should the title nag about backing up? an hour played and nothing exported in 3 days
+  M.wantsBackup = function () {
+    if ((M.data.playtimeMin || 0) < 60) return false;
+    if (!M.data.lastExport) return true;
+    return (Date.now() - new Date(M.data.lastExport).getTime()) > 3 * 86400000;
+  };
+
   M.isIron = function () { return M.profile === 'iron' || M.profile === 'hardcore'; };
   M.isHardcore = function () { return M.profile === 'hardcore'; };
 
@@ -6788,6 +6918,7 @@ GH.meta = (function () {
   // portable string, so browser storage is never the only copy.
   // ---------------------------------------------------------------
   M.exportCode = function () {
+    M.data.lastExport = new Date().toISOString();
     M.save(); // flush the active profile so the code matches live state
     var blob = { v: 1, saved: new Date().toISOString().slice(0, 10), profiles: {} };
     for (var p in M.PROFILES) {
@@ -6808,6 +6939,7 @@ GH.meta = (function () {
       if (code.indexOf('HF1.') !== 0) return { ok: false, error: 'Not a HERO FRAME save code.' };
       var blob = JSON.parse(decodeURIComponent(escape(atob(code.slice(4)))));
       if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Code is damaged or truncated.' };
+      M.backup('before import');
       var count = 0;
       for (var p in blob.profiles) {
         if (!M.PROFILES[p]) continue;
@@ -8792,14 +8924,14 @@ GH.worldlife = (function () {
 <script>
 // HERO FRAME — tiny procedural WebAudio SFX
 GH.audio = (function () {
-  var ctx = null, master = null, muted = false;
+  var ctx = null, master = null, muted = false, volume = 0.25;
 
   function ensure() {
     if (!ctx) {
       try {
         ctx = new (window.AudioContext || window.webkitAudioContext)();
         master = ctx.createGain();
-        master.gain.value = 0.25;
+        master.gain.value = volume;
         master.connect(ctx.destination);
       } catch (e) { /* audio unavailable */ }
     }
@@ -8856,7 +8988,18 @@ GH.audio = (function () {
     wave: function () { tone(330, 0.16, 'square', 0.14, 60); setTimeout(function () { tone(440, 0.2, 'square', 0.14, 60); }, 140); },
     boss: function () { tone(70, 0.8, 'sawtooth', 0.3, 25); noise(0.6, 0.22, 500); },
     die: function () { tone(220, 0.6, 'sawtooth', 0.28, -160); noise(0.6, 0.3, 800); },
-    win: function () { [392, 494, 587, 784].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, 'triangle', 0.18, 15); }, i * 160); }); }
+    win: function () { [392, 494, 587, 784].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, 'triangle', 0.18, 15); }, i * 160); }); },
+    // world-life and driving cues
+    turbo: function (tier) {
+      var base = 300 + (tier || 1) * 120;
+      tone(base, 0.18, 'sawtooth', 0.16, base * 1.5); noise(0.25, 0.14, 2600);
+      if (tier >= 3) setTimeout(function () { tone(base * 2, 0.2, 'square', 0.12, 200); }, 90);
+    },
+    vein: function () { noise(0.08, 0.16, 5000); [1100, 1500, 1900].forEach(function (f, i) { setTimeout(function () { tone(f, 0.08, 'sine', 0.12, 80); }, i * 60); }); },
+    signal: function () { [1500, 1500, 2100].forEach(function (f, i) { setTimeout(function () { tone(f, 0.09, 'sine', 0.14, 0); }, i * 130); }); },
+    diary: function () { [523, 659, 784, 1046].forEach(function (f, i) { setTimeout(function () { tone(f, 0.22, 'triangle', 0.16, 10); }, i * 110); }); },
+    step: function () { tone(660, 0.08, 'square', 0.12, 120); setTimeout(function () { tone(990, 0.12, 'square', 0.1, 60); }, 80); },
+    build: function () { noise(0.12, 0.18, 1600); [330, 440, 660, 880].forEach(function (f, i) { setTimeout(function () { tone(f, 0.16, 'square', 0.13, 20); }, 60 + i * 90); }); }
   };
 
   // ---- ambient beds: looping filtered noise shaped per territory ----
@@ -8906,24 +9049,33 @@ GH.audio = (function () {
     if (GH.music) GH.music.setMuted(m);
   };
   S.isMuted = function () { return muted; };
+  S.setVolume = function (v) {
+    volume = Math.max(0, Math.min(0.6, v));
+    if (master) master.gain.value = volume;
+  };
+  S.volume = function () { return volume; };
   S.ctx = function () { ensure(); return ctx; };
   return S;
 })();
 
 </script>
 <script>
-// HERO FRAME — generative music loops (WebAudio step sequencer).
-// All patterns are procedurally generated from per-stage seeds at runtime;
-// nothing is sampled or transcribed. Layers: bass, pad, arp, drums.
+// HERO FRAME — generative music (WebAudio step sequencer).
+// Every track is original and written here as data: a chord progression,
+// a bass figure, a composed lead motif, and a drum feel. Nothing is
+// sampled or transcribed. The moods take their cues from mecha anime
+// scoring — the relentless minor-key march ostinato of a decisive-battle
+// cue, the bright major-key drive of an opening theme, the brass fanfare
+// of a sortie, the lonely piano-and-strings of a hangar at night — but
+// the notes are ours. Layers: bass, pad/brass, lead, arp, drums.
 GH.music = (function () {
   var M = {};
-  var ctx = null, master = null, padFilter = null;
+  var ctx = null, master = null, padFilter = null, comp = null;
   var running = false, mode = null, cfg = null;
   var step = 0, nextTime = 0, timerId = null;
-  var bossLayer = false, muted = false;
+  var bossLayer = false, muted = false, volume = 0.12;
   var rngState = 1;
 
-  // deterministic per-song randomness so a stage always plays "its" tune
   function srand(seed) { rngState = seed >>> 0 || 1; }
   function rnd() {
     rngState ^= rngState << 13; rngState >>>= 0;
@@ -8932,33 +9084,60 @@ GH.music = (function () {
     return (rngState >>> 0) / 4294967296;
   }
 
+  // scale degrees → semitones
+  var MINOR = [0, 2, 3, 5, 7, 8, 10, 12, 14, 15];
+  var MAJOR = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16];
+  var DORIAN = [0, 2, 3, 5, 7, 9, 10, 12, 14, 15];
   var PENT = [0, 3, 5, 7, 10, 12, 15];
 
-  // per-context song configs (original, generated moods)
+  // A motif is 16 steps of [scaleDegreeIndex | null, lengthInSteps]. Chords
+  // are semitone offsets of the root per bar (each bar = 16 steps).
+  // 'feel' picks the drum pattern. 'lead' picks the lead voice.
   var SONGS = {
-    title:   { root: 55.0, bpm: 64, seed: 11, dense: 0.25, padGain: 0.16, drum: false },
-    wreck:   { root: 110.0, bpm: 96, seed: 21, dense: 0.5, padGain: 0.10, drum: true },
-    glacier: { root: 73.4, bpm: 84, seed: 31, dense: 0.42, padGain: 0.13, drum: true },
-    cloister:{ root: 82.4, bpm: 100, seed: 41, dense: 0.55, padGain: 0.10, drum: true },
-    ember:   { root: 65.4, bpm: 116, seed: 51, dense: 0.62, padGain: 0.08, drum: true },
-    storm:   { root: 61.7, bpm: 122, seed: 61, dense: 0.6, padGain: 0.09, drum: true },
-    null:    { root: 92.5, bpm: 70, seed: 71, dense: 0.32, padGain: 0.15, drum: true },
-    hive:    { root: 58.3, bpm: 128, seed: 81, dense: 0.66, padGain: 0.07, drum: true },
-    ruins:   { root: 77.8, bpm: 78, seed: 91, dense: 0.36, padGain: 0.16, drum: true },
-    keep:    { root: 69.3, bpm: 104, seed: 101, dense: 0.5, padGain: 0.11, drum: true },
-    warrens: { root: 49.0, bpm: 88, seed: 111, dense: 0.3, padGain: 0.14, drum: true },
-    sky:     { root: 98.0, bpm: 92, seed: 121, dense: 0.45, padGain: 0.18, drum: true }
+    // title: slow, wide, a lone lead over a two-chord swell — the hangar at night
+    title: { root: 55.0, bpm: 66, scale: MINOR, chords: [0, 8, 3, 7], feel: 'none', lead: 'sine', padGain: 0.16, arp: 0.2, seed: 11,
+      motif: [[4, 4], null, null, null, [3, 2], null, [2, 2], null, [0, 6], null, null, null, null, null, [1, 2], null] },
+    // hangar / menus: calm arpeggio, no drums
+    hangar: { root: 65.4, bpm: 80, scale: DORIAN, chords: [0, 5, 10, 3], feel: 'none', lead: 'triangle', padGain: 0.12, arp: 0.5, seed: 17,
+      motif: [[0, 2], null, [2, 2], null, [4, 4], null, null, null, [3, 2], null, [2, 2], null, [1, 4], null, null, null] },
+    // the decisive-battle cue: relentless staccato brass ostinato in minor, snare on every beat
+    battle: { root: 73.4, bpm: 128, scale: MINOR, chords: [0, 0, 8, 7], feel: 'march', lead: 'sawtooth', padGain: 0.07, arp: 0.0, seed: 23, staccato: true,
+      motif: [[0, 1], [0, 1], null, [0, 1], [3, 1], null, [0, 1], null, [4, 1], [4, 1], null, [3, 1], [2, 1], null, [0, 1], null],
+      ostinato: [0, 0, 7, 0, 0, 0, 7, 0, 0, 0, 7, 0, 0, 0, 5, 7] },
+    // sortie: bright major fanfare, driving eighths — an opening theme
+    sortie: { root: 82.4, bpm: 138, scale: MAJOR, chords: [0, 9, 5, 7], feel: 'rock', lead: 'square', padGain: 0.09, arp: 0.35, seed: 29,
+      motif: [[0, 2], null, [2, 2], null, [4, 3], null, null, [5, 1], [4, 2], null, [2, 2], null, [1, 2], null, [0, 2], null] },
+    // race: fast synth pulse, offbeat hats
+    race: { root: 98.0, bpm: 150, scale: DORIAN, chords: [0, 0, 3, 5], feel: 'pulse', lead: 'square', padGain: 0.06, arp: 0.7, seed: 37,
+      motif: [[0, 1], null, [0, 1], [2, 1], null, [4, 1], null, [2, 1], [0, 1], null, [0, 1], [3, 1], null, [4, 1], [3, 1], null] },
+    // victory: a rising brass cadence
+    victory: { root: 110.0, bpm: 110, scale: MAJOR, chords: [0, 5, 7, 0], feel: 'march', lead: 'sawtooth', padGain: 0.1, arp: 0.0, seed: 41,
+      motif: [[0, 2], [2, 2], [4, 4], null, null, null, [5, 2], [4, 2], [7, 6], null, null, null, null, null, null, null] },
+    // zones: each territory keeps a signature, drawn per seed over its own progression
+    wreck:   { root: 110.0, bpm: 96, scale: DORIAN, chords: [0, 5, 3, 10], feel: 'beat', lead: 'triangle', padGain: 0.10, arp: 0.5, seed: 21 },
+    glacier: { root: 73.4, bpm: 84, scale: MINOR, chords: [0, 3, 8, 7], feel: 'beat', lead: 'sine', padGain: 0.13, arp: 0.42, seed: 31 },
+    cloister:{ root: 82.4, bpm: 100, scale: DORIAN, chords: [0, 7, 5, 3], feel: 'beat', lead: 'triangle', padGain: 0.10, arp: 0.55, seed: 41 },
+    ember:   { root: 65.4, bpm: 116, scale: MINOR, chords: [0, 1, 0, 7], feel: 'rock', lead: 'sawtooth', padGain: 0.08, arp: 0.62, seed: 51 },
+    storm:   { root: 61.7, bpm: 122, scale: MINOR, chords: [0, 5, 6, 7], feel: 'rock', lead: 'square', padGain: 0.09, arp: 0.6, seed: 61 },
+    null:    { root: 92.5, bpm: 70, scale: MINOR, chords: [0, 1, 0, 6], feel: 'beat', lead: 'sine', padGain: 0.15, arp: 0.32, seed: 71 },
+    hive:    { root: 58.3, bpm: 128, scale: MINOR, chords: [0, 3, 5, 7], feel: 'pulse', lead: 'square', padGain: 0.07, arp: 0.66, seed: 81 },
+    ruins:   { root: 77.8, bpm: 78, scale: DORIAN, chords: [0, 10, 8, 7], feel: 'beat', lead: 'triangle', padGain: 0.16, arp: 0.36, seed: 91 },
+    keep:    { root: 69.3, bpm: 104, scale: MINOR, chords: [0, 7, 3, 8], feel: 'march', lead: 'sawtooth', padGain: 0.11, arp: 0.5, seed: 101 },
+    warrens: { root: 49.0, bpm: 88, scale: MINOR, chords: [0, 1, 3, 0], feel: 'beat', lead: 'sine', padGain: 0.14, arp: 0.3, seed: 111 },
+    sky:     { root: 98.0, bpm: 92, scale: MAJOR, chords: [0, 5, 9, 7], feel: 'beat', lead: 'triangle', padGain: 0.18, arp: 0.45, seed: 121 }
   };
 
-  var arpPattern = [], bassPattern = [];
+  var arpPattern = [], motif = [];
 
   function ensure() {
     if (ctx) return true;
     try {
       ctx = GH.audio.ctx ? GH.audio.ctx() : new (window.AudioContext || window.webkitAudioContext)();
+      comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -18; comp.ratio.value = 4;
       master = ctx.createGain();
-      master.gain.value = muted ? 0 : 0.12;
-      master.connect(ctx.destination);
+      master.gain.value = muted ? 0 : volume;
+      master.connect(comp); comp.connect(ctx.destination);
       padFilter = ctx.createBiquadFilter();
       padFilter.type = 'lowpass';
       padFilter.frequency.value = 700;
@@ -8967,28 +9146,42 @@ GH.music = (function () {
     } catch (e) { return false; }
   }
 
+  // zones without a written motif get one drawn from their seed, in their
+  // scale, so a territory always plays "its" tune
   function regenPatterns() {
     srand(cfg.seed);
-    arpPattern = []; bassPattern = [];
-    for (var i = 0; i < 16; i++) {
-      arpPattern.push(rnd() < cfg.dense ? PENT[Math.floor(rnd() * PENT.length)] : null);
-      bassPattern.push(i % 4 === 0 ? 0 : (rnd() < 0.3 ? (rnd() < 0.5 ? 7 : 5) : null));
+    arpPattern = [];
+    for (var i = 0; i < 16; i++) arpPattern.push(rnd() < cfg.arp ? PENT[Math.floor(rnd() * PENT.length)] : null);
+    if (cfg.motif) { motif = cfg.motif; return; }
+    motif = [];
+    var last = 0;
+    for (var j = 0; j < 16; j++) {
+      if (j % 2 === 0 && rnd() < 0.55) {
+        last = Math.max(0, Math.min(7, last + Math.round((rnd() - 0.5) * 4)));
+        motif.push([last, rnd() < 0.3 ? 4 : 2]);
+      } else motif.push(null);
     }
   }
 
   function noteFreq(root, semis) { return root * Math.pow(2, semis / 12); }
 
-  function tone(freq, t, dur, type, gain, dest, slide) {
+  function tone(freq, t, dur, type, gain, dest, slide, attack) {
     var o = ctx.createOscillator();
     var g = ctx.createGain();
     o.type = type;
     o.frequency.setValueAtTime(freq, t);
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * slide), t + dur);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(gain, t + (attack || 0.02));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g); g.connect(dest || master);
     o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  // a brass-ish voice: two detuned saws through the pad filter
+  function brass(freq, t, dur, gain) {
+    tone(freq * 1.003, t, dur, 'sawtooth', gain, padFilter, 0, 0.04);
+    tone(freq * 0.997, t, dur, 'sawtooth', gain * 0.8, padFilter, 0, 0.04);
   }
 
   function drumNoise(t, dur, gain, freq) {
@@ -9006,34 +9199,78 @@ GH.music = (function () {
     src.connect(f); f.connect(g); g.connect(master);
     src.start(t);
   }
+  function kick(t, gain) { tone(120, t, 0.14, 'sine', gain || 0.7, master, 0.3); }
+  function snare(t, gain) { drumNoise(t, 0.12, gain || 0.25, 1800); tone(180, t, 0.08, 'triangle', 0.25, master, 0.5); }
 
   function scheduleStep(s, t) {
     var stepDur = 60 / cfg.bpm / 4;
-    // bass
-    var b = bassPattern[s % 16];
-    if (b !== null) tone(noteFreq(cfg.root, b) / 2, t, stepDur * 1.8, 'triangle', 0.5);
-    // arp
-    var a = arpPattern[s % 16];
-    if (a !== null) tone(noteFreq(cfg.root * 2, a), t, stepDur * 0.9, 'square', 0.09);
-    // pad: hold root + fifth at bar start
-    if (s % 16 === 0) {
+    var bar = Math.floor(s / 16) % cfg.chords.length;
+    var chord = cfg.chords[bar];
+    var root = cfg.root;
+    var sc = cfg.scale;
+    var inBar = s % 16;
+    // bass: root on the beat, fifth on the and, an ostinato when written
+    if (cfg.ostinato) {
+      var ob = cfg.ostinato[inBar];
+      tone(noteFreq(root, chord + ob) / 2, t, stepDur * 0.9, 'sawtooth', 0.4);
+    } else if (inBar % 4 === 0) {
+      tone(noteFreq(root, chord) / 2, t, stepDur * 1.8, 'triangle', 0.5);
+    } else if (inBar % 8 === 6 && cfg.feel !== 'none') {
+      tone(noteFreq(root, chord + 7) / 2, t, stepDur * 0.9, 'triangle', 0.35);
+    }
+    // pad / brass: the chord, held for the bar
+    if (inBar === 0) {
       var padDur = stepDur * 16;
-      tone(noteFreq(cfg.root, 0) * 1.002, t, padDur, 'sawtooth', cfg.padGain, padFilter);
-      tone(noteFreq(cfg.root, 7) * 0.998, t, padDur, 'sawtooth', cfg.padGain * 0.8, padFilter);
-      if (bossLayer) tone(noteFreq(cfg.root, 1), t, padDur, 'sawtooth', cfg.padGain * 0.5, padFilter);
+      var third = sc === MAJOR ? 4 : 3;
+      if (cfg.feel === 'march' || bossLayer) {
+        brass(noteFreq(root, chord), t, padDur, cfg.padGain);
+        brass(noteFreq(root, chord + third), t, padDur, cfg.padGain * 0.7);
+        brass(noteFreq(root, chord + 7), t, padDur, cfg.padGain * 0.8);
+      } else {
+        tone(noteFreq(root, chord) * 1.002, t, padDur, 'sawtooth', cfg.padGain, padFilter);
+        tone(noteFreq(root, chord + 7) * 0.998, t, padDur, 'sawtooth', cfg.padGain * 0.8, padFilter);
+        tone(noteFreq(root, chord + third), t, padDur, 'triangle', cfg.padGain * 0.6, padFilter);
+      }
+      if (bossLayer) tone(noteFreq(root, chord + 1), t, padDur, 'sawtooth', cfg.padGain * 0.5, padFilter);
       padFilter.frequency.setValueAtTime(500, t);
-      padFilter.frequency.linearRampToValueAtTime(bossLayer ? 1600 : 1000, t + padDur * 0.5);
+      padFilter.frequency.linearRampToValueAtTime(bossLayer || cfg.feel === 'march' ? 1800 : 1000, t + padDur * 0.5);
       padFilter.frequency.linearRampToValueAtTime(500, t + padDur);
     }
-    // drums
-    if (cfg.drum) {
-      if (s % 8 === 0 || (bossLayer && s % 8 === 4)) {
-        tone(120, t, 0.14, 'sine', 0.7, master, 0.3); // kick
-      }
-      if (s % 8 === 4) drumNoise(t, 0.12, 0.25, 1800); // snare-ish
-      if (s % 2 === 1) drumNoise(t, 0.04, bossLayer ? 0.14 : 0.08); // hats
-      if (bossLayer && s % 4 === 2) drumNoise(t, 0.05, 0.1, 9000);
+    // lead: the motif, transposed onto the bar's chord; every other pass an octave up
+    var mn = motif[inBar];
+    if (mn) {
+      var oct = (Math.floor(s / 64) % 2 === 1 && cfg.feel !== 'none') ? 2 : 1;
+      var deg = sc[Math.min(sc.length - 1, mn[0])];
+      var ldur = stepDur * mn[1] * (cfg.staccato ? 0.55 : 0.95);
+      tone(noteFreq(root * 2 * oct, chord + deg), t, ldur, cfg.lead, cfg.lead === 'sine' ? 0.22 : 0.11, master, 0, cfg.lead === 'sine' ? 0.05 : 0.01);
+      if (cfg.feel === 'march') tone(noteFreq(root * 2 * oct, chord + deg) * 0.5, t, ldur, 'triangle', 0.08);
     }
+    // arp: colour in the gaps
+    var a = arpPattern[inBar];
+    if (a !== null && !mn) tone(noteFreq(root * 2, chord + a), t, stepDur * 0.9, 'square', 0.06);
+    // drums
+    var F = cfg.feel;
+    if (F === 'none') return;
+    if (F === 'beat') {
+      if (inBar % 8 === 0 || (bossLayer && inBar % 8 === 4)) kick(t);
+      if (inBar % 8 === 4) snare(t);
+      if (inBar % 2 === 1) drumNoise(t, 0.04, bossLayer ? 0.14 : 0.08);
+    } else if (F === 'rock') {
+      if (inBar % 8 === 0 || inBar % 8 === 5) kick(t);
+      if (inBar % 8 === 4) snare(t);
+      if (inBar % 2 === 0) drumNoise(t, 0.04, 0.1);
+    } else if (F === 'march') {
+      if (inBar % 4 === 0) kick(t, 0.6);
+      if (inBar % 4 === 2) snare(t, 0.22);
+      if (inBar % 16 === 14 || inBar % 16 === 15) snare(t, 0.3); // the roll into the bar
+      if (inBar % 2 === 1) drumNoise(t, 0.03, 0.06);
+    } else if (F === 'pulse') {
+      if (inBar % 4 === 0) kick(t, 0.8);
+      if (inBar % 4 === 2) drumNoise(t, 0.06, 0.16, 7000); // offbeat open hat
+      if (inBar % 8 === 4) snare(t, 0.2);
+      if (inBar % 2 === 1) drumNoise(t, 0.03, 0.08);
+    }
+    if (bossLayer && inBar % 4 === 2) drumNoise(t, 0.05, 0.1, 9000);
   }
 
   function tick() {
@@ -9046,7 +9283,7 @@ GH.music = (function () {
     }
   }
 
-  // mode: 'title' | stage id | null (stop). bossOn toggles the intensity layer.
+  // songId: 'title' | 'hangar' | 'battle' | 'sortie' | 'race' | 'victory' | a zone id
   M.play = function (songId) {
     if (!ensure()) return;
     if (ctx.state === 'suspended') ctx.resume();
@@ -9063,6 +9300,13 @@ GH.music = (function () {
     }
   };
 
+  // a short cue that returns to the previous track (victory / sting)
+  M.sting = function (songId, seconds) {
+    var back = mode;
+    M.play(songId);
+    setTimeout(function () { if (mode === songId) M.play(back); }, (seconds || 6) * 1000);
+  };
+
   M.stop = function () {
     running = false;
     mode = null;
@@ -9073,10 +9317,16 @@ GH.music = (function () {
 
   M.setMuted = function (m) {
     muted = m;
-    if (master) master.gain.value = m ? 0 : 0.12;
+    if (master) master.gain.value = m ? 0 : volume;
   };
+  M.setVolume = function (v) {
+    volume = Math.max(0, Math.min(0.4, v));
+    if (master && !muted) master.gain.value = volume;
+  };
+  M.volume = function () { return volume; };
 
   M.mode = function () { return mode; };
+  M.songs = function () { return Object.keys(SONGS); };
 
   return M;
 })();
@@ -11756,6 +12006,8 @@ GH.game = (function () {
       }
     }
 
+    if (e.tut) tutorialEvent('kill', 1);
+    if (e.tutBoss) tutorialEvent('boss', 1);
     // world life: diaries and the daily board
     if (!e.nestId) {
       lifeEvent('kills', 1);
@@ -12763,6 +13015,7 @@ GH.game = (function () {
     }
     player.energy -= ab.cost;
     player.abilityCds[slot] = ab.cd * bon.cdMult;
+    tutorialEvent('ability', 1);
 
     if (slot === 1) {          // RUPTURE — focused strike
       player.facing = GH.angleTo(player.x, player.z, target.x, target.z);
@@ -13432,7 +13685,9 @@ GH.game = (function () {
         var sgPerk = expActive ? GH.worldlife.zonePerk(curZone).alloy : 1;
         grantMats(Math.round((18 + (zoneNow ? zoneNow.danger * 8 : 0)) * sgPerk), zoneNow && zoneNow.danger >= 3 && Math.random() < 0.4 ? 1 : 0, true);
         queueAnnounce('SIGNAL CACHE RECOVERED', 22);
+        GH.audio.signal();
         lifeEvent('signals', 1);
+        tutorialEvent('signal', 1);
       }
       if (loot.unique) {
         queueAnnounce('CACHE — ' + loot.unique.name.toUpperCase() + ' UNLOCKED', 24);
@@ -14210,6 +14465,8 @@ GH.game = (function () {
           d.nitro = Math.min(1, d.nitro + [0, 0.06, 0.12, 0.2][d.driftTier]);
           announce(['', 'TURBO', 'SUPER TURBO', 'ULTRA TURBO'][d.driftTier], 16 + d.driftTier * 2);
           lifeEvent('drift', 1);
+          tutorialEvent('drift', 1);
+          GH.audio.turbo(d.driftTier);
           spawnBurst(player.x, 0.4, player.z, [0, 0x70c0ff, 0xffa020, 0xc060ff][d.driftTier], 6 + d.driftTier * 4);
           GH.audio.dash();
         }
@@ -14393,6 +14650,7 @@ GH.game = (function () {
       }
       if (input.zoomDelta) camDist = GH.clamp(camDist + input.zoomDelta * 0.12, 0.55, 1.9);
     }
+    if (tutorial) tutorial.lookAcc += Math.abs(input.lookDX) + Math.abs(input.lookDY);
     input.lookDX = 0; input.lookDY = 0; input.zoomDelta = 0;
     input.mmoDrive = null;
     if (chaseNow && !player.speederOn) {
@@ -14754,6 +15012,7 @@ GH.game = (function () {
   // diary / daily payouts announced in the field
   function payDiary(list) {
     (list || []).forEach(function (pd) {
+      GH.audio.diary();
       queueAnnounce('DIARY — ' + pd.name + ' ' + pd.tier.name + ' COMPLETE · +' + pd.tier.reward.alloy + ' ALLOY' +
         (pd.tier.reward.cores ? ' +' + pd.tier.reward.cores + ' CORES' : '') + (pd.tier.perk ? ' · ' + pd.tier.perk.label.toUpperCase() : ''), 26);
       GH.audio.win();
@@ -14783,7 +15042,9 @@ GH.game = (function () {
     spawnBurst(v.x, 0.8, v.z, 0xc8d8f0, 14);
     GH.audio.coin();
     queueAnnounce('VEIN MINED — +' + got + ' ALLOY' + (v.core ? ' · A FRAME CORE INSIDE' : ''), 20);
+    GH.audio.vein();
     lifeEvent('nodes', 1);
+    tutorialEvent('vein', 1);
     saveExpedition();
   }
   var zoneNow = null;
@@ -16035,7 +16296,171 @@ GH.game = (function () {
     }
   }
 
-  G.startExpedition = function (mechIndex) {
+  // =================================================================
+  // ZERO HOUR — the guided first ten minutes. A scripted ladder on top
+  // of the survivor camp: walk, look, fight, cast, ward, transform, drive,
+  // drift, mine, chase a signal, drop a warden, build a frame. Each step
+  // has one sentence, one check, and a beacon where it matters.
+  // =================================================================
+  var tutorial = null, tutMarker = null;
+  var TUT_STEPS = [
+    { id: 'move', text: function () { var L = GH.controls.label; return 'Walk 12 m: ' + L('forward') + '/' + L('back') + ' walk, ' + L('turnLeft') + '/' + L('turnRight') + ' turn, ' + L('strafeLeft') + '/' + L('strafeRight') + ' strafe.'; },
+      prog: function (t) { return Math.min(12, t.walked) + '/12 m'; }, done: function (t) { return t.walked >= 12; } },
+    { id: 'look', text: function () { return 'Hold RIGHT MOUSE and drag to look around. The mouse wheel zooms.'; },
+      prog: function (t) { return Math.min(100, Math.round(t.lookAcc / 3)) + '%'; }, done: function (t) { return t.lookAcc >= 300; } },
+    { id: 'fight', text: function () { return 'Hostiles ahead. LEFT CLICK one to target and attack it; hold to keep swinging.'; },
+      enter: function (t) { t.kills = 0; spawnTutorialPack(3, 12); }, prog: function (t) { return t.kills + '/3 destroyed'; }, done: function (t) { return t.kills >= 3; } },
+    { id: 'ability', text: function () { return 'Press ' + GH.controls.label('ability1') + ' to cast RUPTURE on your target. Abilities spend the blue ENERGY bar.'; },
+      enter: function (t) { t.casts = 0; player.energy = player.stats.energyMax; spawnTutorialPack(2, 10); }, prog: function (t) { return t.casts + '/1 cast'; }, done: function (t) { return t.casts >= 1; } },
+    { id: 'ward', text: function () { var L = GH.controls.label; return 'Raise a WARD with ' + L('ward1') + ' / ' + L('ward2') + ' / ' + L('ward3') + '. A ward matching the incoming damage cuts it by 75%.'; },
+      enter: function (t) { t.wards = 0; }, prog: function (t) { return t.wards + '/1 raised'; }, done: function (t) { return t.wards >= 1; } },
+    { id: 'transform', text: function () { return 'Press ' + GH.controls.label('transform') + ' to fold into your vehicle.'; },
+      enter: function (t) { t.transforms = 0; }, prog: function () { return ''; }, done: function (t) { return t.transforms >= 1; } },
+    { id: 'drive', text: function () { var L = GH.controls.label; return 'Drive 60 m: ' + L('forward') + ' throttle, ' + L('back') + ' brake, ' + L('turnLeft') + '/' + L('turnRight') + ' steer. ' + L('special') + ' burns nitro.'; },
+      enter: function (t) { t.driven = 0; }, prog: function (t) { return Math.min(60, Math.round(t.driven)) + '/60 m'; }, done: function (t) { return t.driven >= 60; } },
+    { id: 'drift', text: function () { return 'Hold ' + GH.controls.label('boost') + ' while steering at speed to DRIFT, then let go for a TURBO. Pay out one turbo.'; },
+      enter: function (t) { t.turbos = 0; }, prog: function (t) { return t.turbos + '/1 turbo'; }, done: function (t) { return t.turbos >= 1; } },
+    { id: 'vein', text: function () { return 'Alloy builds new frames. Follow the beacon to the vein and press ' + GH.controls.label('interact') + ' to mine it (any form).'; },
+      enter: function (t) { t.veins = 0; t.beacon = nearestVein(); }, prog: function (t) { return beaconDist(t) + ' m'; }, done: function (t) { return t.veins >= 1; } },
+    { id: 'signal', text: function () { return 'A CACHE SIGNAL. Treasure sites ping every few minutes and show gold on the minimap. Follow the beacon and pick it up.'; },
+      enter: function (t) { t.signals = 0; t.beacon = spawnTutorialSignal(); }, prog: function (t) { return beaconDist(t) + ' m'; }, done: function (t) { return t.signals >= 1; } },
+    { id: 'boss', text: function () { return 'A RUST WARDEN is hunting you. Bosses drop FRAME CORES. Target it, ward against it, and bring it down.'; },
+      enter: function (t) { t.bosses = 0; t.beacon = spawnTutorialBoss(); }, prog: function (t) { return t.bosses ? 'DOWN' : 'hunt it'; }, done: function (t) { return t.bosses >= 1; } },
+    { id: 'build', text: function () { return 'Return to camp, use the CONSOLE (' + GH.controls.label('interact') + ') → FRAME WORKSHOP → build your first frame. The bill is covered.'; },
+      enter: function (t) {
+        t.builds = 0; t.beacon = { x: GH.world.CAMP.x - 5, z: GH.world.CAMP.z + 4 };
+        var m = GH.meta.data.mats;
+        if (m.alloy < 60) m.alloy = 60;
+        if (GH.meta.data.salvage < 80) GH.meta.data.salvage = 80;
+        GH.meta.save();
+      }, prog: function (t) { return beaconDist(t) + ' m to camp'; }, done: function (t) { return t.builds >= 1; } }
+  ];
+  function nearestVein() {
+    var best = null, bd = 1e9;
+    for (var i = 0; i < veins.length; i++) {
+      if (veins[i].mined) continue;
+      var d2 = GH.dist2(player.x, player.z, veins[i].x, veins[i].z);
+      if (d2 < bd) { bd = d2; best = veins[i]; }
+    }
+    return best ? { x: best.x, z: best.z } : null;
+  }
+  function beaconDist(t) { return t.beacon ? Math.round(Math.sqrt(GH.dist2(player.x, player.z, t.beacon.x, t.beacon.z))) : 0; }
+  function aheadSpot(dist) {
+    var a = player.facing || 0;
+    var x = player.x + Math.sin(a) * dist, z = player.z + Math.cos(a) * dist;
+    var sp = openSpot(x, z, 1.0);
+    return sp ? sp : { x: x, z: z };
+  }
+  function spawnTutorialPack(n, dist) {
+    for (var i = 0; i < n; i++) {
+      var sp = aheadSpot(dist + i * 2);
+      var e = spawnEnemy('husk', sp.x + (i - 1) * 2.2, sp.z);
+      if (e) { e.tut = true; e.aggro = true; e.hp = e.maxHp = Math.round(e.maxHp * 0.7); }
+    }
+  }
+  function spawnTutorialSignal() {
+    var sp = aheadSpot(40);
+    spawnPickup('cache', sp.x, sp.z);
+    var pk = pickups[pickups.length - 1];
+    pk.signal = true; pk.vx = 0; pk.vz = 0;
+    signalSpot = { x: sp.x, z: sp.z, t: 0 };
+    GH.audio.signal();
+    return { x: sp.x, z: sp.z };
+  }
+  function spawnTutorialBoss() {
+    var sp = aheadSpot(22);
+    var e = spawnEnemy('warden', sp.x, sp.z);
+    if (e) { e.tutBoss = true; e.aggro = true; e.hp = e.maxHp = Math.round(e.maxHp * 0.45); }
+    GH.audio.boss();
+    return e ? { x: sp.x, z: sp.z, e: e } : { x: sp.x, z: sp.z };
+  }
+  function tutorialEvent(kind, n) {
+    if (!tutorial) return;
+    var t = tutorial;
+    var map = { kill: 'kills', ability: 'casts', ward: 'wards', transform: 'transforms', drift: 'turbos', vein: 'veins', signal: 'signals', boss: 'bosses', build: 'builds' };
+    var key = map[kind];
+    if (key) t[key] = (t[key] || 0) + (n || 1);
+  }
+  G.tutorialEvent = tutorialEvent;
+  G.tutorialActive = function () { return !!tutorial; };
+
+  function startTutorial() {
+    tutorial = { step: -1, walked: 0, lookAcc: 0, driven: 0, lastX: player.x, lastZ: player.z, doneT: 0, beacon: null, stepT: 0 };
+    if (!tutMarker) {
+      tutMarker = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 14, 8, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xffd050, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }));
+    }
+    scene.add(tutMarker);
+    tutMarker.visible = false;
+    nextTutorialStep();
+    var ob = document.getElementById('objective');
+    if (ob) ob.classList.remove('hidden');
+  }
+  function nextTutorialStep() {
+    var t = tutorial;
+    t.step++;
+    t.stepT = 0;
+    if (t.step >= TUT_STEPS.length) { finishTutorial(false); return; }
+    var st = TUT_STEPS[t.step];
+    t.beacon = null;
+    if (st.enter) st.enter(t);
+    queueAnnounce('ZERO HOUR ' + (t.step + 1) + '/' + TUT_STEPS.length, 22);
+    GH.audio.step();
+  }
+  function finishTutorial(skipped) {
+    var ob = document.getElementById('objective');
+    if (ob) ob.classList.add('hidden');
+    if (tutMarker) scene.remove(tutMarker);
+    if (!skipped) {
+      grantMats(100, 2, true);
+      GH.meta.data.salvage += 200;
+      GH.meta.data.skillPoints += 1;
+      queueAnnounce('ZERO HOUR COMPLETE — +100 ALLOY · +2 CORES · +200 SALVAGE · +1 SKILL POINT', 26);
+      GH.audio.win();
+    }
+    GH.meta.data.tutorial = { done: true, when: new Date().toISOString().slice(0, 10), skipped: !!skipped };
+    GH.meta.save();
+    tutorial = null;
+    lastDom['objective-text'] = null;
+  }
+  G.skipTutorial = function () { if (tutorial) finishTutorial(true); };
+
+  function updateTutorial(dt, input) {
+    var t = tutorial;
+    if (!t) return;
+    t.stepT += dt;
+    // distance on foot / on skids
+    var dx = player.x - t.lastX, dz = player.z - t.lastZ;
+    var moved = Math.sqrt(dx * dx + dz * dz);
+    if (moved < 5) { if (player.speederOn) t.driven += moved; else t.walked += moved; }
+    t.lastX = player.x; t.lastZ = player.z;
+    if (t.step < 0 || t.step >= TUT_STEPS.length) return;
+    var st = TUT_STEPS[t.step];
+    // the beacon: a tall light where the step wants you
+    if (t.beacon && t.beacon.e && !t.beacon.e.dead) { t.beacon.x = t.beacon.e.x; t.beacon.z = t.beacon.e.z; }
+    if (tutMarker) {
+      tutMarker.visible = !!t.beacon;
+      if (t.beacon) tutMarker.position.set(t.beacon.x, gy(t.beacon.x, t.beacon.z) + 7, t.beacon.z);
+      tutMarker.rotation.y += dt;
+    }
+    if (st.id === 'fight' || st.id === 'ability') {
+      // the pack always finds you: respawn a straggler that wandered off
+      var alive = enemies.filter(function (e) { return e.tut && !e.dead; }).length;
+      if (alive === 0 && !st.done(t)) spawnTutorialPack(1, 8);
+    }
+    if (st.id === 'boss' && t.beacon && t.beacon.e && t.beacon.e.dead && !t.bosses) t.bosses = 1;
+    setText(document.getElementById('objective-title'), 'ZERO HOUR · ' + (t.step + 1) + '/' + TUT_STEPS.length + (st.prog(t) ? ' · ' + st.prog(t) : ''));
+    setText(document.getElementById('objective-text'), st.text(t));
+    if (st.done(t)) {
+      if (t.doneT === 0) { GH.audio.levelup(); }
+      t.doneT += dt;
+      if (t.doneT > 0.8) { t.doneT = 0; nextTutorialStep(); }
+    }
+  }
+
+  G.playtime = function () { return runTime; };
+  G.startExpedition = function (mechIndex, opts) {
+    opts = opts || {};
     clearWorld();
     weekly = null;
     G.mode = 'expedition';
@@ -16097,6 +16522,9 @@ GH.game = (function () {
     if (harrowSpot) {
       queueAnnounce('THE HARROW STALKS ' + GH.world.stageFor(harrowSpot.zone).name, 22);
     }
+    tutorial = null;
+    if (opts.tutorial) startTutorial();
+    else { var ob0 = document.getElementById('objective'); if (ob0) ob0.classList.add('hidden'); }
   };
 
   function nestById(id) {
@@ -16146,6 +16574,7 @@ GH.game = (function () {
       }
     }
 
+    updateTutorial(dt, input);
     updateWeather(dt);
     updateHarrow(dt);
     updateDungeon(dt);
@@ -16603,6 +17032,7 @@ GH.game = (function () {
     enemyShots.length = 0;
     document.getElementById('interact-line').classList.add('hidden');
     G.state = 'race';
+    GH.music.play('race');
     announce(kind === 'duel' ? 'TRACE DUEL' : 'SUNSPIRE CIRCUIT', 30);
     GH.race.start(kind, {
       scene: scene, player: player, speeder: player.speederMesh, model: player.def.model,
@@ -16612,6 +17042,7 @@ GH.game = (function () {
 
   function finishRace(kind, res) {
     G.state = 'play';
+    GH.music.play(zoneNow ? GH.worldlife.rootZone(curZone) : 'wreck');
     player.speederOn = false;
     player.mesh.visible = true;
     player.speederMesh.visible = false;
@@ -16666,6 +17097,7 @@ GH.game = (function () {
       scene.add(player.speederMesh);
     }
     player.speederOn = !player.speederOn;
+    if (player.speederOn) tutorialEvent('transform', 1);
     player.mesh.visible = !player.speederOn;
     player.speederMesh.visible = player.speederOn;
     if (player.speederOn) {
@@ -17025,6 +17457,7 @@ GH.game = (function () {
     } else {
       player.ward = kind;
       GH.audio.block();
+      tutorialEvent('ward', 1);
     }
     updateWardDome();
   }
@@ -17589,6 +18022,20 @@ GH.game = (function () {
   // HUD
   // =================================================================
   var el = {};
+  // DOM writes only when the string actually changed (the HUD runs every frame)
+  var lastDom = {};
+  function setHTML(node, html) {
+    if (!node) return;
+    var k = node.id || node;
+    if (lastDom[k] === html) return;
+    lastDom[k] = html; node.innerHTML = html;
+  }
+  function setText(node, text) {
+    if (!node) return;
+    var k = node.id || node;
+    if (lastDom[k] === text) return;
+    lastDom[k] = text; node.textContent = text;
+  }
   function cacheEls() {
     ['hp-fill', 'hp-text', 'xp-fill', 'lvl-text', 'wave-label', 'wave-timer',
       'coin-count', 'boost-fill', 'stat-icons', 'boss-bar-wrap', 'boss-name',
@@ -17620,17 +18067,17 @@ GH.game = (function () {
   function updateHUD() {
     var s = player.stats;
     el['hp-fill'].style.width = GH.clamp(player.hp / s.maxHP * 100, 0, 100) + '%';
-    el['hp-text'].textContent = Math.ceil(player.hp) + '/' + Math.round(s.maxHP);
+    setText(el['hp-text'], Math.ceil(player.hp) + '/' + Math.round(s.maxHP));
     el['xp-fill'].style.width = GH.clamp(player.xp / player.xpNeed * 100, 0, 100) + '%';
-    el['lvl-text'].textContent = 'LVL ' + player.level;
+    setText(el['lvl-text'], 'LVL ' + player.level);
     if (expActive) {
       var dst = dungeonStatusText();
-      el['wave-timer'].textContent = dst ||
-        (zoneNow ? 'DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] : '');
+      setText(el['wave-timer'], dst ||
+        (zoneNow ? 'DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] : ''));
     } else {
-      el['wave-timer'].textContent = GH.fmt1(Math.max(0, waveTimer));
+      setText(el['wave-timer'], GH.fmt1(Math.max(0, waveTimer)));
     }
-    el['coin-count'].textContent = '×' + coinsRun + '   ⬡ ' + GH.meta.data.mats.alloy + ' ALLOY · ◈ ' + GH.meta.data.mats.cores + ' CORES';
+    setText(el['coin-count'], '×' + coinsRun + '   ⬡ ' + GH.meta.data.mats.alloy + ' ALLOY · ◈ ' + GH.meta.data.mats.cores + ' CORES');
     el['boost-fill'].style.width = (player.boost * 100) + '%';
     // skimmer drive cluster: velocity readout, the bottle, the drift call
     if (el['drive-hud']) {
@@ -17638,7 +18085,7 @@ GH.game = (function () {
       el['drive-hud'].classList.toggle('hidden', !driving);
       if (driving) {
         var dvd = player.drive;
-        el['dh-speed'].textContent = Math.round(Math.max(0, dvd.fwd) * 11);
+        setText(el['dh-speed'], Math.round(Math.max(0, dvd.fwd) * 11));
         el['dh-nitro-fill'].style.width = Math.round(dvd.nitro * 100) + '%';
         el['dh-nitro-fill'].classList.toggle('dh-burning', dvd.nitroT > 0);
         // one status word under the speedo: what the ground is doing to you
@@ -17647,7 +18094,7 @@ GH.game = (function () {
           : dvd.offTrack ? 'OFF TRACK' : dvd.driftHeat > 0.5 ? 'SKIDS HOT' : dvd.drift
             ? (dvd.driftTier >= 3 ? 'DRIFT ●●● RELEASE!' : dvd.driftTier === 2 ? 'DRIFT ●●' : dvd.driftTier === 1 ? 'DRIFT ●' : 'DRIFT') : '';
         if (!dstat && player.item) dstat = ITEM_NAMES[player.item] + ' [G]';
-        el['dh-drift'].textContent = dstat;
+        setText(el['dh-drift'], dstat);
         el['dh-drift'].classList.toggle('hidden', !dstat);
       }
     }
@@ -17669,14 +18116,14 @@ GH.game = (function () {
           (known && cd > 0 ? '<div class="hb-cd">' + Math.ceil(cd) + '</div>' : '') +
           '</div>';
       }
-      hb.innerHTML = hh;
+      setHTML(hb, hh);
     }
     // target readout
     var tp = document.getElementById('target-panel');
     if (tp) {
       if (target && !target.dead) {
         tp.classList.remove('hidden');
-        document.getElementById('target-name').textContent = target.def.name;
+        setText(document.getElementById('target-name'), target.def.name);
         document.getElementById('target-fill').style.width =
           GH.clamp(target.hp / target.maxHp * 100, 0, 100) + '%';
       } else {
@@ -17701,7 +18148,7 @@ GH.game = (function () {
       Math.round(player.wardEnergy * 100) + '%"></span></span>';
     if (player.counter.length) wh += '<span class="ward-counter">COUNTER ×' + player.counter.length + '</span>';
     if (player.wardCd > 0) wh += '<span class="ward-counter" style="color:#ff8080">COLLAPSED</span>';
-    wardEl.innerHTML = wh;
+    setHTML(wardEl, wh);
 
     var buffs = [];
     if (player.speederOn) {
@@ -17719,7 +18166,7 @@ GH.game = (function () {
     }
     if (player.edgeT > 0) buffs.push('EDGE');
     if (player.special.active > 0) buffs.push(player.def.special.toUpperCase());
-    el['buff-line'].innerHTML = buffs.join(' · ');
+    setHTML(el['buff-line'], buffs.join(' · '));
     el['reload-line'].textContent = player.suppressed ? 'SIGNAL LOST — LEAVE THE RIFT' :
       (prim.reloading > 0 ? 'RELOADING' :
         (prim.w.clip ? prim.clip + '/' + prim.w.clip : ''));
@@ -17839,6 +18286,7 @@ GH.game = (function () {
     interactables = [];
     veins = [];
     signalSpot = null;
+    if (tutorial) { tutorial = null; if (tutMarker) scene.remove(tutMarker); var obx = document.getElementById('objective'); if (obx) obx.classList.add('hidden'); }
     wallRing.visible = true;
     floor.visible = true;
     var il = document.getElementById('interact-line');
@@ -18079,6 +18527,7 @@ GH.game = (function () {
     if (won) GH.audio.win(); else GH.audio.die();
     if (!won) spawnBurst(player.x, 1.2, player.z, 0xff6030, 30);
     GH.music.play('title');
+    if (won) GH.music.sting('victory', 7);
     GH.music.setBoss(false);
 
     var meta = GH.meta;
@@ -18568,6 +19017,8 @@ GH.game = (function () {
   function applySettings() {
     var st = GH.controls.settings;
     document.getElementById('crt-overlay').classList.toggle('off', !st.crt);
+    GH.music.setVolume(0.12 * (st.music === undefined ? 1 : st.music));
+    GH.audio.setVolume(0.25 * (st.sfx === undefined ? 1 : st.sfx));
   }
 
   // ----------------------------------------------------------------
@@ -18874,8 +19325,13 @@ GH.game = (function () {
   var curScreen = null;
   var backHandlers = {};
 
+  var MENU_MUSIC = { 'title-screen': 'title', 'pause-screen': null, 'reward-screen': null, 'end-screen': null };
   function show(id) {
     curScreen = id;
+    if (id && GH.music.mode()) {
+      var want = MENU_MUSIC[id] === undefined ? 'hangar' : MENU_MUSIC[id];
+      if (want && GH.game.state !== 'play' && GH.game.state !== 'pause') GH.music.play(want);
+    }
     SCREENS.forEach(function (s) {
       document.getElementById(s).classList.toggle('hidden', s !== id);
     });
@@ -18936,6 +19392,19 @@ GH.game = (function () {
       : 'Open world campaign — explore, race, raid dungeons. Your pilot persists between sessions.' +
         ((nestsDead || lairsDown) ? ' (' + nestsDead + ' nests broken · ' + lairsDown + ' lairs down)' : '');
     document.getElementById('btn-new-exp').classList.toggle('hidden', !w.exp);
+    var tutDone = !!(GH.meta.data.tutorial && GH.meta.data.tutorial.done);
+    document.getElementById('btn-play-first').classList.toggle('hidden', tutDone);
+    document.getElementById('first-desc').classList.toggle('hidden', tutDone);
+    document.getElementById('btn-tutorial').classList.toggle('hidden', !tutDone);
+    var nudge = document.getElementById('backup-nudge');
+    if (GH.meta.wantsBackup()) {
+      nudge.classList.remove('hidden');
+      nudge.innerHTML = '⚠ ' + Math.round(GH.meta.data.playtimeMin / 60) + ' h played and no backup in a while — <a href="#" id="nudge-save">HANGAR → SAVE: download your save file</a>.';
+      document.getElementById('nudge-save').onclick = function (e) { e.preventDefault(); openSave(); };
+    } else nudge.classList.add('hidden');
+    document.getElementById('title-version').innerHTML = 'HERO FRAME v' + GH.meta.VERSION +
+      (touchCapable ? ' · best played on a desktop with a mouse' : '') +
+      ' · <a href="https://github.com/Imyala/GundamHero/issues" target="_blank" rel="noopener">report a bug / feedback</a>';
     // a parked arena run
     var cont = document.getElementById('btn-continue');
     var has = GH.game.hasSuspended();
@@ -19416,7 +19885,29 @@ GH.game = (function () {
     document.getElementById('save-export').value = GH.meta.exportCode();
     document.getElementById('save-import').value = '';
     document.getElementById('save-feedback').textContent = '';
+    renderBackups();
     show('save-screen');
+  }
+  function renderBackups() {
+    var wrap = document.getElementById('save-backups');
+    var list = GH.meta.backups();
+    var html = '<div class="bk-label">AUTOMATIC BACKUPS (' + GH.meta.PROFILES[GH.meta.profile].name + ')</div>';
+    if (!list.length) html += '<div class="menu-desc">None yet — one is written every five minutes of play and whenever you exit a run.</div>';
+    list.forEach(function (b) {
+      html += '<div class="bk-row"><span>' + b.when.replace('T', ' ').slice(0, 16) + ' · ' + b.label + ' · ' + b.salvage + ' salvage · ' + b.frames + ' frames · ' + b.pilotXP + ' pilot XP</span>' +
+        '<button class="dv-buy bk-restore" data-slot="' + b.slot + '">RESTORE</button></div>';
+    });
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.bk-restore').forEach(function (btn) {
+      btn.onclick = function () {
+        var slot = parseInt(btn.getAttribute('data-slot'), 10);
+        confirmBox('RESTORE THIS BACKUP?', 'Your current progress is itself backed up first, so this can be undone.', 'RESTORE', function () {
+          if (GH.meta.restoreBackup(slot)) { GH.audio.win(); document.getElementById('save-feedback').textContent = 'Backup restored.'; refreshTitle(); }
+          else { GH.audio.hit(); document.getElementById('save-feedback').textContent = 'Could not restore that backup.'; }
+          openSave();
+        });
+      };
+    });
   }
 
   // ----------------------------------------------------------------
@@ -19902,6 +20393,7 @@ GH.game = (function () {
       document.getElementById('pause-stats').textContent = GH.game.pauseInfo();
       var exp = GH.game.isExpedition();
       document.getElementById('btn-exit-run').textContent = exp ? 'EXIT — SAVE & RETURN TO MENU' : 'EXIT RUN — SAVE & RETURN TO MENU';
+      document.getElementById('btn-skip-tutorial').classList.toggle('hidden', !GH.game.tutorialActive());
       document.getElementById('pause-exit-note').textContent = exp
         ? 'Exit keeps your pilot exactly where they stand. Abandon deletes this pilot; the world\'s scars stay.'
         : 'Exit parks this run at the start of wave ' + Math.max(1, GH.game.debugInfo().wave) + ' — CONTINUE RUN on the title brings you back. Abandon deletes it.';
@@ -19913,6 +20405,10 @@ GH.game = (function () {
   }
 
   function toTitle() {
+    var d = GH.meta.data;
+    if (d.tutorialParked && d.tutorial && d.tutorial.done && !GH.game.tutorialActive()) {
+      d.world.exp = d.tutorialParked; d.tutorialParked = null;
+    }
     GH.meta.save();
     expEntry = null;
     GH.game.state = 'title';
@@ -19924,6 +20420,7 @@ GH.game = (function () {
   // EXIT RUN: save whatever we're flying and go home
   function exitRun() {
     GH.game.suspendRun();
+    GH.meta.backup('exit');
     GH.game.leaveRun();
     GH.audio.card();
     toTitle();
@@ -19964,6 +20461,24 @@ GH.game = (function () {
       if (expEntry === entryKind) resumeExpedition();
       else fallback();
     };
+  }
+
+  // ZERO HOUR: the guided first sortie (fresh pilot in the Reach, tutorial flag on)
+  function startTutorial() {
+    GH.audio.wave();
+    var go = function () {
+      GH.game.mode = 'expedition';
+      show(null);
+      GH.game.startExpedition(0, { tutorial: true });
+    };
+    if (GH.meta.data.world.exp) {
+      confirmBox('REPLAY ZERO HOUR?', 'Zero Hour starts a fresh pilot in the Reach. Your saved pilot is kept aside and restored when you finish or skip it.', 'START', function () {
+        GH.meta.data.tutorialParked = GH.meta.data.world.exp;
+        GH.meta.data.world.exp = null;
+        GH.meta.save();
+        go();
+      });
+    } else go();
   }
 
   function startOrResumeExpedition() {
@@ -20090,7 +20605,7 @@ GH.game = (function () {
           '<button class="menu-btn small" id="ws-build" ' + (can ? '' : 'disabled') + '>' + (can ? '⚒ BUILD ' + d.name : 'NOT YET') + '</button>');
     var bb = document.getElementById('ws-build');
     if (bb) bb.onclick = function () {
-      if (GH.vehicles.build(d.id)) { GH.audio.win(); GH.game.lifeEvent('build', 1); renderWorkshop(); }
+      if (GH.vehicles.build(d.id)) { GH.audio.build(); GH.game.lifeEvent('build', 1); GH.game.tutorialEvent('build', 1); renderWorkshop(); }
       else GH.audio.hit();
     };
   }
@@ -20130,8 +20645,9 @@ GH.game = (function () {
     var bb = document.getElementById('ws-build');
     if (bb) bb.onclick = function () {
       if (GH.roster.build(m.id)) {
-        GH.audio.win();
+        GH.audio.build();
         GH.game.lifeEvent('build', 1);
+        GH.game.tutorialEvent('build', 1);
         renderWorkshop();
         if (GH.game.refreshPilot) GH.game.refreshPilot();
       } else GH.audio.hit();
@@ -20261,6 +20777,10 @@ GH.game = (function () {
     document.getElementById('set-crt').checked = !!st.crt;
     document.getElementById('set-cam').value = GH.game.camMode();
     document.getElementById('set-mute').checked = GH.audio.isMuted();
+    document.getElementById('set-music').value = Math.round((st.music === undefined ? 1 : st.music) * 100);
+    document.getElementById('set-music-val').textContent = Math.round((st.music === undefined ? 1 : st.music) * 100) + '%';
+    document.getElementById('set-sfx').value = Math.round((st.sfx === undefined ? 1 : st.sfx) * 100);
+    document.getElementById('set-sfx-val').textContent = Math.round((st.sfx === undefined ? 1 : st.sfx) * 100) + '%';
   }
 
   // ----------------------------------------------------------------
@@ -20340,6 +20860,12 @@ GH.game = (function () {
       else { expEntry = 'hub'; openHub(); }
     };
     byId('btn-expedition').onclick = startOrResumeExpedition;
+    byId('btn-play-first').onclick = startTutorial;
+    byId('btn-tutorial').onclick = startTutorial;
+    byId('btn-skip-tutorial').onclick = function () {
+      GH.game.skipTutorial();
+      togglePause();
+    };
     byId('btn-new-exp').onclick = newExpedition;
     byId('btn-continue').onclick = function () {
       GH.audio.wave();
@@ -20424,6 +20950,16 @@ GH.game = (function () {
     byId('set-invert').onchange = function () { GH.controls.settings.invertY = this.checked; GH.controls.save(); };
     byId('set-crt').onchange = function () { GH.controls.settings.crt = this.checked; GH.controls.save(); applySettings(); };
     byId('set-cam').onchange = function () { GH.game.setCamMode(this.value); };
+    byId('set-music').oninput = function () {
+      GH.controls.settings.music = parseInt(this.value, 10) / 100;
+      byId('set-music-val').textContent = this.value + '%';
+      GH.controls.save(); applySettings();
+    };
+    byId('set-sfx').oninput = function () {
+      GH.controls.settings.sfx = parseInt(this.value, 10) / 100;
+      byId('set-sfx-val').textContent = this.value + '%';
+      GH.controls.save(); applySettings(); GH.audio.card();
+    };
     byId('set-mute').onchange = function () {
       GH.audio.unlock();
       GH.audio.setMuted(this.checked);
@@ -20445,6 +20981,32 @@ GH.game = (function () {
       byId('save-feedback').textContent =
         ok ? 'Copied — keep it somewhere safe.' : 'Select the code and copy it manually.';
       GH.audio.card();
+    };
+    byId('btn-save-file').onclick = function () {
+      var text = GH.meta.exportBlob();
+      var blob = new Blob([text], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'heroframe-save-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+      byId('save-feedback').textContent = 'Save file downloaded — keep it somewhere safe.';
+      GH.audio.card();
+      refreshTitle();
+    };
+    byId('btn-load-file').onclick = function () { byId('save-file-input').click(); };
+    byId('save-file-input').onchange = function () {
+      var f = this.files && this.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var res = GH.meta.importBlob(String(reader.result || ''));
+        var fb = byId('save-feedback');
+        if (res.ok) { GH.audio.win(); refreshTitle(); openSave(); byId('save-feedback').textContent = 'Restored ' + res.profiles + ' profile(s) from ' + (res.saved || 'file') + '.'; }
+        else { fb.textContent = res.error; GH.audio.hit(); }
+      };
+      reader.readAsText(f);
+      this.value = '';
     };
     byId('btn-save-import').onclick = function () {
       var res = GH.meta.importCode(byId('save-import').value);
@@ -20505,11 +21067,16 @@ GH.game = (function () {
   var pilotFrom = 'title';
 
   // ----------------------------------------------------------------
-  var last = 0;
+  var last = 0, playAcc = 0, backupAcc = 0;
   function loop(now) {
     requestAnimationFrame(loop);
     var dt = Math.min(0.05, (now - last) / 1000 || 0.016);
     last = now;
+    if (GH.game.state === 'play' || GH.game.state === 'race') {
+      playAcc += dt; backupAcc += dt;
+      if (playAcc >= 60) { playAcc -= 60; GH.meta.data.playtimeMin = (GH.meta.data.playtimeMin || 0) + 1; }
+      if (backupAcc >= 300) { backupAcc = 0; GH.meta.save(); GH.meta.backup('auto'); }
+    }
     pollPads();
     if (touchCapable) {
       document.getElementById('touch-ui').classList.toggle('hidden',

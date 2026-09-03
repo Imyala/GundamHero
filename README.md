@@ -49,6 +49,13 @@ MMO-style: **W/S** walk, **A/D** turn, **Q/E** strafe, **hold RIGHT MOUSE** to l
   has 5 packs (AILE, SWORD, LAUNCHER, STORM, PHANTOM) in 3 marks (MK.II → CUSTOM → PROTOTYPE), plus 7 RELIC
   frames gated behind feats.
 
+## First sortie, saves, sound
+
+A fresh profile's first PLAY is **ZERO HOUR**, a ten-minute guided sortie (replay or skip from the pause
+menu). Saves live in the browser: HANGAR → SAVE CODE offers a copyable code, a downloadable save file, and
+four automatic backups with one-click restore. Music is composed procedurally per zone and situation
+(battle, sortie, race, victory, hangar); CONTROLS has separate music and effects volumes.
+
 ## Vehicles, drifting, and living in the Reach
 
 Every lineage folds into two vehicles (23 designs: tanks, crawlers, bikes, beasts, discs, waveriders);

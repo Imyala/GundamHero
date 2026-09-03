@@ -12,10 +12,30 @@
 - **135 frames**: 8 base + 120 lineage variants + 7 relics, with ALLOY / FRAME CORE materials, a FRAME
   WORKSHOP, feat gating, and pack/mark silhouettes on the models.
 
+## Shipped in the third round
+
+- **ZERO HOUR**, the guided first ten minutes: twelve steps on top of the survivor camp (walk, look,
+  fight, cast, ward, transform, drive, drift-turbo, mine a vein, chase a signal, drop a warden, build a
+  frame), each with one sentence, a progress readout and a beacon. First PLAY on a fresh profile starts
+  it; it can be replayed or skipped from the pause menu; finishing pays alloy, cores, salvage and a
+  skill point.
+- **Save features**: version stamp, four rolling automatic backups per profile (every five minutes of
+  play and on every EXIT RUN) with one-click restore, save-file download and load next to the save code,
+  and a title-screen nudge after an hour of play without a backup.
+- **Sound and music**: every track is now composed data (chords, bass, motif, drum feel) instead of a
+  random pentatonic walk. New cues: BATTLE (a relentless minor-key march ostinato with brass), SORTIE
+  (bright major fanfare), RACE, VICTORY sting, HANGAR (menus). New effects for turbo tiers, veins,
+  signals, diary tiers, tutorial steps and builds. Separate music and effects volume sliders.
+- **Menu pass**: every older screen opens with a two-line "what this is, why you care" header.
+- **Performance**: HUD DOM writes are dirty-flagged (hotbar, wards, buffs, readouts only touch the DOM
+  when their text changes).
+- Title: version number, feedback link, "best on desktop" note for touch devices.
+
 ## Still to do before calling it 1.0
 
 ### Must (blocks a public release)
 
+1. ~~Balance pass~~ done (round two, `tools/balance.js`).
 1. **Balance pass on the 127 built frames.** Stats are generated from multipliers (docs in `roster.js`);
    nobody has played PROTOTYPE marks or relics against Danger IV. Expect a few to be either useless or
    dominant. Plan: a spreadsheet of DPS × effective HP per frame, cap outliers.

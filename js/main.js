@@ -57,6 +57,8 @@
   function applySettings() {
     var st = GH.controls.settings;
     document.getElementById('crt-overlay').classList.toggle('off', !st.crt);
+    GH.music.setVolume(0.12 * (st.music === undefined ? 1 : st.music));
+    GH.audio.setVolume(0.25 * (st.sfx === undefined ? 1 : st.sfx));
   }
 
   // ----------------------------------------------------------------
@@ -363,8 +365,13 @@
   var curScreen = null;
   var backHandlers = {};
 
+  var MENU_MUSIC = { 'title-screen': 'title', 'pause-screen': null, 'reward-screen': null, 'end-screen': null };
   function show(id) {
     curScreen = id;
+    if (id && GH.music.mode()) {
+      var want = MENU_MUSIC[id] === undefined ? 'hangar' : MENU_MUSIC[id];
+      if (want && GH.game.state !== 'play' && GH.game.state !== 'pause') GH.music.play(want);
+    }
     SCREENS.forEach(function (s) {
       document.getElementById(s).classList.toggle('hidden', s !== id);
     });
@@ -425,6 +432,19 @@
       : 'Open world campaign — explore, race, raid dungeons. Your pilot persists between sessions.' +
         ((nestsDead || lairsDown) ? ' (' + nestsDead + ' nests broken · ' + lairsDown + ' lairs down)' : '');
     document.getElementById('btn-new-exp').classList.toggle('hidden', !w.exp);
+    var tutDone = !!(GH.meta.data.tutorial && GH.meta.data.tutorial.done);
+    document.getElementById('btn-play-first').classList.toggle('hidden', tutDone);
+    document.getElementById('first-desc').classList.toggle('hidden', tutDone);
+    document.getElementById('btn-tutorial').classList.toggle('hidden', !tutDone);
+    var nudge = document.getElementById('backup-nudge');
+    if (GH.meta.wantsBackup()) {
+      nudge.classList.remove('hidden');
+      nudge.innerHTML = '⚠ ' + Math.round(GH.meta.data.playtimeMin / 60) + ' h played and no backup in a while — <a href="#" id="nudge-save">HANGAR → SAVE: download your save file</a>.';
+      document.getElementById('nudge-save').onclick = function (e) { e.preventDefault(); openSave(); };
+    } else nudge.classList.add('hidden');
+    document.getElementById('title-version').innerHTML = 'HERO FRAME v' + GH.meta.VERSION +
+      (touchCapable ? ' · best played on a desktop with a mouse' : '') +
+      ' · <a href="https://github.com/Imyala/GundamHero/issues" target="_blank" rel="noopener">report a bug / feedback</a>';
     // a parked arena run
     var cont = document.getElementById('btn-continue');
     var has = GH.game.hasSuspended();
@@ -905,7 +925,29 @@
     document.getElementById('save-export').value = GH.meta.exportCode();
     document.getElementById('save-import').value = '';
     document.getElementById('save-feedback').textContent = '';
+    renderBackups();
     show('save-screen');
+  }
+  function renderBackups() {
+    var wrap = document.getElementById('save-backups');
+    var list = GH.meta.backups();
+    var html = '<div class="bk-label">AUTOMATIC BACKUPS (' + GH.meta.PROFILES[GH.meta.profile].name + ')</div>';
+    if (!list.length) html += '<div class="menu-desc">None yet — one is written every five minutes of play and whenever you exit a run.</div>';
+    list.forEach(function (b) {
+      html += '<div class="bk-row"><span>' + b.when.replace('T', ' ').slice(0, 16) + ' · ' + b.label + ' · ' + b.salvage + ' salvage · ' + b.frames + ' frames · ' + b.pilotXP + ' pilot XP</span>' +
+        '<button class="dv-buy bk-restore" data-slot="' + b.slot + '">RESTORE</button></div>';
+    });
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.bk-restore').forEach(function (btn) {
+      btn.onclick = function () {
+        var slot = parseInt(btn.getAttribute('data-slot'), 10);
+        confirmBox('RESTORE THIS BACKUP?', 'Your current progress is itself backed up first, so this can be undone.', 'RESTORE', function () {
+          if (GH.meta.restoreBackup(slot)) { GH.audio.win(); document.getElementById('save-feedback').textContent = 'Backup restored.'; refreshTitle(); }
+          else { GH.audio.hit(); document.getElementById('save-feedback').textContent = 'Could not restore that backup.'; }
+          openSave();
+        });
+      };
+    });
   }
 
   // ----------------------------------------------------------------
@@ -1391,6 +1433,7 @@
       document.getElementById('pause-stats').textContent = GH.game.pauseInfo();
       var exp = GH.game.isExpedition();
       document.getElementById('btn-exit-run').textContent = exp ? 'EXIT — SAVE & RETURN TO MENU' : 'EXIT RUN — SAVE & RETURN TO MENU';
+      document.getElementById('btn-skip-tutorial').classList.toggle('hidden', !GH.game.tutorialActive());
       document.getElementById('pause-exit-note').textContent = exp
         ? 'Exit keeps your pilot exactly where they stand. Abandon deletes this pilot; the world\'s scars stay.'
         : 'Exit parks this run at the start of wave ' + Math.max(1, GH.game.debugInfo().wave) + ' — CONTINUE RUN on the title brings you back. Abandon deletes it.';
@@ -1402,6 +1445,10 @@
   }
 
   function toTitle() {
+    var d = GH.meta.data;
+    if (d.tutorialParked && d.tutorial && d.tutorial.done && !GH.game.tutorialActive()) {
+      d.world.exp = d.tutorialParked; d.tutorialParked = null;
+    }
     GH.meta.save();
     expEntry = null;
     GH.game.state = 'title';
@@ -1413,6 +1460,7 @@
   // EXIT RUN: save whatever we're flying and go home
   function exitRun() {
     GH.game.suspendRun();
+    GH.meta.backup('exit');
     GH.game.leaveRun();
     GH.audio.card();
     toTitle();
@@ -1453,6 +1501,24 @@
       if (expEntry === entryKind) resumeExpedition();
       else fallback();
     };
+  }
+
+  // ZERO HOUR: the guided first sortie (fresh pilot in the Reach, tutorial flag on)
+  function startTutorial() {
+    GH.audio.wave();
+    var go = function () {
+      GH.game.mode = 'expedition';
+      show(null);
+      GH.game.startExpedition(0, { tutorial: true });
+    };
+    if (GH.meta.data.world.exp) {
+      confirmBox('REPLAY ZERO HOUR?', 'Zero Hour starts a fresh pilot in the Reach. Your saved pilot is kept aside and restored when you finish or skip it.', 'START', function () {
+        GH.meta.data.tutorialParked = GH.meta.data.world.exp;
+        GH.meta.data.world.exp = null;
+        GH.meta.save();
+        go();
+      });
+    } else go();
   }
 
   function startOrResumeExpedition() {
@@ -1579,7 +1645,7 @@
           '<button class="menu-btn small" id="ws-build" ' + (can ? '' : 'disabled') + '>' + (can ? '⚒ BUILD ' + d.name : 'NOT YET') + '</button>');
     var bb = document.getElementById('ws-build');
     if (bb) bb.onclick = function () {
-      if (GH.vehicles.build(d.id)) { GH.audio.win(); GH.game.lifeEvent('build', 1); renderWorkshop(); }
+      if (GH.vehicles.build(d.id)) { GH.audio.build(); GH.game.lifeEvent('build', 1); GH.game.tutorialEvent('build', 1); renderWorkshop(); }
       else GH.audio.hit();
     };
   }
@@ -1619,8 +1685,9 @@
     var bb = document.getElementById('ws-build');
     if (bb) bb.onclick = function () {
       if (GH.roster.build(m.id)) {
-        GH.audio.win();
+        GH.audio.build();
         GH.game.lifeEvent('build', 1);
+        GH.game.tutorialEvent('build', 1);
         renderWorkshop();
         if (GH.game.refreshPilot) GH.game.refreshPilot();
       } else GH.audio.hit();
@@ -1750,6 +1817,10 @@
     document.getElementById('set-crt').checked = !!st.crt;
     document.getElementById('set-cam').value = GH.game.camMode();
     document.getElementById('set-mute').checked = GH.audio.isMuted();
+    document.getElementById('set-music').value = Math.round((st.music === undefined ? 1 : st.music) * 100);
+    document.getElementById('set-music-val').textContent = Math.round((st.music === undefined ? 1 : st.music) * 100) + '%';
+    document.getElementById('set-sfx').value = Math.round((st.sfx === undefined ? 1 : st.sfx) * 100);
+    document.getElementById('set-sfx-val').textContent = Math.round((st.sfx === undefined ? 1 : st.sfx) * 100) + '%';
   }
 
   // ----------------------------------------------------------------
@@ -1829,6 +1900,12 @@
       else { expEntry = 'hub'; openHub(); }
     };
     byId('btn-expedition').onclick = startOrResumeExpedition;
+    byId('btn-play-first').onclick = startTutorial;
+    byId('btn-tutorial').onclick = startTutorial;
+    byId('btn-skip-tutorial').onclick = function () {
+      GH.game.skipTutorial();
+      togglePause();
+    };
     byId('btn-new-exp').onclick = newExpedition;
     byId('btn-continue').onclick = function () {
       GH.audio.wave();
@@ -1913,6 +1990,16 @@
     byId('set-invert').onchange = function () { GH.controls.settings.invertY = this.checked; GH.controls.save(); };
     byId('set-crt').onchange = function () { GH.controls.settings.crt = this.checked; GH.controls.save(); applySettings(); };
     byId('set-cam').onchange = function () { GH.game.setCamMode(this.value); };
+    byId('set-music').oninput = function () {
+      GH.controls.settings.music = parseInt(this.value, 10) / 100;
+      byId('set-music-val').textContent = this.value + '%';
+      GH.controls.save(); applySettings();
+    };
+    byId('set-sfx').oninput = function () {
+      GH.controls.settings.sfx = parseInt(this.value, 10) / 100;
+      byId('set-sfx-val').textContent = this.value + '%';
+      GH.controls.save(); applySettings(); GH.audio.card();
+    };
     byId('set-mute').onchange = function () {
       GH.audio.unlock();
       GH.audio.setMuted(this.checked);
@@ -1934,6 +2021,32 @@
       byId('save-feedback').textContent =
         ok ? 'Copied — keep it somewhere safe.' : 'Select the code and copy it manually.';
       GH.audio.card();
+    };
+    byId('btn-save-file').onclick = function () {
+      var text = GH.meta.exportBlob();
+      var blob = new Blob([text], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'heroframe-save-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+      byId('save-feedback').textContent = 'Save file downloaded — keep it somewhere safe.';
+      GH.audio.card();
+      refreshTitle();
+    };
+    byId('btn-load-file').onclick = function () { byId('save-file-input').click(); };
+    byId('save-file-input').onchange = function () {
+      var f = this.files && this.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var res = GH.meta.importBlob(String(reader.result || ''));
+        var fb = byId('save-feedback');
+        if (res.ok) { GH.audio.win(); refreshTitle(); openSave(); byId('save-feedback').textContent = 'Restored ' + res.profiles + ' profile(s) from ' + (res.saved || 'file') + '.'; }
+        else { fb.textContent = res.error; GH.audio.hit(); }
+      };
+      reader.readAsText(f);
+      this.value = '';
     };
     byId('btn-save-import').onclick = function () {
       var res = GH.meta.importCode(byId('save-import').value);
@@ -1994,11 +2107,16 @@
   var pilotFrom = 'title';
 
   // ----------------------------------------------------------------
-  var last = 0;
+  var last = 0, playAcc = 0, backupAcc = 0;
   function loop(now) {
     requestAnimationFrame(loop);
     var dt = Math.min(0.05, (now - last) / 1000 || 0.016);
     last = now;
+    if (GH.game.state === 'play' || GH.game.state === 'race') {
+      playAcc += dt; backupAcc += dt;
+      if (playAcc >= 60) { playAcc -= 60; GH.meta.data.playtimeMin = (GH.meta.data.playtimeMin || 0) + 1; }
+      if (backupAcc >= 300) { backupAcc = 0; GH.meta.save(); GH.meta.backup('auto'); }
+    }
     pollPads();
     if (touchCapable) {
       document.getElementById('touch-ui').classList.toggle('hidden',
