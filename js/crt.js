@@ -13,7 +13,7 @@ GH.crt = (function () {
 
   var LEVELS = {
     // maskType 0: two-phase magenta/green grille (soft), 1: full RGB aperture grille
-    subtle: { curve: 0.03, scan: 0.50, mask: 0.16, maskType: 0, glow: 0.10, aberr: 0.25, vig: 0.10 },
+    subtle: { curve: 0.025, scan: 0.40, mask: 0.12, maskType: 0, glow: 0.08, aberr: 0.15, vig: 0.08 },
     strong: { curve: 0.06, scan: 0.80, mask: 0.35, maskType: 1, glow: 0.20, aberr: 0.60, vig: 0.16 }
   };
   var level = 'subtle';
@@ -70,11 +70,11 @@ GH.crt = (function () {
     'float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }',
     '',
     // beam profile: gaussian across the row, fatter for bright pixels so
-    // highlights stay bright and dark areas get the deepest gaps
-    'float beam(float d, float l) {',
+    // highlights stay bright and dark areas get the deepest gaps. `box` is
+    // the plain nearest-row weight the gaussian blends against.
+    'float beam(float d, float l, float box) {',
     '  float w = mix(0.22, 0.34, l);',
     '  float g = exp(-d * d / (2.0 * w * w));',
-    '  float box = 1.0 - step(0.5, d);',
     '  return mix(box, g, uScan);',
     '}',
     '',
@@ -90,7 +90,12 @@ GH.crt = (function () {
     '  float d0 = py - r0;',
     '  vec3 c0 = rowRGB(px, r0, ab);',
     '  vec3 c1 = rowRGB(px, r0 + 1.0, ab);',
-    '  vec3 col = c0 * beam(d0, luma(c0)) + c1 * beam(1.0 - d0, luma(c1));',
+    // nearest-row weights are complements of one step, so they always sum to
+    // one: an output row sitting exactly on the boundary used to get neither
+    // row and drew a black line (full width at the screen's vertical centre)
+    '  float b1 = step(0.5, d0);',
+    '  float b0 = 1.0 - b1;',
+    '  vec3 col = c0 * beam(d0, luma(c0), b0) + c1 * beam(1.0 - d0, luma(c1), b1);',
     '',
     // halation: bright pixels bleed a soft glow into their neighbours
     '  vec2 t = 1.5 / uSrc;',

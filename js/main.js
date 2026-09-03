@@ -47,11 +47,18 @@
     var rw = Math.max(2, Math.floor(w / PIXEL_SCALE)), rh = Math.max(2, Math.floor(h / PIXEL_SCALE));
     if (GH.crt.active()) {
       // the scene renders into a low-res texture; the CRT pass draws it at
-      // canvas resolution so scanlines and the phosphor mask land on real pixels
-      renderer.setSize(w, h, false);
-      GH.crt.resize(rw, rh, w, h);
+      // true device resolution so scanlines and the phosphor mask land on real
+      // screen pixels. Sizing in CSS pixels on a scaled display (125%, retina)
+      // made the browser resample the 1px patterns: moire bands and a doubled
+      // dark row across the middle. Bilinear CSS scaling covers any remainder.
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var dw = Math.max(2, Math.round(w * dpr)), dh = Math.max(2, Math.round(h * dpr));
+      renderer.setSize(dw, dh, false);
+      GH.crt.resize(rw, rh, dw, dh);
+      canvas.style.imageRendering = 'auto';
     } else {
       renderer.setSize(rw, rh, false);
+      canvas.style.imageRendering = '';
     }
     GH.assets.setSnap(rw, rh);
     canvas.style.width = w + 'px';
