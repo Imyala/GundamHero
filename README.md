@@ -56,6 +56,11 @@ menu). Saves live in the browser: HANGAR → SAVE CODE offers a copyable code, a
 four automatic backups with one-click restore. Music is composed procedurally per zone and situation
 (battle, sortie, race, victory, hangar); CONTROLS has separate music and effects volumes.
 
+## Reach bands
+
+The open world runs at BRONZE, SILVER, GOLD or PLATINUM (title screen or PILOT sheet). Higher bands scale
+enemies up and pay more alloy, salvage and cores; they unlock through hunts, diaries, pilot level and stage clears.
+
 ## Signatures, hunts, the hangar viewer
 
 Every lineage has a signature ability on key 5. Fifty named HUNT bosses roam the Reach (one per territory

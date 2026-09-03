@@ -432,6 +432,7 @@
       : 'Open world campaign — explore, race, raid dungeons. Your pilot persists between sessions.' +
         ((nestsDead || lairsDown) ? ' (' + nestsDead + ' nests broken · ' + lairsDown + ' lairs down)' : '');
     document.getElementById('btn-new-exp').classList.toggle('hidden', !w.exp);
+    renderBandButton();
     var tutDone = !!(GH.meta.data.tutorial && GH.meta.data.tutorial.done);
     document.getElementById('btn-play-first').classList.toggle('hidden', tutDone);
     document.getElementById('first-desc').classList.toggle('hidden', tutDone);
@@ -460,6 +461,35 @@
     } else {
       memEl.textContent = '';
     }
+  }
+
+  // the Reach's difficulty band: cycle through unlocked bands; locked ones say why
+  function renderBandButton() {
+    var b = GH.worldlife.band();
+    var btn = document.getElementById('btn-band');
+    btn.textContent = 'REACH BAND: ' + b.name;
+    btn.style.borderColor = b.css; btn.style.color = b.css;
+    var next = nextBand();
+    var ns = GH.worldlife.bandStatus(next.id);
+    document.getElementById('band-desc').innerHTML =
+      '<span style="color:' + b.css + '">' + b.name + '</span> — ' + b.desc +
+      (next.id !== b.id ? '<br>' + (ns.unlocked ? 'Click to switch. ' : 'Next, ' + next.name + ': ' + ns.missing.join(' · ') + '.') : '');
+  }
+  function nextBand() {
+    var list = GH.worldlife.BANDS, cur = GH.worldlife.band();
+    var i = 0; for (var k = 0; k < list.length; k++) if (list[k].id === cur.id) i = k;
+    for (var n = 1; n <= list.length; n++) {
+      var cand = list[(i + n) % list.length];
+      if (GH.worldlife.bandStatus(cand.id).unlocked) return cand;
+    }
+    return cur;
+  }
+  function cycleBand() {
+    var next = nextBand();
+    if (next.id === GH.worldlife.band().id) { GH.audio.hit(); return; }
+    GH.worldlife.setBand(next.id);
+    GH.audio.card();
+    refreshTitle();
   }
 
   var PROFILE_ORDER = ['standard', 'iron', 'hardcore'];
@@ -1330,7 +1360,7 @@
     for (var k in (w.dgTier || {})) { cleared++; totalTiers += w.dgTier[k]; }
     var dtot = GH.worldlife.diaryTotal();
     document.getElementById('map-head').innerHTML =
-      'HUNTS SLAIN <b>' + GH.bosses.slainCount() + '/' + GH.bosses.LIST.length + '</b> · DIARIES <b>' + dtot.done + '/' + dtot.total + '</b> · ' +
+      'BAND <b style="color:' + GH.worldlife.band().css + '">' + GH.worldlife.band().name + '</b> · HUNTS SLAIN <b>' + GH.bosses.slainCount() + '/' + GH.bosses.LIST.length + '</b> · DIARIES <b>' + dtot.done + '/' + dtot.total + '</b> · ' +
       'NESTS CLEANSED <b>' + Object.keys(w.nests).length + '/' + GH.world.totalNests() + '</b>' +
       ' · DUNGEONS ASCENDED <b>' + cleared + '/' + (GH.world.ZONES.length * 4) + '</b>' +
       ' · TOTAL TIERS CLIMBED <b>' + totalTiers + '</b>' +
@@ -1789,6 +1819,10 @@
       '<div class="pl-row">Cosmetics owned <b>' + Object.keys(d.style.owned).length + '</b> — set on the frame select screen</div>' +
       '<div class="pl-row">Active devotion <b>' + devName + '</b> · broker points <b>' + d.broker.points + '</b></div>' +
       '<div class="pl-row">House: <b>' + factionsSub() + '</b></div>' +
+      '<div class="pl-row">Reach band <b style="color:' + GH.worldlife.band().css + '">' + GH.worldlife.band().name + '</b> · <span class="band-row">' + GH.worldlife.BANDS.map(function (bb) {
+        var st = GH.worldlife.bandStatus(bb.id);
+        return '<span class="band-chip' + (bb.id === GH.worldlife.band().id ? ' on' : '') + (st.unlocked ? '' : ' locked') + '" data-band="' + bb.id + '" style="border-color:' + bb.css + '" title="' + (st.unlocked ? bb.desc : 'Locked: ' + st.missing.join(', ')) + '">' + bb.name + '</span>';
+      }).join('') + '</span></div>' +
       '<div class="pl-row">Vehicles <b>' + GH.vehicles.ownedCount() + '/' + GH.vehicles.DESIGNS.length + '</b> · zone diaries <b>' + GH.worldlife.diaryTotal().done + '/' + GH.worldlife.diaryTotal().total + '</b> · daily streak <b>' + GH.worldlife.daily().streak + '</b>' + (GH.worldlife.dailyUnclaimed() ? ' · <b class="pl-hot">' + GH.worldlife.dailyUnclaimed() + ' daily reward(s) to claim at the BROKER</b>' : '') + '</div>' +
       '</div>' +
       '<div class="pl-block" id="pilot-daily"></div>' +
@@ -1811,6 +1845,11 @@
     var body = document.getElementById('pilot-body');
     body.innerHTML = html;
     renderDaily('pilot-daily');
+    body.querySelectorAll('[data-band]').forEach(function (chip) {
+      chip.onclick = function () {
+        if (GH.worldlife.setBand(chip.getAttribute('data-band'))) { GH.audio.card(); renderPilot(); } else GH.audio.hit();
+      };
+    });
     body.querySelectorAll('[data-go]').forEach(function (b) {
       b.onclick = function () {
         var g = b.getAttribute('data-go');
@@ -1935,7 +1974,8 @@
       '<li><b>Alloy veins</b>: grey crystal clusters in every territory. Press ' + L('interact') + ' to mine. Danger III–IV veins can hold a frame core. They regrow daily.</li>' +
       '<li><b>Cache signals</b>: every few minutes a treasure site pings and is marked gold on the minimap. Worth the detour.</li>' +
       '<li><b>Hunts</b>: fifty named bosses, four or five per territory. One roams each territory per day at a skull totem (☠ on the minimap, listed on the WORLD MAP). Each has its own mechanics — WEAK POINT bosses take 2.5× from behind, SHIELDED ones drop their shield when their adds die, BURROWERS erupt under you. They pay cores and fill the BESTIARY in the COLLECTION LOG. ARENA and CLASSIC midboss waves draw from the same pool.</li>' +
-      '<li>Higher DANGER zones pay more alloy per drop, richer veins, and richer signals — Albion rules: risk buys reward.</li></ul>' +
+      '<li>Higher DANGER zones pay more alloy per drop, richer veins, and richer signals — Albion rules: risk buys reward.</li>' +
+      '<li><b>Reach bands</b> (title screen or PILOT sheet): BRONZE → SILVER → GOLD → PLATINUM. Each band scales enemy hull and damage, spawns elites in the open world, and pays more alloy, salvage and cores per hunt. Bands unlock by slaying hunts, finishing diary tiers, pilot level and CLASSIC clears — never bought.</li></ul>' +
       '<div class="hp-h">TIPS</div>' +
       '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run CLASSIC to wave 20 for cores.</li>' +
       '<li>Sparks feed your persistent PILOT LEVEL — every level is a skill point for PILOT TRAINING.</li>' +
@@ -1966,6 +2006,7 @@
       togglePause();
     };
     byId('btn-new-exp').onclick = newExpedition;
+    byId('btn-band').onclick = cycleBand;
     byId('btn-continue').onclick = function () {
       GH.audio.wave();
       show(null);

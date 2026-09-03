@@ -43,6 +43,14 @@
   territory per day at a skull totem; ARENA and CLASSIC midboss waves draw from the pool. Kills pay
   cores and alloy and fill a BESTIARY in the collection log; the world map lists today's hunt per zone.
 
+## Shipped in the fifth round
+
+- **Reach difficulty bands** (BRONZE / SILVER / GOLD / PLATINUM, `worldlife.js` BANDS): enemy hull
+  ×1 / 1.45 / 2.1 / 3, damage ×1 / 1.25 / 1.55 / 1.9, open-world elite chance 0 / 6 / 12 / 20%, alloy
+  ×1 / 1.4 / 1.9 / 2.6, salvage ×1 / 1.3 / 1.7 / 2.2, +0 / 1 / 2 / 3 cores per hunt; PLATINUM hunts
+  arrive already wounded. Gated on hunts slain, diary tiers, pilot level and CLASSIC clears. Picked on
+  the title or the PILOT sheet; shown in the HUD danger line and the world map.
+
 ## Still to do before calling it 1.0
 
 ### Must (blocks a public release)

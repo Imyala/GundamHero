@@ -522,6 +522,11 @@ GH.game = (function () {
     mesh.position.set(x, 0 + gy(x, z), z);
     scene.add(mesh);
     var hpMult = def.boss ? Math.max(1, wavePlan.hpMult * 0.55) : wavePlan.hpMult;
+    if (def.boss && expActive && !tutorial) {
+      // the band scales bosses too — the low-danger clamp above must not eat it
+      var bEhp = GH.worldlife.band().ehp;
+      hpMult = Math.max(1, wavePlan.hpMult / bEhp * 0.55) * bEhp;
+    }
     if (def.boss && GH.devWeakBoss) hpMult *= 0.03;
     if (def.boss && GH.devPhaseBoss) hpMult *= 0.25;
     if (weekly) hpMult *= weekly.mods.ehp;
@@ -561,7 +566,8 @@ GH.game = (function () {
     if (def.behavior === 'ambusher' && mesh.userData.body) { mesh.userData.body.visible = false; }
     if (def.behavior === 'flyer') e.hgt = 3.0;
     // elites: from wave 6, one in ten spawns carries a modifier
-    if (!def.boss && atX === undefined && waveNum >= 6 && Math.random() < 0.10) {
+    var eliteChance = expActive ? (tutorial ? 0 : GH.worldlife.band().elite) : (atX === undefined && waveNum >= 6 ? 0.10 : 0);
+    if (!def.boss && !def.hunt && Math.random() < eliteChance) {
       var mods2 = ['blazing', 'shielded', 'swift', 'volatile', 'vampiric'];
       e.elite = GH.pick(mods2);
       e.hp *= 2.5; e.maxHp *= 2.5;
@@ -1599,7 +1605,8 @@ GH.game = (function () {
     var first = !d.bestiary[e.id];
     d.bestiary[e.id] = (d.bestiary[e.id] || 0) + 1;
     var t = GH.bosses.TIER[def.huntTier];
-    grantMats(t.alloy, t.cores, true);
+    var bnd = expActive ? GH.worldlife.band() : GH.worldlife.BANDS[0];
+    grantMats(Math.round(t.alloy * bnd.alloy), t.cores + bnd.cores, true);
     queueAnnounce(def.name + ' SLAIN — +' + t.cores + ' CORES · +' + t.alloy + ' ALLOY' + (first ? ' · BESTIARY ENTRY' : ''), 28);
     if (expActive) {
       var hd = d.huntsToday;
@@ -2713,7 +2720,7 @@ GH.game = (function () {
     }
     else if (pk.type === 'alloy') {
       var alN = (GH.rand(1, 3) | 0) || 1;
-      if (expActive) alN = Math.round(alN * GH.worldlife.zonePerk(curZone).alloy * (1 + (zoneNow ? (zoneNow.danger - 1) * 0.25 : 0)));
+      if (expActive) alN = Math.round(alN * GH.worldlife.zonePerk(curZone).alloy * GH.worldlife.band().alloy * (1 + (zoneNow ? (zoneNow.danger - 1) * 0.25 : 0)));
       grantMats(alN, 0, silent);
       lifeEvent('alloy', alN);
     }
@@ -4057,7 +4064,7 @@ GH.game = (function () {
     if (v.mesh) v.mesh.visible = false;
     GH.worldlife.mineNode(curZone, v.idx);
     var perk = GH.worldlife.zonePerk(curZone);
-    var got = Math.round(v.alloy * perk.alloy);
+    var got = Math.round(v.alloy * perk.alloy * GH.worldlife.band().alloy);
     grantMats(got, v.core ? 1 : 0, false);
     spawnBurst(v.x, 0.8, v.z, 0xc8d8f0, 14);
     GH.audio.coin();
@@ -4215,8 +4222,8 @@ GH.game = (function () {
       duration: 999, rate: 0,
       types: st.roster(4 + zone.danger * 3),
       boss: null, midboss: null,
-      hpMult: (0.8 + (zone.danger - 1) * 0.9) * 1.5 * tm.hp,
-      dmgMult: (0.9 + (zone.danger - 1) * 0.45) * tm.dmg,
+      hpMult: (0.8 + (zone.danger - 1) * 0.9) * 1.5 * tm.hp * (tutorial ? 1 : GH.worldlife.band().ehp),
+      dmgMult: (0.9 + (zone.danger - 1) * 0.45) * tm.dmg * (tutorial ? 1 : GH.worldlife.band().edmg),
       overrun: false
     };
   }
@@ -5557,7 +5564,7 @@ GH.game = (function () {
     var mm = document.getElementById('minimap');
     if (mm) mm.classList.remove('hidden');
     var cl = cleanseCount();
-    announce('THE SHATTERED REACH', 34);
+    announce('THE SHATTERED REACH' + (GH.worldlife.band().id !== 'bronze' && !opts.tutorial ? ' — ' + GH.worldlife.band().name + ' BAND' : ''), 34);
     queueAnnounce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1], 24);
     queueAnnounce('NESTS CLEANSED ' + cl.dead + '/' + cl.total, 20);
     if (harrowSpot) {
@@ -5625,7 +5632,7 @@ GH.game = (function () {
         huntUp = true;
         wavePlan = expeditionPlan(zoneNow);
         var he = spawnEnemy(huntSpot.id, huntSpot.x, huntSpot.z);
-        if (he) he.aggro = true;
+        if (he) { he.aggro = true; if (GH.worldlife.band().id === 'platinum') he.hp = Math.round(he.maxHp * 0.64); }
         if (huntTotem) { worldH.group.remove(huntTotem); huntTotem = null; }
         shake = Math.min(0.5, shake + 0.3);
         queueAnnounce(GH.enemyDefs[huntSpot.id].epithet.toUpperCase(), 20);
@@ -5671,6 +5678,7 @@ GH.game = (function () {
     if (inCamp) {
       if (coinsRun > 0) {
         GH.meta.data.world.expBankT = (GH.meta.data.world.expBankT || 0);
+        coinsRun = Math.round(coinsRun * GH.worldlife.band().salvage);
         GH.meta.data.salvage += coinsRun;
         queueAnnounce('BANKED ' + coinsRun + ' SALVAGE', 18);
         coinsRun = 0;
@@ -7133,7 +7141,7 @@ GH.game = (function () {
     if (expActive) {
       var dst = dungeonStatusText();
       setText(el['wave-timer'], dst ||
-        (zoneNow ? 'DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] : ''));
+        (zoneNow ? 'DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] + (GH.worldlife.band().id !== 'bronze' ? ' · ' + GH.worldlife.band().name : '') : ''));
     } else {
       setText(el['wave-timer'], GH.fmt1(Math.max(0, waveTimer)));
     }

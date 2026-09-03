@@ -1217,3 +1217,11 @@ body.looking #crosshair { opacity: 0.4; }
 .hb-slot.sig { border-color: #c090ff; }
 .hb-slot.sig.ready { border-color: #e0b0ff; box-shadow: 0 0 8px rgba(200, 144, 255, 0.5); }
 .log-cell.hunt .lc-name { color: #ffb060; }
+
+/* ---------------- difficulty bands ---------------- */
+.band-btn { border-color: #d09060; }
+#band-desc { max-width: 620px; }
+.band-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.band-chip { padding: 3px 10px; border: 1px solid #3a4456; font-size: 11px; color: #c0c8e0; cursor: pointer; }
+.band-chip.on { border-width: 2px; color: #fff; }
+.band-chip.locked { opacity: 0.5; cursor: default; }

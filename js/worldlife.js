@@ -223,6 +223,55 @@ GH.worldlife = (function () {
   };
 
   // =================================================================
+  // DIFFICULTY BANDS — Sacred's overlapping ladder, Albion's colour zones.
+  // The Reach can be run at four bands. Higher bands scale enemy hull and
+  // damage, spawn elites in the open world, and pay more of everything.
+  // Bands are gated on what you have already done, never bought.
+  // =================================================================
+  L.BANDS = [
+    { id: 'bronze', name: 'BRONZE', css: '#d09060', ehp: 1.0, edmg: 1.0, elite: 0.0, alloy: 1.0, cores: 0, salvage: 1.0,
+      desc: 'The Reach as first found.', unlock: {} },
+    { id: 'silver', name: 'SILVER', css: '#d0d8e8', ehp: 1.45, edmg: 1.25, elite: 0.06, alloy: 1.4, cores: 1, salvage: 1.3,
+      desc: 'Enemies +45% hull, +25% damage; elites roam the open world. Alloy ×1.4, salvage ×1.3, +1 core per hunt.',
+      unlock: { hunts: 3, diaries: 2, pilot: 4 } },
+    { id: 'gold', name: 'GOLD', css: '#ffd050', ehp: 2.1, edmg: 1.55, elite: 0.12, alloy: 1.9, cores: 2, salvage: 1.7,
+      desc: 'Enemies +110% hull, +55% damage; one in eight is an elite. Alloy ×1.9, salvage ×1.7, +2 cores per hunt.',
+      unlock: { hunts: 12, diaries: 8, pilot: 8, stages: 1 } },
+    { id: 'platinum', name: 'PLATINUM', css: '#a0f0ff', ehp: 3.0, edmg: 1.9, elite: 0.2, alloy: 2.6, cores: 3, salvage: 2.2,
+      desc: 'Enemies ×3 hull, +90% damage; one in five is an elite, hunts arrive already wounded. Alloy ×2.6, salvage ×2.2, +3 cores per hunt.',
+      unlock: { hunts: 25, diaries: 16, pilot: 12, stages: 3 } }
+  ];
+  L.bandById = function (id) { for (var i = 0; i < L.BANDS.length; i++) if (L.BANDS[i].id === id) return L.BANDS[i]; return L.BANDS[0]; };
+  L.band = function () { return L.bandById(GH.meta.data.band || 'bronze'); };
+  L.bandStatus = function (id) {
+    var b = L.bandById(id), u = b.unlock;
+    var d = GH.meta.data;
+    var have = {
+      hunts: GH.bosses ? GH.bosses.slainCount() : 0,
+      diaries: L.diaryTotal().done,
+      pilot: GH.skills.pilotProgress().lvl,
+      stages: Object.keys(d.victories || {}).length
+    };
+    var missing = [];
+    if (u.hunts && have.hunts < u.hunts) missing.push('slay ' + u.hunts + ' hunts (' + have.hunts + ')');
+    if (u.diaries && have.diaries < u.diaries) missing.push('complete ' + u.diaries + ' diary tiers (' + have.diaries + ')');
+    if (u.pilot && have.pilot < u.pilot) missing.push('reach pilot level ' + u.pilot + ' (' + have.pilot + ')');
+    if (u.stages && have.stages < u.stages) missing.push('clear ' + u.stages + ' CLASSIC stage' + (u.stages > 1 ? 's' : '') + ' (' + have.stages + ')');
+    return { band: b, unlocked: missing.length === 0, missing: missing };
+  };
+  L.setBand = function (id) {
+    if (!L.bandStatus(id).unlocked) return false;
+    GH.meta.data.band = id;
+    GH.meta.save();
+    return true;
+  };
+  L.highestBand = function () {
+    var best = L.BANDS[0];
+    L.BANDS.forEach(function (b) { if (L.bandStatus(b.id).unlocked) best = b; });
+    return best;
+  };
+
+  // =================================================================
   // CACHE SIGNALS — a treasure site pings every few minutes
   // =================================================================
   L.signalInterval = function (danger) { return 110 - danger * 10; };

@@ -33,6 +33,8 @@ GH.meta = (function () {
       tutorial: { done: false },
       // hunts: bestiary kills per boss id, and which fell today
       bestiary: {},
+      // difficulty band for the Reach (worldlife.js BANDS)
+      band: 'bronze',
       huntsToday: { day: null, slain: {} },
       // save hygiene: minutes played, when a code/file was last exported
       playtimeMin: 0,
