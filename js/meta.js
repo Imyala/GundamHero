@@ -31,6 +31,9 @@ GH.meta = (function () {
       nodesMined: {},
       // onboarding
       tutorial: { done: false },
+      // hunts: bestiary kills per boss id, and which fell today
+      bestiary: {},
+      huntsToday: { day: null, slain: {} },
       // save hygiene: minutes played, when a code/file was last exported
       playtimeMin: 0,
       lastExport: null,

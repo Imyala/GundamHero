@@ -21,6 +21,7 @@ GH.controls = (function () {
     { id: 'ability2', name: 'Ability 2 — SWEEP', def: 'Digit2', group: 'COMBAT' },
     { id: 'ability3', name: 'Ability 3 — SHACKLE', def: 'Digit3', group: 'COMBAT' },
     { id: 'ability4', name: 'Ability 4 — OVERLOAD', def: 'Digit4', group: 'COMBAT' },
+    { id: 'ability5', name: 'Signature ability (per frame)', def: 'Digit5', group: 'COMBAT' },
     { id: 'ward1', name: 'Ward — KINETIC', def: 'KeyZ', group: 'COMBAT' },
     { id: 'ward2', name: 'Ward — BALLISTIC', def: 'KeyX', group: 'COMBAT' },
     { id: 'ward3', name: 'Ward — ARC', def: 'KeyC', group: 'COMBAT' },

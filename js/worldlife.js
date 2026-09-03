@@ -39,15 +39,15 @@ GH.worldlife = (function () {
     { id: 'medium', name: 'MEDIUM', reward: { alloy: 100, cores: 1, salvage: 150 }, perk: null,
       tasks: [['kills', 120, 'Destroy 120 hostiles here'], ['elites', 5, 'Destroy 5 elites here'], ['nests', 1, 'Break a nest here'], ['caches', 1, 'Open a dungeon reward cache here']] },
     { id: 'hard', name: 'HARD', reward: { alloy: 220, cores: 3, salvage: 300 }, perk: { salvage: 1.1, label: '+10% salvage here' },
-      tasks: [['kills', 350, 'Destroy 350 hostiles here'], ['nests', 3, 'Break 3 nests here'], ['tier', 2, 'Ascend a dungeon here to tier 2'], ['signals', 3, 'Recover 3 cache signals here']] },
+      tasks: [['kills', 350, 'Destroy 350 hostiles here'], ['nests', 3, 'Break 3 nests here'], ['tier', 2, 'Ascend a dungeon here to tier 2'], ['hunts', 1, 'Slay a hunt here']] },
     { id: 'elite', name: 'ELITE', reward: { alloy: 420, cores: 6, salvage: 600 }, perk: { alloy: 1.25, label: '+25% alloy here' },
-      tasks: [['kills', 900, 'Destroy 900 hostiles here'], ['elites', 30, 'Destroy 30 elites here'], ['tier', 3, 'Ascend a dungeon here to tier 3'], ['caches', 4, 'Open 4 dungeon reward caches here']] }
+      tasks: [['kills', 900, 'Destroy 900 hostiles here'], ['elites', 30, 'Destroy 30 elites here'], ['tier', 3, 'Ascend a dungeon here to tier 3'], ['hunts', 4, 'Slay 4 hunts here']] }
   ];
 
   function diary(zone) {
     var d = GH.meta.data;
     d.diary = d.diary || {};
-    if (!d.diary[zone]) d.diary[zone] = { kills: 0, elites: 0, nests: 0, caches: 0, nodes: 0, driveT: 0, tier: 0, signals: 0, done: {} };
+    if (!d.diary[zone]) d.diary[zone] = { kills: 0, elites: 0, nests: 0, caches: 0, nodes: 0, driveT: 0, tier: 0, signals: 0, hunts: 0, done: {} };
     return d.diary[zone];
   }
   L.diary = diary;
@@ -121,7 +121,8 @@ GH.worldlife = (function () {
     { id: 'build', need: 1, desc: 'Build a frame or a vehicle in the workshop', reward: { cores: 1 } },
     { id: 'alloy', need: 60, desc: 'Pick up 60 alloy', reward: { salvage: 150 } },
     { id: 'signals', need: 2, desc: 'Recover 2 cache signals', reward: { alloy: 45 } },
-    { id: 'contract', need: 1, desc: "Fill a Broker contract", reward: { alloy: 45, cores: 1 } }
+    { id: 'contract', need: 1, desc: "Fill a Broker contract", reward: { alloy: 45, cores: 1 } },
+    { id: 'hunts', need: 1, desc: 'Slay a HUNT boss (skull totem on the map, or an arena midboss)', reward: { alloy: 60, cores: 1 } }
   ];
   L.SWEEP_BONUS = { cores: 1, alloyPerStreakDay: 10, streakCap: 10 };
 

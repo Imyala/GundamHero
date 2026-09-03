@@ -61,7 +61,7 @@ GH.game = (function () {
     if (seen.__done) return;
     if (waveNum === 1) {
       if (runTime > 0.5) showHint('move', L('forward') + '/' + L('back') + ' walk · ' + L('turnLeft') + '/' + L('turnRight') + ' turn · hold RIGHT MOUSE to look around · LEFT CLICK attacks and marks a target');
-      if (runTime > 8) showHint('ability', 'Press ' + L('ability1') + ' to cast RUPTURE on your target — abilities spend the blue ENERGY bar');
+      if (runTime > 8) showHint('ability', 'Press ' + L('ability1') + ' to cast RUPTURE on your target, ' + L('ability5') + ' for your frame\'s SIGNATURE — abilities spend the blue ENERGY bar');
       if (sparksRun > 0) showHint('sparks', 'SPARKS feed your level AND your persistent PILOT LEVEL — skill points are spent in PILOT TRAINING [' + L('skills') + ']');
     }
     if (waveNum === 2) {
@@ -327,7 +327,8 @@ GH.game = (function () {
       },
       skillBon: skl,
       energy: skl.energyMax,
-      abilityCds: { 1: 0, 2: 0, 3: 0, 4: 0 },
+      abilityCds: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      sig: GH.skills.signatureFor(mechDef), sigPower: mechDef.kind === 'relic' ? 1.25 : 1, sigT: 0, sigKind: null,
       hp: 0,
       xp: 0, level: 1, xpNeed: 6,
       weapons: [],
@@ -362,6 +363,7 @@ GH.game = (function () {
     if (player.shieldT > 0) { G.dmg.spawn(player.x, 2.6, player.z, 'SHIELD', 'heal', 14); return; }
     var s = player.stats;
     if (player.speederOn) raw *= 1.25; // skimmer hull is thin — speed is the armor
+    if (player.sigKind === 'wall') { raw *= 0.4; player.heal(player.stats.maxHP * 0.03); }
     var block = s.block + (player.protocols.vents && player.hp < s.maxHP * 0.35 ? 10 : 0);
     if (Math.random() * 100 < block) {
       G.dmg.spawn(player.x, 2.6, player.z, 'BLOCK', 'heal', 14);
@@ -582,6 +584,7 @@ GH.game = (function () {
       bossRef = e;
       GH.audio.boss();
       GH.music.setBoss(true);
+      if (def.hunt && !expActive) GH.music.play('battle');
       announce(def.name, 32);
       showBossBar(def.name);
     }
@@ -594,6 +597,16 @@ GH.game = (function () {
     if (e.phased > 0) return; // blinked out — nothing to hit
     var dmg = raw;
     if (e.def.armorMult) dmg *= e.def.armorMult;
+    if (e.def.behavior === 'hunt' && e.mech) {
+      if (e.shieldUp) { G.dmg.spawn(e.x, 3.5, e.z, 'SHIELDED', 'elem', 14); return; }
+      if (e.mech.indexOf('weak') !== -1) {
+        var fwx = Math.sin(e.faceA || 0), fwz = Math.cos(e.faceA || 0);
+        var tpx = player.x - e.x, tpz = player.z - e.z, tl = Math.sqrt(tpx * tpx + tpz * tpz) || 1;
+        var dotp = (fwx * tpx + fwz * tpz) / tl;
+        if (dotp < -0.3) { dmg *= 2.5; G.dmg.spawn(e.x, 3.5, e.z, 'WEAK POINT', 'crit', 13); }
+        else if (dotp > 0.3) dmg *= 0.6;
+      }
+    }
     if (e.buried) {
       // shoot the plume: enough hits force it up
       dmg *= 0.3;
@@ -746,6 +759,7 @@ GH.game = (function () {
 
     if (e.tut) tutorialEvent('kill', 1);
     if (e.tutBoss) tutorialEvent('boss', 1);
+    if (e.def.hunt && !e.noLedger) { huntSlain(e); if (expActive && !enemies.some(function (o) { return !o.dead && o.def.boss && o !== e; })) GH.music.play(GH.worldlife.rootZone(curZone)); }
     // world life: diaries and the daily board
     if (!e.nestId) {
       lifeEvent('kills', 1);
@@ -1164,6 +1178,10 @@ GH.game = (function () {
         var r = corruptAI(e, dt, dist, nx, nz);
         mx = r.mx; mz = r.mz;
         if (r.spd !== undefined) spd = r.spd;
+      } else if (def.behavior === 'hunt') {
+        var hr = huntAI(e, dt, dist, nx, nz);
+        mx = hr.mx; mz = hr.mz;
+        if (hr.spd !== undefined) spd = hr.spd;
       } else if (def.behavior === 'racer') {
         // RACEWAY rival: ride the circuit line, harass the pilot in passing
         var rwLay = worldH && worldH.layout.raceway;
@@ -1292,6 +1310,7 @@ GH.game = (function () {
         if (GH.dist2(e.x, e.z, player.x, player.z) < Math.pow(def.radius + 0.8, 2)) {
           e.attackCd = e.modFrenzied ? 0.75 : 1.1;
           playerDamage(e.damage, e, 'kinetic');
+          if (def.behavior === 'hunt' && e.mech && e.mech.indexOf('drain') !== -1) { e.hp = Math.min(e.maxHp, e.hp + e.damage * 3); G.dmg.spawn(e.x, 3, e.z, '+' + Math.round(e.damage * 3), 'heal', 13); }
           if (def.behavior === 'latcher') { player.snareT = Math.max(player.snareT || 0, 0.45); e.attackCd = 0.6; }
         } else if (mate && !mate.down &&
           GH.dist2(e.x, e.z, mate.x, mate.z) < Math.pow(def.radius + 0.8, 2)) {
@@ -1438,6 +1457,165 @@ GH.game = (function () {
       }
     }
     return out;
+  }
+
+  // ---------- HUNT bosses: a mechanics library, phases at 66% / 33% ----------
+  function huntHas(e, m) { return e.mech.indexOf(m) !== -1; }
+  function huntAI(e, dt, dist, nx, nz) {
+    var out = { mx: nx, mz: nz };
+    var def = e.def;
+    if (!e.mech) {
+      e.mech = def.mech.slice(); e.phase = 0; e.cds = {}; e.spiralA = 0; e.sweepA = 0; e.faceA = Math.atan2(nx, nz);
+      e.mech.forEach(function (m) { e.cds[m] = GH.rand(1.5, 4); });
+    }
+    var frac = e.hp / e.maxHp;
+    if (e.phase < 1 && frac < 0.66 || e.phase < 2 && frac < 0.33) {
+      e.phase++;
+      var add = (def.phases || [])[e.phase - 1] || [];
+      add.forEach(function (m) { if (e.mech.indexOf(m) === -1) { e.mech.push(m); e.cds[m] = 1.0; } });
+      announce(def.name + (e.phase === 1 ? ' — WOUNDED' : ' — DESPERATE') + (add.length ? ': ' + add.map(function (m) { return m.split(':')[0].toUpperCase(); }).join(' + ') : ''), 28);
+      GH.audio.boss(); G.hitStop(0.1);
+      spawnBurst(e.x, 2, e.z, def.color, 30);
+      if (huntHas(e, 'shield')) { e.shieldUp = true; e.shieldT = 0; }
+    }
+    var enraged = huntHas(e, 'enrage') && frac < 0.3;
+    var cdMult = enraged ? 0.6 : 1;
+    if (enraged && !e.enrageMsg) { e.enrageMsg = true; announce(def.name + ' — ENRAGED', 26); }
+    var spd = def.speed * (enraged ? 1.5 : 1);
+    if (huntHas(e, 'weak')) {
+      var want = Math.atan2(nx, nz);
+      e.faceA = GH.lerpAngle(e.faceA, want, Math.min(1, dt * (e.stunT > 0 ? 0.2 : 1.1)));
+      e.mesh.rotation.y = e.faceA;
+      out.face = e.faceA;
+    }
+    if (e.shieldUp) {
+      e.shieldT += dt;
+      var addsAlive = enemies.some(function (o) { return !o.dead && o.summonedBy === e; });
+      if (!addsAlive && e.shieldT > 1.5 || e.shieldT > 12) { e.shieldUp = false; announce(def.name + ' — SHIELD DOWN', 22); GH.audio.zap(); }
+      if (e.mesh.userData.crown) e.mesh.userData.crown.scale.setScalar(1 + Math.sin(runTime * 8) * 0.25);
+    } else if (e.mesh.userData.crown) e.mesh.userData.crown.scale.setScalar(1);
+    if (huntHas(e, 'regen') && dist > 25 && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.03 * dt);
+    if (huntHas(e, 'burrow') && e.buried) {
+      e.buryT -= dt;
+      out.spd = def.speed * 1.8;
+      if (e.buryT <= 0) {
+        e.buried = false; e.mesh.visible = true;
+        spawnTelegraph(e.x, e.z, 3.6, 0.5, e.damage * 1.3);
+        spawnBurst(e.x, 0.6, e.z, def.color, 20); GH.audio.explode();
+        e.cds.burrow = 9 * cdMult;
+      }
+      return out;
+    }
+    if (e.stunT > 0) { e.stunT -= dt; out.spd = 0; return out; }
+    if (e.dashing > 0) {
+      e.dashing -= dt;
+      out.spd = 20; out.mx = e.dashDirX; out.mz = e.dashDirZ;
+      if (dist < def.radius + 1.0 && e.attackCd <= 0) { e.attackCd = 0.8; playerDamage(e.damage * 0.9, e, 'kinetic'); }
+      if (e.dashing <= 0) e.stunT = 1.4;
+      return out;
+    }
+    for (var mi = 0; mi < e.mech.length; mi++) {
+      var m = e.mech[mi];
+      e.cds[m] = (e.cds[m] || 0) - dt;
+      if (e.cds[m] > 0) continue;
+      var kind = m.split(':')[0];
+      if (kind === 'slam') { e.cds[m] = 6 * cdMult; spawnTelegraph(player.x, player.z, 3.2, 1.0, e.damage * 1.3); }
+      else if (kind === 'ring') {
+        e.cds[m] = 5.5 * cdMult;
+        for (var rb = 0; rb < 10; rb++) { var ra = (rb / 10) * Math.PI * 2 + runTime; spawnEnemyShot(e.x, 1.4, e.z, Math.sin(ra), Math.cos(ra), 9, e.damage * 0.5); }
+      }
+      else if (kind === 'line') { e.cds[m] = 5 * cdMult; spawnLineTelegraph(e.x, e.z, Math.atan2(nx, nz), 26, 1.0, 0.9, e.damage * 1.4); }
+      else if (kind === 'charge') { e.cds[m] = 7 * cdMult; if (dist > 4) { e.dashing = 0.55; e.dashDirX = nx; e.dashDirZ = nz; spawnBurst(e.x, 1, e.z, def.color, 8); } }
+      else if (kind === 'spiral') {
+        e.cds[m] = 0.14; e.spiralA += 0.45;
+        e.spiralN = (e.spiralN || 0) + 1;
+        for (var sp = 0; sp < 2; sp++) { var sa = e.spiralA + sp * Math.PI; spawnEnemyShot(e.x, 1.4, e.z, Math.sin(sa), Math.cos(sa), 8, e.damage * 0.4); }
+        if (e.spiralN >= 24) { e.spiralN = 0; e.cds[m] = 7 * cdMult; }
+      }
+      else if (kind === 'mines') {
+        e.cds[m] = 6 * cdMult;
+        for (var mn = 0; mn < 4; mn++) {
+          var mx2 = player.x + GH.rand(-5, 5), mz2 = player.z + GH.rand(-5, 5);
+          effects.push({ kind: 'patch', x: mx2, z: mz2, t: 6, radius: 1.5, dps: e.damage * 0.25, chill: huntHas(e, 'frost'), mesh: groundDisc(mx2, mz2, 1.5, huntHas(e, 'frost') ? 0x80c0ff : 0xff5020, 0.3) });
+        }
+      }
+      else if (kind === 'blink') {
+        e.cds[m] = 8 * cdMult;
+        spawnBurst(e.x, 1.5, e.z, def.color, 10);
+        var ba = Math.random() * Math.PI * 2;
+        var bx = player.x + Math.cos(ba) * 6, bz = player.z + Math.sin(ba) * 6;
+        var bsp = openSpot(bx, bz, def.radius); if (bsp) { bx = bsp.x; bz = bsp.z; }
+        e.x = bx; e.z = bz;
+        spawnBurst(e.x, 1.5, e.z, def.color, 10);
+        if (e.cds.slam !== undefined) e.cds.slam = Math.min(e.cds.slam, 0.4);
+      }
+      else if (kind === 'summon') {
+        e.cds[m] = 11 * cdMult;
+        var sid = m.split(':')[1];
+        if (!GH.enemyDefs[sid]) sid = GH.weightedPick(wavePlan.types).id;
+        for (var s2 = 0; s2 < 3; s2++) {
+          var smn = spawnEnemy(sid, e.x + GH.rand(-3, 3), e.z + GH.rand(-3, 3));
+          if (smn) { smn.aggro = true; smn.event = true; smn.summonedBy = e; }
+        }
+        if (huntHas(e, 'shield') && !e.shieldUp) { e.shieldUp = true; e.shieldT = 0; announce(def.name + ' — SHIELDED · KILL THE ADDS', 22); }
+      }
+      else if (kind === 'pull') {
+        e.cds[m] = 9 * cdMult;
+        var pa = GH.angleTo(player.x, player.z, e.x, e.z);
+        var pd = Math.max(0, Math.min(dist - def.radius - 1, 6));
+        player.x += Math.sin(pa) * pd; player.z += Math.cos(pa) * pd;
+        drawLightning(e.x, 1.6, e.z, player.x, 1.2, player.z);
+        GH.audio.zap();
+        spawnTelegraph(e.x, e.z, def.radius + 3.5, 0.9, e.damage * 1.2);
+      }
+      else if (kind === 'artillery') {
+        e.cds[m] = 7 * cdMult;
+        for (var t2 = 0; t2 < 5; t2++) spawnTelegraph(player.x + GH.rand(-4, 4), player.z + GH.rand(-4, 4), 2.4, 1.1 + t2 * 0.15, e.damage);
+      }
+      else if (kind === 'sweep') {
+        e.cds[m] = 0.35; e.sweepA += 0.5;
+        e.sweepN = (e.sweepN || 0) + 1;
+        spawnLineTelegraph(e.x, e.z, e.sweepA, 22, 1.0, 0.35, e.damage * 0.6);
+        if (e.sweepN >= 8) { e.sweepN = 0; e.cds[m] = 9 * cdMult; }
+      }
+      else if (kind === 'burrow') {
+        e.cds[m] = 99;
+        e.buried = true; e.buryT = 3.0; e.mesh.visible = false;
+        spawnBurst(e.x, 0.5, e.z, 0xc8b080, 14);
+      }
+      else e.cds[m] = 99; // passive mechanics: shield, weak, enrage, regen, drain, burn, frost, split
+    }
+    if (huntHas(e, 'burn') && Math.random() < 0.15) {
+      effects.push({ kind: 'patch', x: e.x, z: e.z, t: 2.5, radius: 1.2, dps: e.damage * 0.2, mesh: groundDisc(e.x, e.z, 1.2, 0xff5020, 0.25) });
+    }
+    out.spd = spd;
+    return out;
+  }
+
+  function huntSlain(e) {
+    var def = e.def;
+    var d = GH.meta.data;
+    d.bestiary = d.bestiary || {};
+    var first = !d.bestiary[e.id];
+    d.bestiary[e.id] = (d.bestiary[e.id] || 0) + 1;
+    var t = GH.bosses.TIER[def.huntTier];
+    grantMats(t.alloy, t.cores, true);
+    queueAnnounce(def.name + ' SLAIN — +' + t.cores + ' CORES · +' + t.alloy + ' ALLOY' + (first ? ' · BESTIARY ENTRY' : ''), 28);
+    if (expActive) {
+      var hd = d.huntsToday;
+      if (hd.day !== GH.world.dayStamp()) { hd.day = GH.world.dayStamp(); hd.slain = {}; }
+      hd.slain[e.id] = true;
+      if (huntSpot && huntSpot.id === e.id) { huntSpot = null; huntUp = false; }
+    }
+    lifeEvent('hunts', 1);
+    if (e.mech && e.mech.indexOf('split') !== -1 && !e.isSplit) {
+      for (var i = 0; i < 2; i++) {
+        var h = spawnEnemy(e.id, e.x + (i ? 2 : -2), e.z);
+        if (h) { h.isSplit = true; h.hp = h.maxHp = Math.round(e.maxHp * 0.3); h.mesh.scale.multiplyScalar(0.6); h.baseScale = h.mesh.scale.x; h.aggro = true; h.mech = def.mech.filter(function (m) { return m !== 'split'; }); h.phase = 2; h.cds = {}; h.noLedger = true; }
+      }
+      queueAnnounce(def.name + ' SPLITS', 22);
+    }
+    GH.meta.save();
   }
 
   // ---------- telegraphs ----------
@@ -1806,6 +1984,102 @@ GH.game = (function () {
     }
   }
 
+  // ---------------- signature abilities (slot 5, one per lineage) ----------------
+  function castSignature() {
+    var sg = player.sig;
+    if (!sg || player.abilityCds[5] > 0) return;
+    if (player.energy < sg.cost) { announce('LOW ENERGY', 16); GH.audio.hit(); return; }
+    var key = player.def.kind === 'relic' ? player.def.relicBase : (player.def.lineage || player.def.id);
+    var inst = player.weapons[0];
+    var dmg = weaponDamage(inst) * player.sigPower;
+    var needsTarget = key === 'fang' || key === 'viper';
+    if (needsTarget && (!target || target.dead)) { announce('NO TARGET — CLICK A HOSTILE', 16); return; }
+    if (needsTarget && GH.dist2(player.x, player.z, target.x, target.z) > 18 * 18) { announce('OUT OF RANGE', 16); return; }
+    player.energy -= sg.cost;
+    player.abilityCds[5] = sg.cd * player.skillBon.cdMult;
+    announce(sg.name, 22);
+    tutorialEvent('ability', 1);
+    var i, e, a;
+    if (key === 'aegis') {
+      player.sigT = 5; player.sigKind = 'wall';
+      GH.audio.block();
+      for (i = 0; i < enemies.length; i++) {
+        e = enemies[i]; if (e.dead) continue;
+        if (GH.dist2(player.x, player.z, e.x, e.z) < 36) { a = GH.angleTo(player.x, player.z, e.x, e.z); e.vx += Math.sin(a) * 20 / e.def.mass; e.vz += Math.cos(a) * 20 / e.def.mass; damageEnemy(e, dmg * 0.8, { inst: inst }); }
+      }
+      spawnBurst(player.x, 1, player.z, 0xffd040, 18);
+    } else if (key === 'vulcan') {
+      var base = player.facing;
+      for (i = -7; i <= 6; i++) fireShot(inst, player.x, player.z, base + i * 0.09 + 0.045, player);
+      GH.audio.shoot(); G.hitStop(0.04);
+    } else if (key === 'fang') {
+      a = GH.angleTo(target.x, target.z, player.x, player.z);
+      player.x = target.x + Math.sin(a) * (target.def.radius + 0.9);
+      player.z = target.z + Math.cos(a) * (target.def.radius + 0.9);
+      player.facing = GH.angleTo(player.x, player.z, target.x, target.z);
+      player.dashTime = 0.12;
+      damageEnemy(target, dmg * 2.5, { inst: inst });
+      target.vx += Math.sin(player.facing) * 10 / target.def.mass; target.vz += Math.cos(player.facing) * 10 / target.def.mass;
+      player.frenzy.push(4, 4); while (player.frenzy.length > 5) player.frenzy.shift();
+      spawnBurst(target.x, 1.4, target.z, 0xff5040, 14); GH.audio.crit(); G.hitStop(0.06);
+    } else if (key === 'hexen') {
+      if (inst.w.cycle) inst.cycleT = 0;
+      var elem = currentElement(inst) || 'burn';
+      for (i = 0; i < 12; i++) {
+        var tmp = makeWeaponInst('spellstorm', { type: 'shot', damage: Math.round(dmg * 0.9), speed: 18, life: 2.0, size: 0.28, color: GH.elements[elem] ? GH.elements[elem].color : 0x50e8d8, spread: 0, count: 1, homing: 6, aoe: 1.6, elem: elem });
+        fireShot(tmp, player.x, player.z, player.facing + (i - 5.5) * 0.5, player);
+      }
+      GH.audio.zap(); spawnBurst(player.x, 1.4, player.z, 0x50e8d8, 16);
+    } else if (key === 'viper') {
+      a = GH.angleTo(player.x, player.z, target.x, target.z);
+      spawnBurst(player.x, 1, player.z, 0x9ae848, 10);
+      player.x = target.x + Math.sin(a) * (target.def.radius + 1.0);
+      player.z = target.z + Math.cos(a) * (target.def.radius + 1.0);
+      player.facing = GH.angleTo(player.x, player.z, target.x, target.z);
+      player.dashTime = 0.15;
+      player.edgeT = 4;
+      for (i = 0; i < enemies.length; i++) { e = enemies[i]; if (!e.dead && !e.def.boss && GH.dist2(player.x, player.z, e.x, e.z) < 225) e.stun = Math.max(e.stun || 0, 1.2); }
+      if (target.def.boss) target.stunT = Math.max(target.stunT || 0, 1.0);
+      damageEnemy(target, dmg * 1.5, { inst: inst });
+      spawnBurst(player.x, 1, player.z, 0x9ae848, 10); GH.audio.dash();
+    } else if (key === 'morrow') {
+      var healed = 0;
+      for (i = 0; i < enemies.length; i++) {
+        e = enemies[i]; if (e.dead) continue;
+        if (GH.dist2(player.x, player.z, e.x, e.z) < 81) {
+          a = GH.angleTo(e.x, e.z, player.x, player.z);
+          var pullD = Math.max(0, Math.sqrt(GH.dist2(player.x, player.z, e.x, e.z)) - e.def.radius - 1.2) * (e.def.boss ? 0.3 : 0.9);
+          e.x += Math.sin(a) * pullD; e.z += Math.cos(a) * pullD;
+          var before = e.hp; damageEnemy(e, dmg * 1.2, { inst: inst }); healed += Math.max(0, before - Math.max(0, e.hp));
+        }
+      }
+      player.heal(healed * 0.3);
+      spawnBurst(player.x, 1.2, player.z, 0xb03050, 22); GH.audio.explode();
+    } else if (key === 'strix') {
+      player.dashX = Math.sin(player.facing); player.dashZ = Math.cos(player.facing);
+      player.dashTime = 0.4; player.dashId++; player.dashKind = 'lunge'; player.dashMult = 2.2;
+      player.edgeT = 3;
+      GH.audio.dash(); spawnBurst(player.x, 1, player.z, 0xf05060, 10);
+    } else if (key === 'titan') {
+      player.sigT = 5; player.sigKind = 'siege';
+      player.stats.atkSpdMult *= 2.2; player.stats.armor += 12;
+      if (inst.w.aoe) { inst.w.aoe *= 1.5; player.sigAoe = inst; }
+      GH.audio.block(); spawnBurst(player.x, 0.4, player.z, 0xf0a030, 16);
+    }
+  }
+  function updateSignature(dt) {
+    if (player.sigT > 0) {
+      player.sigT -= dt;
+      if (player.sigT <= 0) {
+        if (player.sigKind === 'siege') {
+          player.stats.atkSpdMult /= 2.2; player.stats.armor -= 12;
+          if (player.sigAoe) { player.sigAoe.w.aoe /= 1.5; player.sigAoe = null; }
+        }
+        player.sigKind = null;
+      }
+    }
+  }
+
   function updateWeapons(dt, input) {
     var s = player.stats;
     // the trigger: a click (or held button) from mouse, or an active aim
@@ -1818,7 +2092,7 @@ GH.game = (function () {
     // (a DAMPENED dungeon chokes the reactor)
     var enRate = dungeonState && dungeonState.modIds.dampened ? 0.55 : 1;
     player.energy = Math.min(s.energyMax, player.energy + s.energyRegen * enRate * dt);
-    for (var c = 1; c <= 4; c++) {
+    for (var c = 1; c <= 5; c++) {
       if (player.abilityCds[c] > 0) player.abilityCds[c] -= dt;
     }
     maintainTarget();
@@ -1852,6 +2126,8 @@ GH.game = (function () {
     }
     player.suppressed = false;
 
+    updateSignature(dt);
+    if (input.abilityPressed && input.abilityPressed[5]) { input.abilityPressed[5] = false; castSignature(); }
     // hotbar casts
     if (input.abilityPressed) {
       for (c = 1; c <= 4; c++) {
@@ -2708,6 +2984,11 @@ GH.game = (function () {
     waveNum = n;
     if (n === 10) lifeEvent('wave10', 1);
     wavePlan = GH.wavePlan(stage, n, G.mode !== 'classic');
+    // ARENA every ten waves and CLASSIC wave 10 draw a HUNT from this stage's pool
+    if (wavePlan.midboss && (G.mode !== 'classic' || n === 10) && Math.random() < 0.7) {
+      var hb2 = GH.bosses.pickFor(stage.id, G.mode === 'classic' ? 2 : Math.min(4, 1 + Math.floor(n / 10)));
+      if (hb2) wavePlan.midboss = hb2.id;
+    }
     if (weekly) {
       wavePlan.rate *= weekly.mods.rate;
       if (weekly.mods.midbossEvery && n % weekly.mods.midbossEvery === 0 && !wavePlan.midboss) {
@@ -3436,7 +3717,7 @@ GH.game = (function () {
 
     player.blocking = player.def.special === 'block' && input.special && !player.speederOn;
 
-    var spd = s.speed * (player.blocking ? 0.55 : 1);
+    var spd = s.speed * (player.blocking ? 0.55 : 1) * (player.sigKind === 'siege' ? 0.02 : 1);
     if (player.protocols.vents && player.hp < s.maxHP * 0.35) spd *= 1.2;
     if (artOn('circuit_laurel')) spd *= 1.08;
     // a shouldered power core weighs on the servos
@@ -3486,9 +3767,9 @@ GH.game = (function () {
           var rr = 1.3 + e.def.radius;
           if (GH.dist2(player.x, player.z, e.x, e.z) <= rr * rr) {
             e.lastDashId = player.dashId;
-            var dmg = player.dashKind === 'lunge'
+            var dmg = (player.dashKind === 'lunge'
               ? (12 + s.flatDamage * 2) * s.damageMult
-              : (10 + s.armor + s.block) * s.damageMult;
+              : (10 + s.armor + s.block) * s.damageMult) * (player.dashMult || 1);
             damageEnemy(e, dmg, {});
             var a = GH.angleTo(player.x, player.z, e.x, e.z);
             e.vx += Math.sin(a) * 14 / e.def.mass;
@@ -3745,6 +4026,7 @@ GH.game = (function () {
   var interactables = [];
   var nearInteract = null;
   var veins = [];            // today's alloy veins in the loaded zone
+  var huntSpot = null, huntUp = false, huntTotem = null; // today's HUNT in this territory
   var signalT = 0, signalSpot = null; // the next cache signal, and the live one
 
   // diary / daily payouts announced in the field
@@ -4102,11 +4384,32 @@ GH.game = (function () {
     });
     signalT = GH.worldlife.signalInterval(zoneNow.danger) * (0.5 + Math.random() * 0.5);
     signalSpot = null;
+    // today's hunt: a skull totem somewhere in the territory
+    huntSpot = null; huntUp = false;
+    if (huntTotem) { scene.remove(huntTotem); huntTotem = null; }
+    if (!zoneNow.dungeon) {
+      var hd0 = GH.meta.data.huntsToday;
+      if (hd0.day !== GH.world.dayStamp()) { hd0.day = GH.world.dayStamp(); hd0.slain = {}; }
+      var hb = GH.bosses.todayFor(zoneId, GH.world.dayStamp(), hd0.slain);
+      if (hb) {
+        var hrng = GH.worldlife.nodesFor(zoneId, GH.world.BOUNDS);
+        var hp0 = hrng.length ? hrng[hrng.length - 1] : { x: 0, z: -40 };
+        var hx = hp0.x * 0.7, hz = hp0.z * 0.7;
+        if (zoneId === 'wreck' && GH.dist2(hx, hz, GH.world.CAMP.x, GH.world.CAMP.z) < 50 * 50) hz -= 90;
+        var hsp = openSpot(hx, hz, 2.5); if (hsp) { hx = hsp.x; hz = hsp.z; }
+        huntSpot = { id: hb.id, name: hb.name, x: hx, z: hz };
+        huntTotem = GH.models.buildHarrowTotem();
+        huntTotem.position.set(hx, gy(hx, hz), hz);
+        if (huntTotem.userData.core && huntTotem.userData.core.material && huntTotem.userData.core.material.color) huntTotem.userData.core.material.color.setHex(hb.color);
+        worldH.group.add(huntTotem);
+      }
+    }
     if (fromZoneId && !zoneNow.dungeon) {
       var dp = GH.worldlife.diaryProgress(zoneId);
       var pk0 = GH.worldlife.zonePerk(zoneId);
       queueAnnounce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] +
         ' · DIARY ' + dp.doneTiers + '/' + dp.total + (pk0.labels.length ? ' · ' + pk0.labels.join(', ').toUpperCase() : ''), 22);
+      if (huntSpot) queueAnnounce('HUNT: ' + huntSpot.name + ' — MARKED ON THE MAP', 20);
     }
     stage = GH.world.stageFor(zoneId);
     applyZoneLook(zoneNow, stage);
@@ -5260,6 +5563,7 @@ GH.game = (function () {
     if (harrowSpot) {
       queueAnnounce('THE HARROW STALKS ' + GH.world.stageFor(harrowSpot.zone).name, 22);
     }
+    if (huntSpot) queueAnnounce('HUNT: ' + huntSpot.name + ' — MARKED ON THE MAP', 22);
     tutorial = null;
     if (opts.tutorial) startTutorial();
     else { var ob0 = document.getElementById('objective'); if (ob0) ob0.classList.add('hidden'); }
@@ -5315,6 +5619,19 @@ GH.game = (function () {
     updateTutorial(dt, input);
     updateWeather(dt);
     updateHarrow(dt);
+    if (huntSpot && !huntUp) {
+      if (huntTotem && huntTotem.userData.core) huntTotem.userData.core.rotation.y += dt * 2;
+      if (GH.dist2(player.x, player.z, huntSpot.x, huntSpot.z) < 22 * 22) {
+        huntUp = true;
+        wavePlan = expeditionPlan(zoneNow);
+        var he = spawnEnemy(huntSpot.id, huntSpot.x, huntSpot.z);
+        if (he) he.aggro = true;
+        if (huntTotem) { worldH.group.remove(huntTotem); huntTotem = null; }
+        shake = Math.min(0.5, shake + 0.3);
+        queueAnnounce(GH.enemyDefs[huntSpot.id].epithet.toUpperCase(), 20);
+        GH.music.play('battle');
+      }
+    }
     updateDungeon(dt);
     updateZoneEvent(dt);
     updateItemPads(dt);
@@ -5710,6 +6027,11 @@ GH.game = (function () {
       if (veins[vi].mined) continue;
       ctx.fillStyle = veins[vi].rich ? '#d8e8ff' : '#a0a8b8';
       ctx.fillRect(sx(veins[vi].x) - 1.5, sz(veins[vi].z) - 1.5, 3, 3);
+    }
+    if (huntSpot && !huntUp) {
+      ctx.fillStyle = '#ffb060';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText('☠', sx(huntSpot.x) - 4, sz(huntSpot.z) + 4);
     }
     if (signalSpot) {
       ctx.strokeStyle = '#ffd050';
@@ -6842,12 +7164,12 @@ GH.game = (function () {
     var hb = document.getElementById('hotbar');
     if (hb) {
       var hh = '';
-      for (var hn = 1; hn <= 4; hn++) {
-        var ab = GH.skills.ABILITIES[hn];
-        var known = player.skillBon.slots[hn];
+      for (var hn = 1; hn <= 5; hn++) {
+        var ab = hn === 5 ? player.sig : GH.skills.ABILITIES[hn];
+        var known = hn === 5 ? true : player.skillBon.slots[hn];
         var cd = Math.max(0, player.abilityCds[hn]);
         var ready = known && cd <= 0 && player.energy >= ab.cost;
-        hh += '<div class="hb-slot' + (known ? '' : ' locked') + (ready ? ' ready' : '') + '" title="' +
+        hh += '<div class="hb-slot' + (hn === 5 ? ' sig' : '') + (known ? '' : ' locked') + (ready ? ' ready' : '') + '" title="' +
           ab.name + ' — ' + ab.desc + ' (' + ab.cost + ' energy)">' +
           '<div class="hb-glyph">' + (known ? ab.glyph : '✕') + '</div>' +
           '<div class="hb-key">' + GH.controls.label('ability' + hn) + '</div>' +
@@ -7024,6 +7346,8 @@ GH.game = (function () {
     interactables = [];
     veins = [];
     signalSpot = null;
+    huntSpot = null; huntUp = false;
+    if (huntTotem) { scene.remove(huntTotem); huntTotem = null; }
     if (tutorial) { tutorial = null; if (tutMarker) scene.remove(tutMarker); var obx = document.getElementById('objective'); if (obx) obx.classList.add('hidden'); }
     wallRing.visible = true;
     floor.visible = true;
@@ -7400,7 +7724,8 @@ GH.game = (function () {
         '<b>Base Stats</b>\n' + def.baseText +
         '\n\n<b>On Level Up</b>\n' + def.levelText +
         '\n\n<b>Primary</b>\n' + def.weapon.name + ' (' + (def.weapon.cls || '') + ')' +
-        '\n\n<b>Special</b>\n' + def.specialText;
+        '\n\n<b>Special</b>\n' + def.specialText +
+        '\n\n<b>Signature [' + GH.controls.label('ability5') + ']</b>\n' + GH.skills.signatureFor(def).name + ' — ' + GH.skills.signatureFor(def).desc;
     } else {
       var rst = GH.roster.status(def.id);
       document.getElementById('select-desc').textContent = def.desc;
@@ -7657,6 +7982,12 @@ GH.game = (function () {
     return true;
   };
   G.devEventNow = function () { zoneEventT = 0.01; return !!ZONE_EVENTS[curZone]; };
+  // dev/test: spawn any enemy beside the pilot; kill the live boss; today's hunt spot
+  G.devSpawn = function (id, dx, dz) { if (!player || !GH.enemyDefs[id]) return null; var e = spawnEnemy(id, player.x + (dx || 8), player.z + (dz || 0)); if (e) e.aggro = true; return !!e; };
+  G.devKillBoss = function () { if (bossRef && !bossRef.dead) { bossRef.shieldUp = false; damageEnemy(bossRef, 1e9, { canCrit: false }); if (bossRef && bossRef.hp <= 0) killEnemy(bossRef); return true; } return false; };
+  G.devHunt = function () { return huntSpot ? { id: huntSpot.id, x: huntSpot.x, z: huntSpot.z, up: huntUp } : null; };
+  G.devBoss = function () { return bossRef && !bossRef.dead ? { id: bossRef.id, hp: Math.round(bossRef.hp), max: Math.round(bossRef.maxHp), mech: bossRef.mech, phase: bossRef.phase, shield: !!bossRef.shieldUp } : null; };
+  G.devSig = function () { return { name: player && player.sig ? player.sig.name : null, cd: player ? player.abilityCds[5] : 0, kind: player ? player.sigKind : null, energy: player ? Math.round(player.energy) : 0 }; };
   G.devGiveItem = function (kind) { if (player) player.item = kind; };
   G.devUseItem = function () { useItem(); };
   G.devCards = function () { awardCards(3); };

@@ -31,6 +31,18 @@
   when their text changes).
 - Title: version number, feedback link, "best on desktop" note for touch devices.
 
+## Shipped in the fourth round
+
+- **Signature abilities** (slot 5, key 5): one per lineage — SHIELD WALL, BARRAGE, POUNCE, SPELLSTORM,
+  SHADOW STEP, HARVEST, RAIL CHARGE, SIEGE STANCE. Relics inherit their base lineage's at ×1.25.
+- **The hangar viewer**: the workshop detail panel renders the picked frame and its vehicle turning on
+  a plinth (second WebGL context; degrades silently where one isn't available).
+- **Fifty HUNT bosses** (`js/bosses.js`), four or five per territory, built from a mechanics library
+  (slam, ring, line, charge, spiral, mines, blink, summon, shield, weak point, enrage, regen, pull,
+  artillery, split, burrow, sweep, drain, burn, frost) with phases at 66% and 33% hull. One roams each
+  territory per day at a skull totem; ARENA and CLASSIC midboss waves draw from the pool. Kills pay
+  cores and alloy and fill a BESTIARY in the collection log; the world map lists today's hunt per zone.
+
 ## Still to do before calling it 1.0
 
 ### Must (blocks a public release)

@@ -1206,3 +1206,14 @@ body.looking #crosshair { opacity: 0.4; }
 #save-backups { width: min(92vw, 640px); font-size: 12px; }
 .bk-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid #1c2236; }
 .bk-row span { flex: 1; color: #c0c8e0; }
+
+/* ---------------- workshop viewer, hunts ---------------- */
+#ws-side { width: 320px; display: flex; flex-direction: column; gap: 8px; }
+#ws-view { width: 300px; height: 220px; border: 2px solid #d8d8d8; box-shadow: 0 0 0 2px #000; background: #0a1030; image-rendering: pixelated; }
+#ws-side #ws-detail { width: 100%; max-height: calc(100vh - 470px); }
+.mp-hunt { font-size: 11px; color: #ffb060; margin-top: 2px; }
+.mp-hunt b { color: #fff; }
+.mp-hunt.slain { color: #60c890; }
+.hb-slot.sig { border-color: #c090ff; }
+.hb-slot.sig.ready { border-color: #e0b0ff; box-shadow: 0 0 8px rgba(200, 144, 255, 0.5); }
+.log-cell.hunt .lc-name { color: #ffb060; }

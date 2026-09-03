@@ -56,6 +56,12 @@ menu). Saves live in the browser: HANGAR → SAVE CODE offers a copyable code, a
 four automatic backups with one-click restore. Music is composed procedurally per zone and situation
 (battle, sortie, race, victory, hangar); CONTROLS has separate music and effects volumes.
 
+## Signatures, hunts, the hangar viewer
+
+Every lineage has a signature ability on key 5. Fifty named HUNT bosses roam the Reach (one per territory
+per day, at a skull totem) and stand in for arena midbosses; each fights with its own mechanics and fills the
+BESTIARY. The workshop shows the frame you're building and its vehicle turning on a plinth.
+
 ## Vehicles, drifting, and living in the Reach
 
 Every lineage folds into two vehicles (23 designs: tanks, crawlers, bikes, beasts, discs, waveriders);

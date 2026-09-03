@@ -1215,6 +1215,17 @@ body.looking #crosshair { opacity: 0.4; }
 .bk-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid #1c2236; }
 .bk-row span { flex: 1; color: #c0c8e0; }
 
+/* ---------------- workshop viewer, hunts ---------------- */
+#ws-side { width: 320px; display: flex; flex-direction: column; gap: 8px; }
+#ws-view { width: 300px; height: 220px; border: 2px solid #d8d8d8; box-shadow: 0 0 0 2px #000; background: #0a1030; image-rendering: pixelated; }
+#ws-side #ws-detail { width: 100%; max-height: calc(100vh - 470px); }
+.mp-hunt { font-size: 11px; color: #ffb060; margin-top: 2px; }
+.mp-hunt b { color: #fff; }
+.mp-hunt.slain { color: #60c890; }
+.hb-slot.sig { border-color: #c090ff; }
+.hb-slot.sig.ready { border-color: #e0b0ff; box-shadow: 0 0 8px rgba(200, 144, 255, 0.5); }
+.log-cell.hunt .lc-name { color: #ffb060; }
+
 </style>
 </head>
 <body>
@@ -1502,7 +1513,7 @@ body.looking #crosshair { opacity: 0.4; }
     <div id="ws-tabs"></div>
     <div id="ws-body">
       <div id="ws-grid"></div>
-      <div id="ws-detail"></div>
+      <div id="ws-side"><canvas id="ws-view" width="300" height="220"></canvas><div id="ws-detail"></div></div>
     </div>
     <div class="menu-desc">Frames need ⬡ ALLOY (drops from hostiles, elites, caches), ◈ FRAME CORES (bosses, wardens, stage clears) and $ SALVAGE. Build MK.II → CUSTOM → PROTOTYPE.</div>
   </div>
@@ -6518,6 +6529,7 @@ GH.controls = (function () {
     { id: 'ability2', name: 'Ability 2 — SWEEP', def: 'Digit2', group: 'COMBAT' },
     { id: 'ability3', name: 'Ability 3 — SHACKLE', def: 'Digit3', group: 'COMBAT' },
     { id: 'ability4', name: 'Ability 4 — OVERLOAD', def: 'Digit4', group: 'COMBAT' },
+    { id: 'ability5', name: 'Signature ability (per frame)', def: 'Digit5', group: 'COMBAT' },
     { id: 'ward1', name: 'Ward — KINETIC', def: 'KeyZ', group: 'COMBAT' },
     { id: 'ward2', name: 'Ward — BALLISTIC', def: 'KeyX', group: 'COMBAT' },
     { id: 'ward3', name: 'Ward — ARC', def: 'KeyC', group: 'COMBAT' },
@@ -6657,6 +6669,9 @@ GH.meta = (function () {
       nodesMined: {},
       // onboarding
       tutorial: { done: false },
+      // hunts: bestiary kills per boss id, and which fell today
+      bestiary: {},
+      huntsToday: { day: null, slain: {} },
       // save hygiene: minutes played, when a code/file was last exported
       playtimeMin: 0,
       lastExport: null,
@@ -7473,6 +7488,236 @@ GH.buildCorrupt = function (mechId) {
 
 </script>
 <script>
+// HERO FRAME — the HUNT roster: fifty named bosses, four or five per
+// territory, each built from a mechanics library so every one fights
+// differently. One hunt roams each territory per day (a skull totem
+// marks it); ARENA and CLASSIC midboss waves also draw from the pool.
+//
+// Mechanics (game.js huntAI implements these):
+//   slam       telegraphed ring at your feet          ring     radial shot burst
+//   line       telegraphed rail along its facing        charge   a dash that stuns it briefly after
+//   spiral     rotating shot stream                     mines    drops burning/chilling patches
+//   blink      teleports beside you                     summon:X calls X (or zone fauna)
+//   shield     immune while its adds live               weak     x2.5 from behind, x0.6 from the front, turns slowly
+//   enrage     below 30%: faster, meaner                regen    heals when you back off past 25 m
+//   pull       drags you in before a slam               artillery mortar rain around you
+//   split      on death, two halves (once)              burrow   submerges, immune, erupts under you
+//   sweep      rotating laser line                      drain    its hits heal it
+//   frost      chill patches                            burn     fire trail
+// phases: mechanics appended at 66% and 33% hull.
+GH.bosses = (function () {
+  var B = {};
+
+  // tier: 1 easy … 4 brutal. Stats scale from tier; zone danger scales again at spawn.
+  var TIER = {
+    1: { hp: 1100, dmg: 18, cores: 2, alloy: 40 },
+    2: { hp: 1900, dmg: 24, cores: 2, alloy: 60 },
+    3: { hp: 3000, dmg: 30, cores: 3, alloy: 90 },
+    4: { hp: 4400, dmg: 36, cores: 4, alloy: 130 }
+  };
+
+  // model: [builder, args..., scale]  — tints keep each one recognisable
+  B.LIST = [
+    // ---- TIDE WRECKAGE (wreck) ----
+    { id: 'h_tidewarden', name: 'BRINE WARDEN', epithet: 'the drowned sentinel', zone: 'wreck', tier: 1, speed: 2.4, radius: 1.3, mass: 10,
+      model: ['warden', 1.1], color: 0x40a0b0, mech: ['slam', 'summon:tideleech'], phases: [['ring'], ['enrage']] },
+    { id: 'h_dunelord', name: 'DUNE LORD', epithet: 'the sand that swallows', zone: 'wreck', tier: 2, speed: 6.0, radius: 1.5, mass: 12,
+      model: ['burrower', 0xc8a860, 2.2], color: 0xd8b060, mech: ['burrow', 'slam'], phases: [['summon:burrower'], ['enrage']] },
+    { id: 'h_scarabking', name: 'SCARAB KING', epithet: 'the armoured tide', zone: 'wreck', tier: 2, speed: 2.6, radius: 1.6, mass: 14, armorMult: 0.6,
+      model: ['scarab', 2.4], color: 0x806040, mech: ['charge', 'weak'], phases: [['summon:scarab'], ['regen']] },
+    { id: 'h_wreckace', name: 'ACE "SALTLINE"', epithet: 'a pirate frame off the drowned fleet', zone: 'wreck', tier: 3, speed: 3.4, radius: 1.15, mass: 10,
+      model: ['mech', { body: 0x3a5060, accent: 0x60e0ff, dark: 0x101820, trim: 0x8098a8, prop: 'guns' }, 2.0], color: 0x60e0ff, mech: ['ring', 'line', 'blink'], phases: [['mines'], ['enrage']] },
+    { id: 'h_leviathan', name: 'BEACH LEVIATHAN', epithet: 'the beast the fleet was fleeing', zone: 'wreck', tier: 4, speed: 2.2, radius: 2.2, mass: 22,
+      model: ['carapace', 1.4], color: 0x2080a0, mech: ['slam', 'pull', 'summon:tideleech'], phases: [['spiral'], ['enrage', 'ring']] },
+
+    // ---- GLACIER HOLLOW (glacier) ----
+    { id: 'h_rimehowler', name: 'RIME HOWLER', epithet: 'the voice of the white-out', zone: 'glacier', tier: 1, speed: 4.6, radius: 1.2, mass: 8,
+      model: ['howler', 2.0], color: 0xc0e8ff, mech: ['charge', 'summon:stalker'], phases: [['frost'], ['enrage']] },
+    { id: 'h_glassgolem', name: 'GLASS GOLEM', epithet: 'ice that learned to walk', zone: 'glacier', tier: 2, speed: 2.0, radius: 1.8, mass: 16,
+      model: ['golem', 0xa0d8f0, 0xe0f8ff, 2.2], color: 0xa0d8f0, mech: ['slam', 'weak'], phases: [['frost'], ['split']] },
+    { id: 'h_frostmatriarch', name: 'FROST MATRIARCH', epithet: 'the pack\'s mother', zone: 'glacier', tier: 2, speed: 5.4, radius: 1.3, mass: 9,
+      model: ['stalker', 0xe8f0ff, 2.3], color: 0xe8f0ff, mech: ['charge', 'summon:stalker', 'shield'], phases: [['frost'], ['enrage']] },
+    { id: 'h_glacierace', name: 'ACE "WHITEOUT"', epithet: 'a hunter frame in snow camouflage', zone: 'glacier', tier: 3, speed: 3.6, radius: 1.15, mass: 10,
+      model: ['mech', { body: 0xe8eef8, accent: 0x80c0ff, dark: 0x304050, trim: 0xb0c0d0, prop: 'lance' }, 2.0], color: 0x80c0ff, mech: ['line', 'blink', 'frost'], phases: [['charge'], ['enrage']] },
+    { id: 'h_avalanche', name: 'THE AVALANCHE', epithet: 'a mountain with a grudge', zone: 'glacier', tier: 4, speed: 1.9, radius: 2.4, mass: 26,
+      model: ['golem', 0x8090a0, 0xc0f0ff, 3.0], color: 0xc0f0ff, mech: ['slam', 'artillery', 'regen'], phases: [['split'], ['enrage', 'ring']] },
+
+    // ---- VERDANT CLOISTER (cloister) ----
+    { id: 'h_toadking', name: 'BELLOW KING', epithet: 'the swamp\'s throat', zone: 'cloister', tier: 1, speed: 2.6, radius: 1.6, mass: 12,
+      model: ['toad', 2.4], color: 0x80c040, mech: ['ring', 'pull'], phases: [['summon:skitter'], ['enrage']] },
+    { id: 'h_thornmother', name: 'THORN MOTHER', epithet: 'roots that reach for you', zone: 'cloister', tier: 2, speed: 2.2, radius: 1.5, mass: 12,
+      model: ['bloat', 0x6a9a48, 2.4], color: 0x9ae848, mech: ['mines', 'summon:creeper', 'shield'], phases: [['slam'], ['regen']] },
+    { id: 'h_lurkerprime', name: 'LURKER PRIME', epithet: 'the ambush that never ends', zone: 'cloister', tier: 2, speed: 5.2, radius: 1.3, mass: 9,
+      model: ['lurker', 2.2], color: 0x407040, mech: ['blink', 'charge', 'weak'], phases: [['mines'], ['enrage']] },
+    { id: 'h_cloisterace', name: 'ACE "CANOPY"', epithet: 'a sniper frame in the trees', zone: 'cloister', tier: 3, speed: 3.0, radius: 1.15, mass: 10,
+      model: ['mech', { body: 0x3a5a30, accent: 0xc0ff60, dark: 0x142010, trim: 0x6a8a50, prop: 'staff' }, 2.0], color: 0xc0ff60, mech: ['line', 'artillery', 'blink'], phases: [['summon:creeper'], ['enrage']] },
+    { id: 'h_wyrmroot', name: 'WYRMROOT', epithet: 'the drake beneath the pond', zone: 'cloister', tier: 4, speed: 3.4, radius: 2.0, mass: 20,
+      model: ['drake', 'cloister', 2.6], color: 0x60c060, mech: ['sweep', 'burn', 'summon:skitter'], phases: [['charge'], ['enrage', 'ring']] },
+
+    // ---- EMBER FURNACE (ember) ----
+    { id: 'h_slagfather', name: 'SLAG FATHER', epithet: 'the furnace\'s first son', zone: 'ember', tier: 1, speed: 2.0, radius: 1.7, mass: 15,
+      model: ['golem', 0x4a3028, 0xff7020, 2.2], color: 0xff7020, mech: ['slam', 'burn'], phases: [['split'], ['enrage']] },
+    { id: 'h_cinderpack', name: 'CINDER ALPHA', epithet: 'the hound that runs on fire', zone: 'ember', tier: 2, speed: 5.6, radius: 1.3, mass: 9,
+      model: ['hound', 0x8a2a10, 2.3], color: 0xff5020, mech: ['charge', 'burn', 'summon:cinderhound'], phases: [['ring'], ['enrage']] },
+    { id: 'h_magmadrake', name: 'MAGMA DRAKE', epithet: 'a wing of molten rock', zone: 'ember', tier: 3, speed: 3.6, radius: 2.0, mass: 18,
+      model: ['drake', 'ember', 2.5], color: 0xff8030, mech: ['sweep', 'artillery', 'burn'], phases: [['blink'], ['enrage']] },
+    { id: 'h_emberace', name: 'ACE "KILN"', epithet: 'a flamethrower frame, welded and burning', zone: 'ember', tier: 3, speed: 3.2, radius: 1.15, mass: 10,
+      model: ['mech', { body: 0x6a2a20, accent: 0xffa030, dark: 0x201008, trim: 0xa06040, prop: 'mortar' }, 2.0], color: 0xffa030, mech: ['artillery', 'mines', 'ring'], phases: [['charge'], ['enrage']] },
+    { id: 'h_calderaheart', name: 'CALDERA HEART', epithet: 'the volcano\'s core, awake', zone: 'ember', tier: 4, speed: 1.8, radius: 2.4, mass: 28,
+      model: ['carapace', 1.5], color: 0xff4010, mech: ['spiral', 'burn', 'pull', 'regen'], phases: [['artillery'], ['enrage', 'summon:cinder']] },
+
+    // ---- STORM SPIRE (storm) ----
+    { id: 'h_voltcolony', name: 'VOLT COLONY', epithet: 'a hive with one mind', zone: 'storm', tier: 1, speed: 3.0, radius: 1.4, mass: 9,
+      model: ['eyecluster', 2.2], color: 0x90d0ff, mech: ['ring', 'summon:volt'], phases: [['spiral'], ['enrage']] },
+    { id: 'h_rodking', name: 'ROD KING', epithet: 'the tower that shoots back', zone: 'storm', tier: 2, speed: 0.8, radius: 1.6, mass: 30,
+      model: ['turret', 'rod', 2.4], color: 0x80c0ff, mech: ['line', 'artillery', 'shield'], phases: [['sweep'], ['enrage']] },
+    { id: 'h_stormrider', name: 'STORM RIDER', epithet: 'a ray that surfs the lightning', zone: 'storm', tier: 2, speed: 5.0, radius: 1.6, mass: 10,
+      model: ['ray', 2.4], color: 0xc0c0ff, mech: ['charge', 'spiral', 'blink'], phases: [['ring'], ['enrage']] },
+    { id: 'h_stormace', name: 'ACE "FULMEN"', epithet: 'a duelist frame wrapped in arcs', zone: 'storm', tier: 3, speed: 3.8, radius: 1.15, mass: 10,
+      model: ['mech', { body: 0x304060, accent: 0xa0e0ff, dark: 0x101828, trim: 0x6080b0, prop: 'daggers' }, 2.0], color: 0xa0e0ff, mech: ['blink', 'line', 'charge', 'weak'], phases: [['spiral'], ['enrage']] },
+    { id: 'h_thunderhead', name: 'THE THUNDERHEAD', epithet: 'the storm itself, given a body', zone: 'storm', tier: 4, speed: 2.6, radius: 2.3, mass: 22,
+      model: ['harrow', 0.9], color: 0xffffff, mech: ['sweep', 'spiral', 'artillery', 'blink'], phases: [['summon:volt'], ['enrage', 'ring']] },
+
+    // ---- NULL FIELD (null) ----
+    { id: 'h_phantomchoir', name: 'PHANTOM CHOIR', epithet: 'three voices, one shape', zone: 'null', tier: 1, speed: 3.6, radius: 1.3, mass: 8,
+      model: ['phantom', 2.2], color: 0xc0a0ff, mech: ['blink', 'summon:phantom'], phases: [['ring'], ['enrage']] },
+    { id: 'h_nullmonolith', name: 'NULL MONOLITH', epithet: 'the silence at the centre', zone: 'null', tier: 2, speed: 1.4, radius: 1.8, mass: 24,
+      model: ['nullshard', 3.0], color: 0x9a94a8, mech: ['pull', 'slam', 'shield'], phases: [['spiral'], ['regen']] },
+    { id: 'h_sentinelprime', name: 'SENTINEL PRIME', epithet: 'the last of the old guard', zone: 'null', tier: 3, speed: 2.8, radius: 1.5, mass: 14,
+      model: ['sentinel', 2.4], color: 0x80ffd0, mech: ['line', 'sweep', 'weak'], phases: [['artillery'], ['enrage']] },
+    { id: 'h_nullace', name: 'ACE "ZERO"', epithet: 'a frame that isn\'t quite there', zone: 'null', tier: 3, speed: 3.6, radius: 1.15, mass: 10,
+      model: ['mech', { body: 0x505060, accent: 0xd0c0ff, dark: 0x181820, trim: 0x8080a0, prop: 'sword' }, 2.0], color: 0xd0c0ff, mech: ['blink', 'charge', 'ring'], phases: [['drain'], ['enrage']] },
+    { id: 'h_voidmaw', name: 'THE VOID MAW', epithet: 'where the field folds in', zone: 'null', tier: 4, speed: 2.0, radius: 2.4, mass: 26,
+      model: ['burrower', 0x40304a, 3.0], color: 0xc080ff, mech: ['burrow', 'pull', 'spiral'], phases: [['summon:nullshard'], ['enrage', 'slam']] },
+
+    // ---- THE HIVE (hive) ----
+    { id: 'h_broodqueen', name: 'BROOD QUEEN', epithet: 'the hive\'s beating heart', zone: 'hive', tier: 2, speed: 2.4, radius: 1.7, mass: 14,
+      model: ['carapace', 1.2], color: 0xe0c040, mech: ['summon:glowmite', 'slam', 'shield'], phases: [['mines'], ['enrage']] },
+    { id: 'h_habwarlord', name: 'HAB WARLORD', epithet: 'the biggest brute in the block', zone: 'hive', tier: 2, speed: 2.6, radius: 1.6, mass: 16,
+      model: ['husk', 2.6, 0x4a4f5c], color: 0xffd050, mech: ['charge', 'slam', 'weak'], phases: [['summon:habbrute'], ['enrage']] },
+    { id: 'h_hiveace', name: 'ACE "TENEMENT"', epithet: 'a gunner frame with a grudge', zone: 'hive', tier: 3, speed: 3.4, radius: 1.15, mass: 10,
+      model: ['mech', { body: 0x6a6a30, accent: 0xffe060, dark: 0x282810, trim: 0x9a9a50, prop: 'guns' }, 2.0], color: 0xffe060, mech: ['ring', 'spiral', 'mines'], phases: [['charge'], ['enrage']] },
+    { id: 'h_tunnelking', name: 'TUNNEL KING', epithet: 'the maw beneath the hab-blocks', zone: 'hive', tier: 4, speed: 6.5, radius: 2.0, mass: 20,
+      model: ['burrower', 0x5a4a70, 2.8], color: 0xd0a0ff, mech: ['burrow', 'slam', 'summon:tunnelmaw'], phases: [['ring'], ['enrage']] },
+
+    // ---- THE RUINS (ruins) ----
+    { id: 'h_gravemarshal', name: 'GRAVE MARSHAL', epithet: 'the knight who never yielded', zone: 'ruins', tier: 2, speed: 2.8, radius: 1.5, mass: 14,
+      model: ['knight', 2.2], color: 0xc0c0d0, mech: ['charge', 'line', 'weak'], phases: [['summon:wardenknight'], ['enrage']] },
+    { id: 'h_carrionqueen', name: 'CARRION QUEEN', epithet: 'the kite that feeds on the fallen', zone: 'ruins', tier: 2, speed: 4.0, radius: 1.7, mass: 12,
+      model: ['drake', 'ruins', 2.4], color: 0x9a9aa0, mech: ['sweep', 'drain', 'summon:carrionkite'], phases: [['blink'], ['enrage']] },
+    { id: 'h_ruinsace', name: 'ACE "REQUIEM"', epithet: 'a reaper frame in mourning black', zone: 'ruins', tier: 3, speed: 3.2, radius: 1.15, mass: 10,
+      model: ['mech', { body: 0x2a2a30, accent: 0xc04060, dark: 0x101014, trim: 0x505058, prop: 'scythe' }, 2.0], color: 0xc04060, mech: ['slam', 'drain', 'pull'], phases: [['ring'], ['enrage']] },
+    { id: 'h_ballistaprime', name: 'BALLISTA PRIME', epithet: 'the wall\'s last gun', zone: 'ruins', tier: 4, speed: 1.0, radius: 1.8, mass: 30,
+      model: ['turret', 'ballista', 2.6], color: 0xe0d0a0, mech: ['line', 'artillery', 'shield', 'regen'], phases: [['sweep'], ['enrage', 'ring']] },
+
+    // ---- THE KEEP (keep) ----
+    { id: 'h_keepcastellan', name: 'THE CASTELLAN', epithet: 'the keep\'s iron steward', zone: 'keep', tier: 2, speed: 2.4, radius: 1.5, mass: 16,
+      model: ['knight', 2.4], color: 0xf0d080, mech: ['slam', 'shield', 'summon:wardenknight'], phases: [['charge'], ['enrage']] },
+    { id: 'h_slingerlord', name: 'SLINGER LORD', epithet: 'every parapet is his', zone: 'keep', tier: 2, speed: 3.0, radius: 1.3, mass: 10,
+      model: ['slinger', 2.3], color: 0xffb060, mech: ['artillery', 'ring', 'blink'], phases: [['mines'], ['enrage']] },
+    { id: 'h_keepace', name: 'ACE "PORTCULLIS"', epithet: 'a paladin frame that holds the gate', zone: 'keep', tier: 3, speed: 3.0, radius: 1.15, mass: 12,
+      model: ['mech', { body: 0x8a8060, accent: 0xffd050, dark: 0x302810, trim: 0xb0a070, prop: 'sword' }, 2.0], color: 0xffd050, mech: ['charge', 'slam', 'weak', 'regen'], phases: [['summon:wardenknight'], ['enrage']] },
+    { id: 'h_siegeengine', name: 'THE SIEGE ENGINE', epithet: 'a fortress that walked off its walls', zone: 'keep', tier: 4, speed: 1.6, radius: 2.4, mass: 30,
+      model: ['warden', 1.8], color: 0xe0a040, mech: ['artillery', 'slam', 'mines', 'shield'], phases: [['line'], ['enrage', 'ring']] },
+
+    // ---- THE WARRENS (warrens) ----
+    { id: 'h_fungallord', name: 'FUNGAL LORD', epithet: 'the bloom that thinks', zone: 'warrens', tier: 2, speed: 2.2, radius: 1.6, mass: 14,
+      model: ['bloat', 0x6a5a8a, 2.6], color: 0xa080ff, mech: ['mines', 'summon:fungalshambler', 'regen'], phases: [['pull'], ['enrage']] },
+    { id: 'h_glowmatriarch', name: 'GLOW MATRIARCH', epithet: 'ten thousand small lights', zone: 'warrens', tier: 2, speed: 4.4, radius: 1.3, mass: 8,
+      model: ['shardling', 0x60e0c0, 3.2], color: 0x60e0c0, mech: ['summon:glowmite', 'spiral', 'shield'], phases: [['split'], ['enrage']] },
+    { id: 'h_warrensace', name: 'ACE "TUNNELRAT"', epithet: 'a striker frame that lives in the dark', zone: 'warrens', tier: 3, speed: 4.0, radius: 1.15, mass: 9,
+      model: ['mech', { body: 0x3a3048, accent: 0x80ffc0, dark: 0x141020, trim: 0x605078, prop: 'claws' }, 2.0], color: 0x80ffc0, mech: ['charge', 'blink', 'drain'], phases: [['mines'], ['enrage']] },
+    { id: 'h_deepmaw', name: 'THE DEEP MAW', epithet: 'the warren\'s oldest tenant', zone: 'warrens', tier: 4, speed: 6.0, radius: 2.4, mass: 26,
+      model: ['burrower', 0x2a2038, 3.2], color: 0xc0ffe0, mech: ['burrow', 'pull', 'slam', 'regen'], phases: [['summon:tunnelmaw'], ['enrage', 'ring']] },
+
+    // ---- THE SKY COURT (sky) ----
+    { id: 'h_cloudshepherd', name: 'CLOUD SHEPHERD', epithet: 'the wisp that herds the storm', zone: 'sky', tier: 2, speed: 3.4, radius: 1.3, mass: 8,
+      model: ['frostwisp', 0xe8e0ff, 2.6], color: 0xe8e0ff, mech: ['ring', 'summon:cloudwisp', 'blink'], phases: [['spiral'], ['enrage']] },
+    { id: 'h_aetherking', name: 'AETHER KING', epithet: 'a ray as wide as the sky', zone: 'sky', tier: 3, speed: 4.6, radius: 2.0, mass: 14,
+      model: ['ray', 3.0], color: 0xffffff, mech: ['charge', 'sweep', 'spiral'], phases: [['blink'], ['enrage']] },
+    { id: 'h_skyace', name: 'ACE "ZENITH"', epithet: 'an interceptor frame above it all', zone: 'sky', tier: 3, speed: 4.0, radius: 1.15, mass: 10,
+      model: ['mech', { body: 0xf0f0f8, accent: 0xff70a0, dark: 0x404860, trim: 0xa0a8c0, prop: 'lance' }, 2.0], color: 0xff70a0, mech: ['line', 'charge', 'blink', 'weak'], phases: [['ring'], ['enrage']] },
+    { id: 'h_skyfather', name: 'THE SKY FATHER', epithet: 'what the court kneels to', zone: 'sky', tier: 4, speed: 2.4, radius: 2.4, mass: 24,
+      model: ['harrow', 1.0], color: 0xffe0a0, mech: ['sweep', 'artillery', 'pull', 'summon:cloudwisp'], phases: [['spiral'], ['enrage', 'ring']] }
+  ];
+
+  B.byId = function (id) { for (var i = 0; i < B.LIST.length; i++) if (B.LIST[i].id === id) return B.LIST[i]; return null; };
+  B.forZone = function (zone) { return B.LIST.filter(function (b) { return b.zone === zone; }); };
+  B.TIER = TIER;
+
+  // register as enemy defs + builders
+  B.LIST.forEach(function (b) {
+    var t = TIER[b.tier];
+    GH.enemyDefs[b.id] = {
+      id: b.id, name: b.name, boss: true, hunt: true, huntTier: b.tier,
+      hp: t.hp, speed: b.speed, damage: t.dmg, radius: b.radius, xp: 40 + b.tier * 25, mass: b.mass,
+      behavior: 'hunt', armorMult: b.armorMult, mech: b.mech, phases: b.phases, color: b.color, epithet: b.epithet, zone: b.zone
+    };
+    GH.enemyBuilders[b.id] = function () {
+      var m = b.model, g;
+      var kind = m[0];
+      if (kind === 'mech') { g = GH.models.buildMech(m[1]); g.scale.setScalar(m[2]); }
+      else if (kind === 'warden') { g = GH.models.buildWarden(); g.scale.setScalar(m[1]); }
+      else if (kind === 'carapace') { g = GH.models.buildCarapace(); g.scale.setScalar(m[1]); }
+      else if (kind === 'harrow') { g = GH.models.buildHarrow(); g.scale.setScalar(m[1]); }
+      else if (kind === 'golem') { g = GH.models.buildGolem(m[1], m[2]); g.scale.setScalar(m[3]); }
+      else if (kind === 'husk') { g = GH.models.buildHusk(m[1], m[2]); }
+      else if (kind === 'burrower') { g = GH.models.buildBurrower(m[1]); g.scale.setScalar(m[2]); }
+      else if (kind === 'stalker') { g = GH.models.buildStalker(m[1]); g.scale.setScalar(m[2]); }
+      else if (kind === 'hound') { g = GH.models.buildHound(m[1]); g.scale.setScalar(m[2]); }
+      else if (kind === 'bloat') { g = GH.models.buildBloat(m[1]); g.scale.setScalar(m[2]); }
+      else if (kind === 'drake') { g = GH.models.buildDrake(m[1]); g.scale.setScalar(m[2]); }
+      else if (kind === 'turret') { g = GH.models.buildTurret(m[1]); g.scale.setScalar(m[2]); }
+      else if (kind === 'shardling') { g = GH.models.buildShardling(m[1]); g.scale.setScalar(m[2]); }
+      else if (kind === 'frostwisp') { g = GH.models.buildFrostWisp(m[1]); g.scale.setScalar(m[2]); }
+      else {
+        var fn = GH.models['build' + kind.charAt(0).toUpperCase() + kind.slice(1)];
+        g = fn ? fn() : GH.models.buildHusk(2, 0x808080);
+        g.scale.setScalar(m[1] || 2);
+      }
+      // a crown of light in the boss's colour, so a hunt reads at a distance
+      var crown = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 4, 16),
+        GH.assets.basic(b.color, { transparent: true, opacity: 0.75 }));
+      crown.rotation.x = Math.PI / 2;
+      crown.position.y = 2.4;
+      g.add(crown);
+      g.userData.crown = crown;
+      return g;
+    };
+  });
+
+  // today's hunt for a territory: seeded, skipping ones already slain today
+  B.todayFor = function (zone, dayStamp, slainToday) {
+    var list = B.forZone(zone);
+    if (!list.length) return null;
+    var h = 2166136261, str = 'hunt:' + dayStamp + ':' + zone;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    var start = (h >>> 0) % list.length;
+    for (var k = 0; k < list.length; k++) {
+      var b = list[(start + k) % list.length];
+      if (!slainToday || !slainToday[b.id]) return b;
+    }
+    return null; // every hunt in this zone is down for today
+  };
+
+  // a random hunt for arena / classic midboss waves, capped by tier
+  B.pickFor = function (zone, maxTier) {
+    var pool = B.LIST.filter(function (b) { return (!zone || b.zone === zone) && b.tier <= maxTier; });
+    if (!pool.length) pool = B.LIST.filter(function (b) { return b.tier <= maxTier; });
+    return pool[Math.floor(Math.random() * pool.length)];
+  };
+
+  B.slainCount = function () {
+    var n = 0, bs = GH.meta.data.bestiary || {};
+    B.LIST.forEach(function (b) { if (bs[b.id]) n++; });
+    return n;
+  };
+
+  return B;
+})();
+
+</script>
+<script>
 // HERO FRAME — long-horizon progression: hunt contracts, stage trials,
 // collection log helpers. All state lives in GH.meta.data (per profile).
 GH.progress = (function () {
@@ -8211,6 +8456,23 @@ GH.skills = (function () {
   // Abilities: the hotbar. Damage scales off the primary weapon, so
   // gems, resonances, and the frame you fly all still matter.
   // ---------------------------------------------------------------
+  // Signature abilities: one per lineage, always unlocked, slot 5.
+  // Relics inherit their base lineage's signature at 1.25x power.
+  S.SIGNATURES = {
+    aegis:  { name: 'SHIELD WALL', glyph: '⛨', cost: 35, cd: 18, desc: 'For 5 s take 60% less damage, each hit mends 3% hull, and the cast shoves everything near you back.' },
+    vulcan: { name: 'BARRAGE', glyph: '⋔', cost: 30, cd: 12, desc: 'Empty the drums: fourteen shots in a fan ahead of you, instantly.' },
+    fang:   { name: 'POUNCE', glyph: '↯', cost: 25, cd: 9, desc: 'Leap onto your target for 2.5× damage and two FRENZY stacks.' },
+    hexen:  { name: 'SPELLSTORM', glyph: '✵', cost: 40, cd: 14, desc: 'Cycle the element and loose twelve homing bolts of it.' },
+    viper:  { name: 'SHADOW STEP', glyph: '☾', cost: 30, cd: 10, desc: 'Vanish and reappear behind your target: they lose you for a breath, your next 4 s of hits crit.' },
+    morrow: { name: 'HARVEST', glyph: '☥', cost: 35, cd: 15, desc: 'Drag everything within 9 m to you, reap it, and mend 30% of the damage dealt.' },
+    strix:  { name: 'RAIL CHARGE', glyph: '➤', cost: 30, cd: 10, desc: 'A 10 m charge that runs through the line for 2.2×, then 3 s of sharpened crits.' },
+    titan:  { name: 'SIEGE STANCE', glyph: '⛫', cost: 40, cd: 16, desc: 'Plant for 5 s: cannot move or be knocked back, +12 armor, fire rate ×2.2, blasts 50% wider.' }
+  };
+  S.signatureFor = function (def) {
+    var key = def.kind === 'relic' ? def.relicBase : (def.lineage || def.id);
+    return S.SIGNATURES[key] || S.SIGNATURES.aegis;
+  };
+
   S.ABILITIES = {
     1: { name: 'RUPTURE', glyph: '†', cost: 20, cd: 6,
       desc: 'A focused 2.2× strike on your target.' },
@@ -8730,15 +8992,15 @@ GH.worldlife = (function () {
     { id: 'medium', name: 'MEDIUM', reward: { alloy: 100, cores: 1, salvage: 150 }, perk: null,
       tasks: [['kills', 120, 'Destroy 120 hostiles here'], ['elites', 5, 'Destroy 5 elites here'], ['nests', 1, 'Break a nest here'], ['caches', 1, 'Open a dungeon reward cache here']] },
     { id: 'hard', name: 'HARD', reward: { alloy: 220, cores: 3, salvage: 300 }, perk: { salvage: 1.1, label: '+10% salvage here' },
-      tasks: [['kills', 350, 'Destroy 350 hostiles here'], ['nests', 3, 'Break 3 nests here'], ['tier', 2, 'Ascend a dungeon here to tier 2'], ['signals', 3, 'Recover 3 cache signals here']] },
+      tasks: [['kills', 350, 'Destroy 350 hostiles here'], ['nests', 3, 'Break 3 nests here'], ['tier', 2, 'Ascend a dungeon here to tier 2'], ['hunts', 1, 'Slay a hunt here']] },
     { id: 'elite', name: 'ELITE', reward: { alloy: 420, cores: 6, salvage: 600 }, perk: { alloy: 1.25, label: '+25% alloy here' },
-      tasks: [['kills', 900, 'Destroy 900 hostiles here'], ['elites', 30, 'Destroy 30 elites here'], ['tier', 3, 'Ascend a dungeon here to tier 3'], ['caches', 4, 'Open 4 dungeon reward caches here']] }
+      tasks: [['kills', 900, 'Destroy 900 hostiles here'], ['elites', 30, 'Destroy 30 elites here'], ['tier', 3, 'Ascend a dungeon here to tier 3'], ['hunts', 4, 'Slay 4 hunts here']] }
   ];
 
   function diary(zone) {
     var d = GH.meta.data;
     d.diary = d.diary || {};
-    if (!d.diary[zone]) d.diary[zone] = { kills: 0, elites: 0, nests: 0, caches: 0, nodes: 0, driveT: 0, tier: 0, signals: 0, done: {} };
+    if (!d.diary[zone]) d.diary[zone] = { kills: 0, elites: 0, nests: 0, caches: 0, nodes: 0, driveT: 0, tier: 0, signals: 0, hunts: 0, done: {} };
     return d.diary[zone];
   }
   L.diary = diary;
@@ -8812,7 +9074,8 @@ GH.worldlife = (function () {
     { id: 'build', need: 1, desc: 'Build a frame or a vehicle in the workshop', reward: { cores: 1 } },
     { id: 'alloy', need: 60, desc: 'Pick up 60 alloy', reward: { salvage: 150 } },
     { id: 'signals', need: 2, desc: 'Recover 2 cache signals', reward: { alloy: 45 } },
-    { id: 'contract', need: 1, desc: "Fill a Broker contract", reward: { alloy: 45, cores: 1 } }
+    { id: 'contract', need: 1, desc: "Fill a Broker contract", reward: { alloy: 45, cores: 1 } },
+    { id: 'hunts', need: 1, desc: 'Slay a HUNT boss (skull totem on the map, or an arena midboss)', reward: { alloy: 60, cores: 1 } }
   ];
   L.SWEEP_BONUS = { cores: 1, alloyPerStreakDay: 10, streakCap: 10 };
 
@@ -11323,7 +11586,7 @@ GH.game = (function () {
     if (seen.__done) return;
     if (waveNum === 1) {
       if (runTime > 0.5) showHint('move', L('forward') + '/' + L('back') + ' walk · ' + L('turnLeft') + '/' + L('turnRight') + ' turn · hold RIGHT MOUSE to look around · LEFT CLICK attacks and marks a target');
-      if (runTime > 8) showHint('ability', 'Press ' + L('ability1') + ' to cast RUPTURE on your target — abilities spend the blue ENERGY bar');
+      if (runTime > 8) showHint('ability', 'Press ' + L('ability1') + ' to cast RUPTURE on your target, ' + L('ability5') + ' for your frame\'s SIGNATURE — abilities spend the blue ENERGY bar');
       if (sparksRun > 0) showHint('sparks', 'SPARKS feed your level AND your persistent PILOT LEVEL — skill points are spent in PILOT TRAINING [' + L('skills') + ']');
     }
     if (waveNum === 2) {
@@ -11589,7 +11852,8 @@ GH.game = (function () {
       },
       skillBon: skl,
       energy: skl.energyMax,
-      abilityCds: { 1: 0, 2: 0, 3: 0, 4: 0 },
+      abilityCds: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      sig: GH.skills.signatureFor(mechDef), sigPower: mechDef.kind === 'relic' ? 1.25 : 1, sigT: 0, sigKind: null,
       hp: 0,
       xp: 0, level: 1, xpNeed: 6,
       weapons: [],
@@ -11624,6 +11888,7 @@ GH.game = (function () {
     if (player.shieldT > 0) { G.dmg.spawn(player.x, 2.6, player.z, 'SHIELD', 'heal', 14); return; }
     var s = player.stats;
     if (player.speederOn) raw *= 1.25; // skimmer hull is thin — speed is the armor
+    if (player.sigKind === 'wall') { raw *= 0.4; player.heal(player.stats.maxHP * 0.03); }
     var block = s.block + (player.protocols.vents && player.hp < s.maxHP * 0.35 ? 10 : 0);
     if (Math.random() * 100 < block) {
       G.dmg.spawn(player.x, 2.6, player.z, 'BLOCK', 'heal', 14);
@@ -11844,6 +12109,7 @@ GH.game = (function () {
       bossRef = e;
       GH.audio.boss();
       GH.music.setBoss(true);
+      if (def.hunt && !expActive) GH.music.play('battle');
       announce(def.name, 32);
       showBossBar(def.name);
     }
@@ -11856,6 +12122,16 @@ GH.game = (function () {
     if (e.phased > 0) return; // blinked out — nothing to hit
     var dmg = raw;
     if (e.def.armorMult) dmg *= e.def.armorMult;
+    if (e.def.behavior === 'hunt' && e.mech) {
+      if (e.shieldUp) { G.dmg.spawn(e.x, 3.5, e.z, 'SHIELDED', 'elem', 14); return; }
+      if (e.mech.indexOf('weak') !== -1) {
+        var fwx = Math.sin(e.faceA || 0), fwz = Math.cos(e.faceA || 0);
+        var tpx = player.x - e.x, tpz = player.z - e.z, tl = Math.sqrt(tpx * tpx + tpz * tpz) || 1;
+        var dotp = (fwx * tpx + fwz * tpz) / tl;
+        if (dotp < -0.3) { dmg *= 2.5; G.dmg.spawn(e.x, 3.5, e.z, 'WEAK POINT', 'crit', 13); }
+        else if (dotp > 0.3) dmg *= 0.6;
+      }
+    }
     if (e.buried) {
       // shoot the plume: enough hits force it up
       dmg *= 0.3;
@@ -12008,6 +12284,7 @@ GH.game = (function () {
 
     if (e.tut) tutorialEvent('kill', 1);
     if (e.tutBoss) tutorialEvent('boss', 1);
+    if (e.def.hunt && !e.noLedger) { huntSlain(e); if (expActive && !enemies.some(function (o) { return !o.dead && o.def.boss && o !== e; })) GH.music.play(GH.worldlife.rootZone(curZone)); }
     // world life: diaries and the daily board
     if (!e.nestId) {
       lifeEvent('kills', 1);
@@ -12426,6 +12703,10 @@ GH.game = (function () {
         var r = corruptAI(e, dt, dist, nx, nz);
         mx = r.mx; mz = r.mz;
         if (r.spd !== undefined) spd = r.spd;
+      } else if (def.behavior === 'hunt') {
+        var hr = huntAI(e, dt, dist, nx, nz);
+        mx = hr.mx; mz = hr.mz;
+        if (hr.spd !== undefined) spd = hr.spd;
       } else if (def.behavior === 'racer') {
         // RACEWAY rival: ride the circuit line, harass the pilot in passing
         var rwLay = worldH && worldH.layout.raceway;
@@ -12554,6 +12835,7 @@ GH.game = (function () {
         if (GH.dist2(e.x, e.z, player.x, player.z) < Math.pow(def.radius + 0.8, 2)) {
           e.attackCd = e.modFrenzied ? 0.75 : 1.1;
           playerDamage(e.damage, e, 'kinetic');
+          if (def.behavior === 'hunt' && e.mech && e.mech.indexOf('drain') !== -1) { e.hp = Math.min(e.maxHp, e.hp + e.damage * 3); G.dmg.spawn(e.x, 3, e.z, '+' + Math.round(e.damage * 3), 'heal', 13); }
           if (def.behavior === 'latcher') { player.snareT = Math.max(player.snareT || 0, 0.45); e.attackCd = 0.6; }
         } else if (mate && !mate.down &&
           GH.dist2(e.x, e.z, mate.x, mate.z) < Math.pow(def.radius + 0.8, 2)) {
@@ -12700,6 +12982,165 @@ GH.game = (function () {
       }
     }
     return out;
+  }
+
+  // ---------- HUNT bosses: a mechanics library, phases at 66% / 33% ----------
+  function huntHas(e, m) { return e.mech.indexOf(m) !== -1; }
+  function huntAI(e, dt, dist, nx, nz) {
+    var out = { mx: nx, mz: nz };
+    var def = e.def;
+    if (!e.mech) {
+      e.mech = def.mech.slice(); e.phase = 0; e.cds = {}; e.spiralA = 0; e.sweepA = 0; e.faceA = Math.atan2(nx, nz);
+      e.mech.forEach(function (m) { e.cds[m] = GH.rand(1.5, 4); });
+    }
+    var frac = e.hp / e.maxHp;
+    if (e.phase < 1 && frac < 0.66 || e.phase < 2 && frac < 0.33) {
+      e.phase++;
+      var add = (def.phases || [])[e.phase - 1] || [];
+      add.forEach(function (m) { if (e.mech.indexOf(m) === -1) { e.mech.push(m); e.cds[m] = 1.0; } });
+      announce(def.name + (e.phase === 1 ? ' — WOUNDED' : ' — DESPERATE') + (add.length ? ': ' + add.map(function (m) { return m.split(':')[0].toUpperCase(); }).join(' + ') : ''), 28);
+      GH.audio.boss(); G.hitStop(0.1);
+      spawnBurst(e.x, 2, e.z, def.color, 30);
+      if (huntHas(e, 'shield')) { e.shieldUp = true; e.shieldT = 0; }
+    }
+    var enraged = huntHas(e, 'enrage') && frac < 0.3;
+    var cdMult = enraged ? 0.6 : 1;
+    if (enraged && !e.enrageMsg) { e.enrageMsg = true; announce(def.name + ' — ENRAGED', 26); }
+    var spd = def.speed * (enraged ? 1.5 : 1);
+    if (huntHas(e, 'weak')) {
+      var want = Math.atan2(nx, nz);
+      e.faceA = GH.lerpAngle(e.faceA, want, Math.min(1, dt * (e.stunT > 0 ? 0.2 : 1.1)));
+      e.mesh.rotation.y = e.faceA;
+      out.face = e.faceA;
+    }
+    if (e.shieldUp) {
+      e.shieldT += dt;
+      var addsAlive = enemies.some(function (o) { return !o.dead && o.summonedBy === e; });
+      if (!addsAlive && e.shieldT > 1.5 || e.shieldT > 12) { e.shieldUp = false; announce(def.name + ' — SHIELD DOWN', 22); GH.audio.zap(); }
+      if (e.mesh.userData.crown) e.mesh.userData.crown.scale.setScalar(1 + Math.sin(runTime * 8) * 0.25);
+    } else if (e.mesh.userData.crown) e.mesh.userData.crown.scale.setScalar(1);
+    if (huntHas(e, 'regen') && dist > 25 && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.03 * dt);
+    if (huntHas(e, 'burrow') && e.buried) {
+      e.buryT -= dt;
+      out.spd = def.speed * 1.8;
+      if (e.buryT <= 0) {
+        e.buried = false; e.mesh.visible = true;
+        spawnTelegraph(e.x, e.z, 3.6, 0.5, e.damage * 1.3);
+        spawnBurst(e.x, 0.6, e.z, def.color, 20); GH.audio.explode();
+        e.cds.burrow = 9 * cdMult;
+      }
+      return out;
+    }
+    if (e.stunT > 0) { e.stunT -= dt; out.spd = 0; return out; }
+    if (e.dashing > 0) {
+      e.dashing -= dt;
+      out.spd = 20; out.mx = e.dashDirX; out.mz = e.dashDirZ;
+      if (dist < def.radius + 1.0 && e.attackCd <= 0) { e.attackCd = 0.8; playerDamage(e.damage * 0.9, e, 'kinetic'); }
+      if (e.dashing <= 0) e.stunT = 1.4;
+      return out;
+    }
+    for (var mi = 0; mi < e.mech.length; mi++) {
+      var m = e.mech[mi];
+      e.cds[m] = (e.cds[m] || 0) - dt;
+      if (e.cds[m] > 0) continue;
+      var kind = m.split(':')[0];
+      if (kind === 'slam') { e.cds[m] = 6 * cdMult; spawnTelegraph(player.x, player.z, 3.2, 1.0, e.damage * 1.3); }
+      else if (kind === 'ring') {
+        e.cds[m] = 5.5 * cdMult;
+        for (var rb = 0; rb < 10; rb++) { var ra = (rb / 10) * Math.PI * 2 + runTime; spawnEnemyShot(e.x, 1.4, e.z, Math.sin(ra), Math.cos(ra), 9, e.damage * 0.5); }
+      }
+      else if (kind === 'line') { e.cds[m] = 5 * cdMult; spawnLineTelegraph(e.x, e.z, Math.atan2(nx, nz), 26, 1.0, 0.9, e.damage * 1.4); }
+      else if (kind === 'charge') { e.cds[m] = 7 * cdMult; if (dist > 4) { e.dashing = 0.55; e.dashDirX = nx; e.dashDirZ = nz; spawnBurst(e.x, 1, e.z, def.color, 8); } }
+      else if (kind === 'spiral') {
+        e.cds[m] = 0.14; e.spiralA += 0.45;
+        e.spiralN = (e.spiralN || 0) + 1;
+        for (var sp = 0; sp < 2; sp++) { var sa = e.spiralA + sp * Math.PI; spawnEnemyShot(e.x, 1.4, e.z, Math.sin(sa), Math.cos(sa), 8, e.damage * 0.4); }
+        if (e.spiralN >= 24) { e.spiralN = 0; e.cds[m] = 7 * cdMult; }
+      }
+      else if (kind === 'mines') {
+        e.cds[m] = 6 * cdMult;
+        for (var mn = 0; mn < 4; mn++) {
+          var mx2 = player.x + GH.rand(-5, 5), mz2 = player.z + GH.rand(-5, 5);
+          effects.push({ kind: 'patch', x: mx2, z: mz2, t: 6, radius: 1.5, dps: e.damage * 0.25, chill: huntHas(e, 'frost'), mesh: groundDisc(mx2, mz2, 1.5, huntHas(e, 'frost') ? 0x80c0ff : 0xff5020, 0.3) });
+        }
+      }
+      else if (kind === 'blink') {
+        e.cds[m] = 8 * cdMult;
+        spawnBurst(e.x, 1.5, e.z, def.color, 10);
+        var ba = Math.random() * Math.PI * 2;
+        var bx = player.x + Math.cos(ba) * 6, bz = player.z + Math.sin(ba) * 6;
+        var bsp = openSpot(bx, bz, def.radius); if (bsp) { bx = bsp.x; bz = bsp.z; }
+        e.x = bx; e.z = bz;
+        spawnBurst(e.x, 1.5, e.z, def.color, 10);
+        if (e.cds.slam !== undefined) e.cds.slam = Math.min(e.cds.slam, 0.4);
+      }
+      else if (kind === 'summon') {
+        e.cds[m] = 11 * cdMult;
+        var sid = m.split(':')[1];
+        if (!GH.enemyDefs[sid]) sid = GH.weightedPick(wavePlan.types).id;
+        for (var s2 = 0; s2 < 3; s2++) {
+          var smn = spawnEnemy(sid, e.x + GH.rand(-3, 3), e.z + GH.rand(-3, 3));
+          if (smn) { smn.aggro = true; smn.event = true; smn.summonedBy = e; }
+        }
+        if (huntHas(e, 'shield') && !e.shieldUp) { e.shieldUp = true; e.shieldT = 0; announce(def.name + ' — SHIELDED · KILL THE ADDS', 22); }
+      }
+      else if (kind === 'pull') {
+        e.cds[m] = 9 * cdMult;
+        var pa = GH.angleTo(player.x, player.z, e.x, e.z);
+        var pd = Math.max(0, Math.min(dist - def.radius - 1, 6));
+        player.x += Math.sin(pa) * pd; player.z += Math.cos(pa) * pd;
+        drawLightning(e.x, 1.6, e.z, player.x, 1.2, player.z);
+        GH.audio.zap();
+        spawnTelegraph(e.x, e.z, def.radius + 3.5, 0.9, e.damage * 1.2);
+      }
+      else if (kind === 'artillery') {
+        e.cds[m] = 7 * cdMult;
+        for (var t2 = 0; t2 < 5; t2++) spawnTelegraph(player.x + GH.rand(-4, 4), player.z + GH.rand(-4, 4), 2.4, 1.1 + t2 * 0.15, e.damage);
+      }
+      else if (kind === 'sweep') {
+        e.cds[m] = 0.35; e.sweepA += 0.5;
+        e.sweepN = (e.sweepN || 0) + 1;
+        spawnLineTelegraph(e.x, e.z, e.sweepA, 22, 1.0, 0.35, e.damage * 0.6);
+        if (e.sweepN >= 8) { e.sweepN = 0; e.cds[m] = 9 * cdMult; }
+      }
+      else if (kind === 'burrow') {
+        e.cds[m] = 99;
+        e.buried = true; e.buryT = 3.0; e.mesh.visible = false;
+        spawnBurst(e.x, 0.5, e.z, 0xc8b080, 14);
+      }
+      else e.cds[m] = 99; // passive mechanics: shield, weak, enrage, regen, drain, burn, frost, split
+    }
+    if (huntHas(e, 'burn') && Math.random() < 0.15) {
+      effects.push({ kind: 'patch', x: e.x, z: e.z, t: 2.5, radius: 1.2, dps: e.damage * 0.2, mesh: groundDisc(e.x, e.z, 1.2, 0xff5020, 0.25) });
+    }
+    out.spd = spd;
+    return out;
+  }
+
+  function huntSlain(e) {
+    var def = e.def;
+    var d = GH.meta.data;
+    d.bestiary = d.bestiary || {};
+    var first = !d.bestiary[e.id];
+    d.bestiary[e.id] = (d.bestiary[e.id] || 0) + 1;
+    var t = GH.bosses.TIER[def.huntTier];
+    grantMats(t.alloy, t.cores, true);
+    queueAnnounce(def.name + ' SLAIN — +' + t.cores + ' CORES · +' + t.alloy + ' ALLOY' + (first ? ' · BESTIARY ENTRY' : ''), 28);
+    if (expActive) {
+      var hd = d.huntsToday;
+      if (hd.day !== GH.world.dayStamp()) { hd.day = GH.world.dayStamp(); hd.slain = {}; }
+      hd.slain[e.id] = true;
+      if (huntSpot && huntSpot.id === e.id) { huntSpot = null; huntUp = false; }
+    }
+    lifeEvent('hunts', 1);
+    if (e.mech && e.mech.indexOf('split') !== -1 && !e.isSplit) {
+      for (var i = 0; i < 2; i++) {
+        var h = spawnEnemy(e.id, e.x + (i ? 2 : -2), e.z);
+        if (h) { h.isSplit = true; h.hp = h.maxHp = Math.round(e.maxHp * 0.3); h.mesh.scale.multiplyScalar(0.6); h.baseScale = h.mesh.scale.x; h.aggro = true; h.mech = def.mech.filter(function (m) { return m !== 'split'; }); h.phase = 2; h.cds = {}; h.noLedger = true; }
+      }
+      queueAnnounce(def.name + ' SPLITS', 22);
+    }
+    GH.meta.save();
   }
 
   // ---------- telegraphs ----------
@@ -13068,6 +13509,102 @@ GH.game = (function () {
     }
   }
 
+  // ---------------- signature abilities (slot 5, one per lineage) ----------------
+  function castSignature() {
+    var sg = player.sig;
+    if (!sg || player.abilityCds[5] > 0) return;
+    if (player.energy < sg.cost) { announce('LOW ENERGY', 16); GH.audio.hit(); return; }
+    var key = player.def.kind === 'relic' ? player.def.relicBase : (player.def.lineage || player.def.id);
+    var inst = player.weapons[0];
+    var dmg = weaponDamage(inst) * player.sigPower;
+    var needsTarget = key === 'fang' || key === 'viper';
+    if (needsTarget && (!target || target.dead)) { announce('NO TARGET — CLICK A HOSTILE', 16); return; }
+    if (needsTarget && GH.dist2(player.x, player.z, target.x, target.z) > 18 * 18) { announce('OUT OF RANGE', 16); return; }
+    player.energy -= sg.cost;
+    player.abilityCds[5] = sg.cd * player.skillBon.cdMult;
+    announce(sg.name, 22);
+    tutorialEvent('ability', 1);
+    var i, e, a;
+    if (key === 'aegis') {
+      player.sigT = 5; player.sigKind = 'wall';
+      GH.audio.block();
+      for (i = 0; i < enemies.length; i++) {
+        e = enemies[i]; if (e.dead) continue;
+        if (GH.dist2(player.x, player.z, e.x, e.z) < 36) { a = GH.angleTo(player.x, player.z, e.x, e.z); e.vx += Math.sin(a) * 20 / e.def.mass; e.vz += Math.cos(a) * 20 / e.def.mass; damageEnemy(e, dmg * 0.8, { inst: inst }); }
+      }
+      spawnBurst(player.x, 1, player.z, 0xffd040, 18);
+    } else if (key === 'vulcan') {
+      var base = player.facing;
+      for (i = -7; i <= 6; i++) fireShot(inst, player.x, player.z, base + i * 0.09 + 0.045, player);
+      GH.audio.shoot(); G.hitStop(0.04);
+    } else if (key === 'fang') {
+      a = GH.angleTo(target.x, target.z, player.x, player.z);
+      player.x = target.x + Math.sin(a) * (target.def.radius + 0.9);
+      player.z = target.z + Math.cos(a) * (target.def.radius + 0.9);
+      player.facing = GH.angleTo(player.x, player.z, target.x, target.z);
+      player.dashTime = 0.12;
+      damageEnemy(target, dmg * 2.5, { inst: inst });
+      target.vx += Math.sin(player.facing) * 10 / target.def.mass; target.vz += Math.cos(player.facing) * 10 / target.def.mass;
+      player.frenzy.push(4, 4); while (player.frenzy.length > 5) player.frenzy.shift();
+      spawnBurst(target.x, 1.4, target.z, 0xff5040, 14); GH.audio.crit(); G.hitStop(0.06);
+    } else if (key === 'hexen') {
+      if (inst.w.cycle) inst.cycleT = 0;
+      var elem = currentElement(inst) || 'burn';
+      for (i = 0; i < 12; i++) {
+        var tmp = makeWeaponInst('spellstorm', { type: 'shot', damage: Math.round(dmg * 0.9), speed: 18, life: 2.0, size: 0.28, color: GH.elements[elem] ? GH.elements[elem].color : 0x50e8d8, spread: 0, count: 1, homing: 6, aoe: 1.6, elem: elem });
+        fireShot(tmp, player.x, player.z, player.facing + (i - 5.5) * 0.5, player);
+      }
+      GH.audio.zap(); spawnBurst(player.x, 1.4, player.z, 0x50e8d8, 16);
+    } else if (key === 'viper') {
+      a = GH.angleTo(player.x, player.z, target.x, target.z);
+      spawnBurst(player.x, 1, player.z, 0x9ae848, 10);
+      player.x = target.x + Math.sin(a) * (target.def.radius + 1.0);
+      player.z = target.z + Math.cos(a) * (target.def.radius + 1.0);
+      player.facing = GH.angleTo(player.x, player.z, target.x, target.z);
+      player.dashTime = 0.15;
+      player.edgeT = 4;
+      for (i = 0; i < enemies.length; i++) { e = enemies[i]; if (!e.dead && !e.def.boss && GH.dist2(player.x, player.z, e.x, e.z) < 225) e.stun = Math.max(e.stun || 0, 1.2); }
+      if (target.def.boss) target.stunT = Math.max(target.stunT || 0, 1.0);
+      damageEnemy(target, dmg * 1.5, { inst: inst });
+      spawnBurst(player.x, 1, player.z, 0x9ae848, 10); GH.audio.dash();
+    } else if (key === 'morrow') {
+      var healed = 0;
+      for (i = 0; i < enemies.length; i++) {
+        e = enemies[i]; if (e.dead) continue;
+        if (GH.dist2(player.x, player.z, e.x, e.z) < 81) {
+          a = GH.angleTo(e.x, e.z, player.x, player.z);
+          var pullD = Math.max(0, Math.sqrt(GH.dist2(player.x, player.z, e.x, e.z)) - e.def.radius - 1.2) * (e.def.boss ? 0.3 : 0.9);
+          e.x += Math.sin(a) * pullD; e.z += Math.cos(a) * pullD;
+          var before = e.hp; damageEnemy(e, dmg * 1.2, { inst: inst }); healed += Math.max(0, before - Math.max(0, e.hp));
+        }
+      }
+      player.heal(healed * 0.3);
+      spawnBurst(player.x, 1.2, player.z, 0xb03050, 22); GH.audio.explode();
+    } else if (key === 'strix') {
+      player.dashX = Math.sin(player.facing); player.dashZ = Math.cos(player.facing);
+      player.dashTime = 0.4; player.dashId++; player.dashKind = 'lunge'; player.dashMult = 2.2;
+      player.edgeT = 3;
+      GH.audio.dash(); spawnBurst(player.x, 1, player.z, 0xf05060, 10);
+    } else if (key === 'titan') {
+      player.sigT = 5; player.sigKind = 'siege';
+      player.stats.atkSpdMult *= 2.2; player.stats.armor += 12;
+      if (inst.w.aoe) { inst.w.aoe *= 1.5; player.sigAoe = inst; }
+      GH.audio.block(); spawnBurst(player.x, 0.4, player.z, 0xf0a030, 16);
+    }
+  }
+  function updateSignature(dt) {
+    if (player.sigT > 0) {
+      player.sigT -= dt;
+      if (player.sigT <= 0) {
+        if (player.sigKind === 'siege') {
+          player.stats.atkSpdMult /= 2.2; player.stats.armor -= 12;
+          if (player.sigAoe) { player.sigAoe.w.aoe /= 1.5; player.sigAoe = null; }
+        }
+        player.sigKind = null;
+      }
+    }
+  }
+
   function updateWeapons(dt, input) {
     var s = player.stats;
     // the trigger: a click (or held button) from mouse, or an active aim
@@ -13080,7 +13617,7 @@ GH.game = (function () {
     // (a DAMPENED dungeon chokes the reactor)
     var enRate = dungeonState && dungeonState.modIds.dampened ? 0.55 : 1;
     player.energy = Math.min(s.energyMax, player.energy + s.energyRegen * enRate * dt);
-    for (var c = 1; c <= 4; c++) {
+    for (var c = 1; c <= 5; c++) {
       if (player.abilityCds[c] > 0) player.abilityCds[c] -= dt;
     }
     maintainTarget();
@@ -13114,6 +13651,8 @@ GH.game = (function () {
     }
     player.suppressed = false;
 
+    updateSignature(dt);
+    if (input.abilityPressed && input.abilityPressed[5]) { input.abilityPressed[5] = false; castSignature(); }
     // hotbar casts
     if (input.abilityPressed) {
       for (c = 1; c <= 4; c++) {
@@ -13970,6 +14509,11 @@ GH.game = (function () {
     waveNum = n;
     if (n === 10) lifeEvent('wave10', 1);
     wavePlan = GH.wavePlan(stage, n, G.mode !== 'classic');
+    // ARENA every ten waves and CLASSIC wave 10 draw a HUNT from this stage's pool
+    if (wavePlan.midboss && (G.mode !== 'classic' || n === 10) && Math.random() < 0.7) {
+      var hb2 = GH.bosses.pickFor(stage.id, G.mode === 'classic' ? 2 : Math.min(4, 1 + Math.floor(n / 10)));
+      if (hb2) wavePlan.midboss = hb2.id;
+    }
     if (weekly) {
       wavePlan.rate *= weekly.mods.rate;
       if (weekly.mods.midbossEvery && n % weekly.mods.midbossEvery === 0 && !wavePlan.midboss) {
@@ -14698,7 +15242,7 @@ GH.game = (function () {
 
     player.blocking = player.def.special === 'block' && input.special && !player.speederOn;
 
-    var spd = s.speed * (player.blocking ? 0.55 : 1);
+    var spd = s.speed * (player.blocking ? 0.55 : 1) * (player.sigKind === 'siege' ? 0.02 : 1);
     if (player.protocols.vents && player.hp < s.maxHP * 0.35) spd *= 1.2;
     if (artOn('circuit_laurel')) spd *= 1.08;
     // a shouldered power core weighs on the servos
@@ -14748,9 +15292,9 @@ GH.game = (function () {
           var rr = 1.3 + e.def.radius;
           if (GH.dist2(player.x, player.z, e.x, e.z) <= rr * rr) {
             e.lastDashId = player.dashId;
-            var dmg = player.dashKind === 'lunge'
+            var dmg = (player.dashKind === 'lunge'
               ? (12 + s.flatDamage * 2) * s.damageMult
-              : (10 + s.armor + s.block) * s.damageMult;
+              : (10 + s.armor + s.block) * s.damageMult) * (player.dashMult || 1);
             damageEnemy(e, dmg, {});
             var a = GH.angleTo(player.x, player.z, e.x, e.z);
             e.vx += Math.sin(a) * 14 / e.def.mass;
@@ -15007,6 +15551,7 @@ GH.game = (function () {
   var interactables = [];
   var nearInteract = null;
   var veins = [];            // today's alloy veins in the loaded zone
+  var huntSpot = null, huntUp = false, huntTotem = null; // today's HUNT in this territory
   var signalT = 0, signalSpot = null; // the next cache signal, and the live one
 
   // diary / daily payouts announced in the field
@@ -15364,11 +15909,32 @@ GH.game = (function () {
     });
     signalT = GH.worldlife.signalInterval(zoneNow.danger) * (0.5 + Math.random() * 0.5);
     signalSpot = null;
+    // today's hunt: a skull totem somewhere in the territory
+    huntSpot = null; huntUp = false;
+    if (huntTotem) { scene.remove(huntTotem); huntTotem = null; }
+    if (!zoneNow.dungeon) {
+      var hd0 = GH.meta.data.huntsToday;
+      if (hd0.day !== GH.world.dayStamp()) { hd0.day = GH.world.dayStamp(); hd0.slain = {}; }
+      var hb = GH.bosses.todayFor(zoneId, GH.world.dayStamp(), hd0.slain);
+      if (hb) {
+        var hrng = GH.worldlife.nodesFor(zoneId, GH.world.BOUNDS);
+        var hp0 = hrng.length ? hrng[hrng.length - 1] : { x: 0, z: -40 };
+        var hx = hp0.x * 0.7, hz = hp0.z * 0.7;
+        if (zoneId === 'wreck' && GH.dist2(hx, hz, GH.world.CAMP.x, GH.world.CAMP.z) < 50 * 50) hz -= 90;
+        var hsp = openSpot(hx, hz, 2.5); if (hsp) { hx = hsp.x; hz = hsp.z; }
+        huntSpot = { id: hb.id, name: hb.name, x: hx, z: hz };
+        huntTotem = GH.models.buildHarrowTotem();
+        huntTotem.position.set(hx, gy(hx, hz), hz);
+        if (huntTotem.userData.core && huntTotem.userData.core.material && huntTotem.userData.core.material.color) huntTotem.userData.core.material.color.setHex(hb.color);
+        worldH.group.add(huntTotem);
+      }
+    }
     if (fromZoneId && !zoneNow.dungeon) {
       var dp = GH.worldlife.diaryProgress(zoneId);
       var pk0 = GH.worldlife.zonePerk(zoneId);
       queueAnnounce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1] +
         ' · DIARY ' + dp.doneTiers + '/' + dp.total + (pk0.labels.length ? ' · ' + pk0.labels.join(', ').toUpperCase() : ''), 22);
+      if (huntSpot) queueAnnounce('HUNT: ' + huntSpot.name + ' — MARKED ON THE MAP', 20);
     }
     stage = GH.world.stageFor(zoneId);
     applyZoneLook(zoneNow, stage);
@@ -16522,6 +17088,7 @@ GH.game = (function () {
     if (harrowSpot) {
       queueAnnounce('THE HARROW STALKS ' + GH.world.stageFor(harrowSpot.zone).name, 22);
     }
+    if (huntSpot) queueAnnounce('HUNT: ' + huntSpot.name + ' — MARKED ON THE MAP', 22);
     tutorial = null;
     if (opts.tutorial) startTutorial();
     else { var ob0 = document.getElementById('objective'); if (ob0) ob0.classList.add('hidden'); }
@@ -16577,6 +17144,19 @@ GH.game = (function () {
     updateTutorial(dt, input);
     updateWeather(dt);
     updateHarrow(dt);
+    if (huntSpot && !huntUp) {
+      if (huntTotem && huntTotem.userData.core) huntTotem.userData.core.rotation.y += dt * 2;
+      if (GH.dist2(player.x, player.z, huntSpot.x, huntSpot.z) < 22 * 22) {
+        huntUp = true;
+        wavePlan = expeditionPlan(zoneNow);
+        var he = spawnEnemy(huntSpot.id, huntSpot.x, huntSpot.z);
+        if (he) he.aggro = true;
+        if (huntTotem) { worldH.group.remove(huntTotem); huntTotem = null; }
+        shake = Math.min(0.5, shake + 0.3);
+        queueAnnounce(GH.enemyDefs[huntSpot.id].epithet.toUpperCase(), 20);
+        GH.music.play('battle');
+      }
+    }
     updateDungeon(dt);
     updateZoneEvent(dt);
     updateItemPads(dt);
@@ -16972,6 +17552,11 @@ GH.game = (function () {
       if (veins[vi].mined) continue;
       ctx.fillStyle = veins[vi].rich ? '#d8e8ff' : '#a0a8b8';
       ctx.fillRect(sx(veins[vi].x) - 1.5, sz(veins[vi].z) - 1.5, 3, 3);
+    }
+    if (huntSpot && !huntUp) {
+      ctx.fillStyle = '#ffb060';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText('☠', sx(huntSpot.x) - 4, sz(huntSpot.z) + 4);
     }
     if (signalSpot) {
       ctx.strokeStyle = '#ffd050';
@@ -18104,12 +18689,12 @@ GH.game = (function () {
     var hb = document.getElementById('hotbar');
     if (hb) {
       var hh = '';
-      for (var hn = 1; hn <= 4; hn++) {
-        var ab = GH.skills.ABILITIES[hn];
-        var known = player.skillBon.slots[hn];
+      for (var hn = 1; hn <= 5; hn++) {
+        var ab = hn === 5 ? player.sig : GH.skills.ABILITIES[hn];
+        var known = hn === 5 ? true : player.skillBon.slots[hn];
         var cd = Math.max(0, player.abilityCds[hn]);
         var ready = known && cd <= 0 && player.energy >= ab.cost;
-        hh += '<div class="hb-slot' + (known ? '' : ' locked') + (ready ? ' ready' : '') + '" title="' +
+        hh += '<div class="hb-slot' + (hn === 5 ? ' sig' : '') + (known ? '' : ' locked') + (ready ? ' ready' : '') + '" title="' +
           ab.name + ' — ' + ab.desc + ' (' + ab.cost + ' energy)">' +
           '<div class="hb-glyph">' + (known ? ab.glyph : '✕') + '</div>' +
           '<div class="hb-key">' + GH.controls.label('ability' + hn) + '</div>' +
@@ -18286,6 +18871,8 @@ GH.game = (function () {
     interactables = [];
     veins = [];
     signalSpot = null;
+    huntSpot = null; huntUp = false;
+    if (huntTotem) { scene.remove(huntTotem); huntTotem = null; }
     if (tutorial) { tutorial = null; if (tutMarker) scene.remove(tutMarker); var obx = document.getElementById('objective'); if (obx) obx.classList.add('hidden'); }
     wallRing.visible = true;
     floor.visible = true;
@@ -18662,7 +19249,8 @@ GH.game = (function () {
         '<b>Base Stats</b>\n' + def.baseText +
         '\n\n<b>On Level Up</b>\n' + def.levelText +
         '\n\n<b>Primary</b>\n' + def.weapon.name + ' (' + (def.weapon.cls || '') + ')' +
-        '\n\n<b>Special</b>\n' + def.specialText;
+        '\n\n<b>Special</b>\n' + def.specialText +
+        '\n\n<b>Signature [' + GH.controls.label('ability5') + ']</b>\n' + GH.skills.signatureFor(def).name + ' — ' + GH.skills.signatureFor(def).desc;
     } else {
       var rst = GH.roster.status(def.id);
       document.getElementById('select-desc').textContent = def.desc;
@@ -18919,6 +19507,12 @@ GH.game = (function () {
     return true;
   };
   G.devEventNow = function () { zoneEventT = 0.01; return !!ZONE_EVENTS[curZone]; };
+  // dev/test: spawn any enemy beside the pilot; kill the live boss; today's hunt spot
+  G.devSpawn = function (id, dx, dz) { if (!player || !GH.enemyDefs[id]) return null; var e = spawnEnemy(id, player.x + (dx || 8), player.z + (dz || 0)); if (e) e.aggro = true; return !!e; };
+  G.devKillBoss = function () { if (bossRef && !bossRef.dead) { bossRef.shieldUp = false; damageEnemy(bossRef, 1e9, { canCrit: false }); if (bossRef && bossRef.hp <= 0) killEnemy(bossRef); return true; } return false; };
+  G.devHunt = function () { return huntSpot ? { id: huntSpot.id, x: huntSpot.x, z: huntSpot.z, up: huntUp } : null; };
+  G.devBoss = function () { return bossRef && !bossRef.dead ? { id: bossRef.id, hp: Math.round(bossRef.hp), max: Math.round(bossRef.maxHp), mech: bossRef.mech, phase: bossRef.phase, shield: !!bossRef.shieldUp } : null; };
+  G.devSig = function () { return { name: player && player.sig ? player.sig.name : null, cd: player ? player.abilityCds[5] : 0, kind: player ? player.sigKind : null, energy: player ? Math.round(player.energy) : 0 }; };
   G.devGiveItem = function (kind) { if (player) player.item = kind; };
   G.devUseItem = function () { useItem(); };
   G.devCards = function () { awardCards(3); };
@@ -20153,6 +20747,14 @@ GH.game = (function () {
         '<div class="lc-name">' + m.name + '</div>' +
         '<div class="lc-count">Lv ' + lvl + (lvl >= 50 ? ' ★' : '') + '</div></div>';
     });
+    var bst = GH.meta.data.bestiary || {};
+    html += '</div><div class="log-section">BESTIARY — HUNTS (' + GH.bosses.slainCount() + '/' + GH.bosses.LIST.length + ')</div><div class="log-grid">';
+    GH.bosses.LIST.forEach(function (b) {
+      var n = bst[b.id] || 0;
+      html += '<div class="log-cell hunt' + (n ? ' seen' : '') + '" title="' + (n ? b.epithet + ' · ' + b.mech.join(', ') : GH.world.stageFor(b.zone).name + ' · tier ' + b.tier) + '">' +
+        '<div class="lc-name">' + (n ? b.name : '???') + '</div>' +
+        '<div class="lc-count">' + (n ? '×' + n : GH.world.stageFor(b.zone).name.split(' ')[0]) + ' · T' + b.tier + '</div></div>';
+    });
     var wArt = GH.meta.data.world;
     var artHave = Object.keys(wArt.artifacts).length;
     html += '</div><div class="log-section">NAMED ARTIFACTS (' + artHave + '/' +
@@ -20282,7 +20884,7 @@ GH.game = (function () {
     for (var k in (w.dgTier || {})) { cleared++; totalTiers += w.dgTier[k]; }
     var dtot = GH.worldlife.diaryTotal();
     document.getElementById('map-head').innerHTML =
-      'DIARIES <b>' + dtot.done + '/' + dtot.total + '</b> · ' +
+      'HUNTS SLAIN <b>' + GH.bosses.slainCount() + '/' + GH.bosses.LIST.length + '</b> · DIARIES <b>' + dtot.done + '/' + dtot.total + '</b> · ' +
       'NESTS CLEANSED <b>' + Object.keys(w.nests).length + '/' + GH.world.totalNests() + '</b>' +
       ' · DUNGEONS ASCENDED <b>' + cleared + '/' + (GH.world.ZONES.length * 4) + '</b>' +
       ' · TOTAL TIERS CLIMBED <b>' + totalTiers + '</b>' +
@@ -20309,6 +20911,14 @@ GH.game = (function () {
         (nextTier ? '<div class="mp-diary-tasks">' + nextTier.name + ': ' + nextTier.tasks.map(function (t) {
           return '<span class="' + (t.done ? 'dt-done' : '') + '">' + (t.done ? '☑' : '☐') + ' ' + t.desc.replace(' here', '') + ' ' + t.have + '/' + t.need + '</span>';
         }).join(' ') + ' → +' + nextTier.reward.alloy + ' alloy' + (nextTier.reward.cores ? ', +' + nextTier.reward.cores + ' cores' : '') + (nextTier.perk ? ', ' + nextTier.perk.label : '') + '</div>' : '<div class="mp-diary-tasks dt-done">ALL TIERS COMPLETE</div>') + '</div>';
+      var hd = GH.meta.data.huntsToday || { day: null, slain: {} };
+      var todaySlain = hd.day === GH.world.dayStamp() ? hd.slain : {};
+      var hunt = GH.bosses.todayFor(zn.id, GH.world.dayStamp(), todaySlain);
+      var zoneHunts = GH.bosses.forZone(zn.id);
+      var bst2 = GH.meta.data.bestiary || {};
+      var seenHere = zoneHunts.filter(function (b) { return bst2[b.id]; }).length;
+      head += '<div class="mp-hunt' + (hunt ? '' : ' slain') + '">☠ HUNT: ' + (hunt ? '<b>' + hunt.name + '</b> — ' + hunt.epithet + ' (tier ' + hunt.tier + ')' : 'every hunt here is down for today') +
+        ' · bestiary ' + seenHere + '/' + zoneHunts.length + '</div>';
       var rows = '';
       var archList = ['depths'].concat(GH.dungeons.ZONE_SETS[zn.id] || []);
       archList.forEach(function (arch) {
@@ -20593,6 +21203,7 @@ GH.game = (function () {
     var d = GH.vehicles.byId(wsPick);
     if (!d) { box.innerHTML = ''; return; }
     var base = GH.mechById(d.lineage), K = GH.VECTORS[d.kind] || GH.VECTORS.bike;
+    wsPreview([function () { return GH.models.buildSpeeder(base.model, d.kind, d.shape); }]);
     var owned = GH.vehicles.owned(d.id), can = GH.vehicles.canBuild(d.id), c = GH.vehicles.BUILD_COST, m = GH.meta.data.mats;
     var need = function (have, want, label) { return '<span class="' + (have >= want ? 'ws-ok' : 'ws-short') + '">' + label + ' ' + have + '/' + want + '</span>'; };
     box.innerHTML = '<div class="ws-d-name">' + base.icon + ' ' + d.name + '</div>' +
@@ -20610,17 +21221,57 @@ GH.game = (function () {
     };
   }
 
+  // the hangar viewer: the picked frame (and its vehicle) turning on a plinth
+  var wsView = null;
+  function wsPreview(buildFns) {
+    var cv = document.getElementById('ws-view');
+    if (!cv) return;
+    try {
+      if (!wsView) {
+        var r = new THREE.WebGLRenderer({ canvas: cv, antialias: false });
+        r.setPixelRatio(1); r.setSize(cv.width, cv.height, false);
+        var sc = new THREE.Scene();
+        sc.background = new THREE.Color(0x0a1030);
+        sc.add(new THREE.HemisphereLight(0xdfe8ff, 0x303848, 1.0));
+        var sun = new THREE.DirectionalLight(0xfff0d0, 0.9); sun.position.set(3, 6, 4); sc.add(sun);
+        var cam = new THREE.PerspectiveCamera(38, cv.width / cv.height, 0.1, 60);
+        var floor = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.2, 24), new THREE.MeshLambertMaterial({ color: 0x1a2450 }));
+        floor.position.y = -0.1; sc.add(floor);
+        wsView = { r: r, sc: sc, cam: cam, group: null, t: 0 };
+      }
+      if (wsView.group) wsView.sc.remove(wsView.group);
+      var g = new THREE.Group();
+      var models = buildFns.map(function (f) { return f(); });
+      models.forEach(function (m, i) { m.position.x = models.length > 1 ? (i === 0 ? -1.5 : 1.7) : 0; g.add(m); });
+      wsView.sc.add(g);
+      wsView.group = g;
+      wsView.two = models.length > 1;
+    } catch (e) { /* no second context — the panel still works */ }
+  }
+  function wsTick(dt) {
+    if (!wsView || !wsView.group || curScreen !== 'workshop-screen') return;
+    wsView.t += dt;
+    wsView.group.rotation.y = wsView.t * 0.7;
+    var d = wsView.two ? 7.8 : 6.2;
+    wsView.cam.position.set(0, 2.6, d); wsView.cam.lookAt(0, 1.3, 0);
+    wsView.r.render(wsView.sc, wsView.cam);
+  }
+
   function renderWorkshopDetail() {
     var box = document.getElementById('ws-detail');
     var m = wsPick ? GH.mechById(wsPick) : null;
     if (!m) { box.innerHTML = ''; return; }
+    var vec = GH.vehicles.activeFor(m);
+    wsPreview([function () { var cfg = {}; for (var k in m.model) cfg[k] = m.model[k]; return GH.models.buildMech(cfg); },
+      function () { var sp = GH.models.buildSpeeder(m.model, vec.kind, vec.shape); sp.scale.setScalar(0.85); return sp; }]);
     var st = GH.roster.status(m.id);
     var pk = m.pack ? GH.roster.packById(m.pack) : null;
     var html = '<div class="ws-d-name">' + m.icon + ' ' + m.name + '</div>' +
       '<div class="ws-d-role">' + m.role + '</div>' +
       '<div class="ws-d-desc">' + m.desc + '</div>' +
       '<div class="ws-d-stats">' + m.baseText.replace(/\n/g, ' · ') + '</div>' +
-      '<div class="ws-d-stats">Primary: <b>' + m.weapon.name + '</b> · ' + m.specialText + '</div>';
+      '<div class="ws-d-stats">Primary: <b>' + m.weapon.name + '</b> · ' + m.specialText + '</div>' +
+      (function () { var sg = GH.skills.signatureFor(m); return '<div class="ws-d-stats">Signature [' + GH.controls.label('ability5') + ']: <b>' + sg.glyph + ' ' + sg.name + '</b> — ' + sg.desc + (m.kind === 'relic' ? ' (relic: ×1.25)' : '') + '</div>'; })();
     if (pk) html += '<div class="ws-d-pack" style="color:' + pk.css + '">' + pk.glyph + ' ' + pk.name + ' PACK — ' + pk.desc + '</div>';
     if (st.owned) {
       html += '<div class="ws-d-status owned">OWNED — pick it on the frame select screen.</div>';
@@ -20810,6 +21461,7 @@ GH.game = (function () {
       '<ul><li><b>' + L('forward') + ' / ' + L('back') + '</b> walk forward / back · <b>' + L('turnLeft') + ' / ' + L('turnRight') + '</b> turn · <b>' + L('strafeLeft') + ' / ' + L('strafeRight') + '</b> strafe</li>' +
       '<li><b>Hold RIGHT MOUSE</b> and drag to look around; <b>WHEEL</b> zooms. <b>' + L('camera') + '</b> switches to the tactical top-down camera (mouse aims there).</li>' +
       '<li><b>LEFT CLICK</b> attacks and marks the hostile under the cursor as your target. <b>' + L('target') + '</b> cycles targets.</li>' +
+      '<li><b>' + L('ability5') + '</b> casts your frame\'s SIGNATURE — one per lineage (SHIELD WALL, BARRAGE, POUNCE, SPELLSTORM, SHADOW STEP, HARVEST, RAIL CHARGE, SIEGE STANCE).</li>' +
       '<li><b>' + L('ability1') + '–' + L('ability4') + '</b> cast abilities (spend ENERGY). <b>' + L('ward1') + ' ' + L('ward2') + ' ' + L('ward3') + '</b> raise a ward matching the incoming damage.</li>' +
       '<li><b>' + L('boost') + '</b> dashes (hold to drift in skimmer form). <b>' + L('special') + '</b> fires your frame\'s special, or nitro when driving.</li>' +
       '<li><b>' + L('transform') + '</b> folds into the skimmer: ' + L('forward') + ' throttle, ' + L('back') + ' brake, ' + L('turnLeft') + '/' + L('turnRight') + ' steer.</li>' +
@@ -20836,6 +21488,7 @@ GH.game = (function () {
       '<li><b>Daily task board</b> (BROKER or PILOT): three tasks a day, claim each, sweep all three for a bonus core and a growing streak.</li>' +
       '<li><b>Alloy veins</b>: grey crystal clusters in every territory. Press ' + L('interact') + ' to mine. Danger III–IV veins can hold a frame core. They regrow daily.</li>' +
       '<li><b>Cache signals</b>: every few minutes a treasure site pings and is marked gold on the minimap. Worth the detour.</li>' +
+      '<li><b>Hunts</b>: fifty named bosses, four or five per territory. One roams each territory per day at a skull totem (☠ on the minimap, listed on the WORLD MAP). Each has its own mechanics — WEAK POINT bosses take 2.5× from behind, SHIELDED ones drop their shield when their adds die, BURROWERS erupt under you. They pay cores and fill the BESTIARY in the COLLECTION LOG. ARENA and CLASSIC midboss waves draw from the same pool.</li>' +
       '<li>Higher DANGER zones pay more alloy per drop, richer veins, and richer signals — Albion rules: risk buys reward.</li></ul>' +
       '<div class="hp-h">TIPS</div>' +
       '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run CLASSIC to wave 20 for cores.</li>' +
@@ -21084,6 +21737,7 @@ GH.game = (function () {
     }
     GH.game.update(dt, input, window.innerWidth, window.innerHeight);
     renderer.render(GH.game.scene(), GH.game.camera());
+    wsTick(dt);
   }
 
   if (document.readyState === 'loading') {

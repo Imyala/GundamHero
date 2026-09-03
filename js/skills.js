@@ -166,6 +166,23 @@ GH.skills = (function () {
   // Abilities: the hotbar. Damage scales off the primary weapon, so
   // gems, resonances, and the frame you fly all still matter.
   // ---------------------------------------------------------------
+  // Signature abilities: one per lineage, always unlocked, slot 5.
+  // Relics inherit their base lineage's signature at 1.25x power.
+  S.SIGNATURES = {
+    aegis:  { name: 'SHIELD WALL', glyph: '⛨', cost: 35, cd: 18, desc: 'For 5 s take 60% less damage, each hit mends 3% hull, and the cast shoves everything near you back.' },
+    vulcan: { name: 'BARRAGE', glyph: '⋔', cost: 30, cd: 12, desc: 'Empty the drums: fourteen shots in a fan ahead of you, instantly.' },
+    fang:   { name: 'POUNCE', glyph: '↯', cost: 25, cd: 9, desc: 'Leap onto your target for 2.5× damage and two FRENZY stacks.' },
+    hexen:  { name: 'SPELLSTORM', glyph: '✵', cost: 40, cd: 14, desc: 'Cycle the element and loose twelve homing bolts of it.' },
+    viper:  { name: 'SHADOW STEP', glyph: '☾', cost: 30, cd: 10, desc: 'Vanish and reappear behind your target: they lose you for a breath, your next 4 s of hits crit.' },
+    morrow: { name: 'HARVEST', glyph: '☥', cost: 35, cd: 15, desc: 'Drag everything within 9 m to you, reap it, and mend 30% of the damage dealt.' },
+    strix:  { name: 'RAIL CHARGE', glyph: '➤', cost: 30, cd: 10, desc: 'A 10 m charge that runs through the line for 2.2×, then 3 s of sharpened crits.' },
+    titan:  { name: 'SIEGE STANCE', glyph: '⛫', cost: 40, cd: 16, desc: 'Plant for 5 s: cannot move or be knocked back, +12 armor, fire rate ×2.2, blasts 50% wider.' }
+  };
+  S.signatureFor = function (def) {
+    var key = def.kind === 'relic' ? def.relicBase : (def.lineage || def.id);
+    return S.SIGNATURES[key] || S.SIGNATURES.aegis;
+  };
+
   S.ABILITIES = {
     1: { name: 'RUPTURE', glyph: '†', cost: 20, cd: 6,
       desc: 'A focused 2.2× strike on your target.' },

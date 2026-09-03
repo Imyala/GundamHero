@@ -1193,6 +1193,14 @@
         '<div class="lc-name">' + m.name + '</div>' +
         '<div class="lc-count">Lv ' + lvl + (lvl >= 50 ? ' ★' : '') + '</div></div>';
     });
+    var bst = GH.meta.data.bestiary || {};
+    html += '</div><div class="log-section">BESTIARY — HUNTS (' + GH.bosses.slainCount() + '/' + GH.bosses.LIST.length + ')</div><div class="log-grid">';
+    GH.bosses.LIST.forEach(function (b) {
+      var n = bst[b.id] || 0;
+      html += '<div class="log-cell hunt' + (n ? ' seen' : '') + '" title="' + (n ? b.epithet + ' · ' + b.mech.join(', ') : GH.world.stageFor(b.zone).name + ' · tier ' + b.tier) + '">' +
+        '<div class="lc-name">' + (n ? b.name : '???') + '</div>' +
+        '<div class="lc-count">' + (n ? '×' + n : GH.world.stageFor(b.zone).name.split(' ')[0]) + ' · T' + b.tier + '</div></div>';
+    });
     var wArt = GH.meta.data.world;
     var artHave = Object.keys(wArt.artifacts).length;
     html += '</div><div class="log-section">NAMED ARTIFACTS (' + artHave + '/' +
@@ -1322,7 +1330,7 @@
     for (var k in (w.dgTier || {})) { cleared++; totalTiers += w.dgTier[k]; }
     var dtot = GH.worldlife.diaryTotal();
     document.getElementById('map-head').innerHTML =
-      'DIARIES <b>' + dtot.done + '/' + dtot.total + '</b> · ' +
+      'HUNTS SLAIN <b>' + GH.bosses.slainCount() + '/' + GH.bosses.LIST.length + '</b> · DIARIES <b>' + dtot.done + '/' + dtot.total + '</b> · ' +
       'NESTS CLEANSED <b>' + Object.keys(w.nests).length + '/' + GH.world.totalNests() + '</b>' +
       ' · DUNGEONS ASCENDED <b>' + cleared + '/' + (GH.world.ZONES.length * 4) + '</b>' +
       ' · TOTAL TIERS CLIMBED <b>' + totalTiers + '</b>' +
@@ -1349,6 +1357,14 @@
         (nextTier ? '<div class="mp-diary-tasks">' + nextTier.name + ': ' + nextTier.tasks.map(function (t) {
           return '<span class="' + (t.done ? 'dt-done' : '') + '">' + (t.done ? '☑' : '☐') + ' ' + t.desc.replace(' here', '') + ' ' + t.have + '/' + t.need + '</span>';
         }).join(' ') + ' → +' + nextTier.reward.alloy + ' alloy' + (nextTier.reward.cores ? ', +' + nextTier.reward.cores + ' cores' : '') + (nextTier.perk ? ', ' + nextTier.perk.label : '') + '</div>' : '<div class="mp-diary-tasks dt-done">ALL TIERS COMPLETE</div>') + '</div>';
+      var hd = GH.meta.data.huntsToday || { day: null, slain: {} };
+      var todaySlain = hd.day === GH.world.dayStamp() ? hd.slain : {};
+      var hunt = GH.bosses.todayFor(zn.id, GH.world.dayStamp(), todaySlain);
+      var zoneHunts = GH.bosses.forZone(zn.id);
+      var bst2 = GH.meta.data.bestiary || {};
+      var seenHere = zoneHunts.filter(function (b) { return bst2[b.id]; }).length;
+      head += '<div class="mp-hunt' + (hunt ? '' : ' slain') + '">☠ HUNT: ' + (hunt ? '<b>' + hunt.name + '</b> — ' + hunt.epithet + ' (tier ' + hunt.tier + ')' : 'every hunt here is down for today') +
+        ' · bestiary ' + seenHere + '/' + zoneHunts.length + '</div>';
       var rows = '';
       var archList = ['depths'].concat(GH.dungeons.ZONE_SETS[zn.id] || []);
       archList.forEach(function (arch) {
@@ -1633,6 +1649,7 @@
     var d = GH.vehicles.byId(wsPick);
     if (!d) { box.innerHTML = ''; return; }
     var base = GH.mechById(d.lineage), K = GH.VECTORS[d.kind] || GH.VECTORS.bike;
+    wsPreview([function () { return GH.models.buildSpeeder(base.model, d.kind, d.shape); }]);
     var owned = GH.vehicles.owned(d.id), can = GH.vehicles.canBuild(d.id), c = GH.vehicles.BUILD_COST, m = GH.meta.data.mats;
     var need = function (have, want, label) { return '<span class="' + (have >= want ? 'ws-ok' : 'ws-short') + '">' + label + ' ' + have + '/' + want + '</span>'; };
     box.innerHTML = '<div class="ws-d-name">' + base.icon + ' ' + d.name + '</div>' +
@@ -1650,17 +1667,57 @@
     };
   }
 
+  // the hangar viewer: the picked frame (and its vehicle) turning on a plinth
+  var wsView = null;
+  function wsPreview(buildFns) {
+    var cv = document.getElementById('ws-view');
+    if (!cv) return;
+    try {
+      if (!wsView) {
+        var r = new THREE.WebGLRenderer({ canvas: cv, antialias: false });
+        r.setPixelRatio(1); r.setSize(cv.width, cv.height, false);
+        var sc = new THREE.Scene();
+        sc.background = new THREE.Color(0x0a1030);
+        sc.add(new THREE.HemisphereLight(0xdfe8ff, 0x303848, 1.0));
+        var sun = new THREE.DirectionalLight(0xfff0d0, 0.9); sun.position.set(3, 6, 4); sc.add(sun);
+        var cam = new THREE.PerspectiveCamera(38, cv.width / cv.height, 0.1, 60);
+        var floor = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.2, 24), new THREE.MeshLambertMaterial({ color: 0x1a2450 }));
+        floor.position.y = -0.1; sc.add(floor);
+        wsView = { r: r, sc: sc, cam: cam, group: null, t: 0 };
+      }
+      if (wsView.group) wsView.sc.remove(wsView.group);
+      var g = new THREE.Group();
+      var models = buildFns.map(function (f) { return f(); });
+      models.forEach(function (m, i) { m.position.x = models.length > 1 ? (i === 0 ? -1.5 : 1.7) : 0; g.add(m); });
+      wsView.sc.add(g);
+      wsView.group = g;
+      wsView.two = models.length > 1;
+    } catch (e) { /* no second context — the panel still works */ }
+  }
+  function wsTick(dt) {
+    if (!wsView || !wsView.group || curScreen !== 'workshop-screen') return;
+    wsView.t += dt;
+    wsView.group.rotation.y = wsView.t * 0.7;
+    var d = wsView.two ? 7.8 : 6.2;
+    wsView.cam.position.set(0, 2.6, d); wsView.cam.lookAt(0, 1.3, 0);
+    wsView.r.render(wsView.sc, wsView.cam);
+  }
+
   function renderWorkshopDetail() {
     var box = document.getElementById('ws-detail');
     var m = wsPick ? GH.mechById(wsPick) : null;
     if (!m) { box.innerHTML = ''; return; }
+    var vec = GH.vehicles.activeFor(m);
+    wsPreview([function () { var cfg = {}; for (var k in m.model) cfg[k] = m.model[k]; return GH.models.buildMech(cfg); },
+      function () { var sp = GH.models.buildSpeeder(m.model, vec.kind, vec.shape); sp.scale.setScalar(0.85); return sp; }]);
     var st = GH.roster.status(m.id);
     var pk = m.pack ? GH.roster.packById(m.pack) : null;
     var html = '<div class="ws-d-name">' + m.icon + ' ' + m.name + '</div>' +
       '<div class="ws-d-role">' + m.role + '</div>' +
       '<div class="ws-d-desc">' + m.desc + '</div>' +
       '<div class="ws-d-stats">' + m.baseText.replace(/\n/g, ' · ') + '</div>' +
-      '<div class="ws-d-stats">Primary: <b>' + m.weapon.name + '</b> · ' + m.specialText + '</div>';
+      '<div class="ws-d-stats">Primary: <b>' + m.weapon.name + '</b> · ' + m.specialText + '</div>' +
+      (function () { var sg = GH.skills.signatureFor(m); return '<div class="ws-d-stats">Signature [' + GH.controls.label('ability5') + ']: <b>' + sg.glyph + ' ' + sg.name + '</b> — ' + sg.desc + (m.kind === 'relic' ? ' (relic: ×1.25)' : '') + '</div>'; })();
     if (pk) html += '<div class="ws-d-pack" style="color:' + pk.css + '">' + pk.glyph + ' ' + pk.name + ' PACK — ' + pk.desc + '</div>';
     if (st.owned) {
       html += '<div class="ws-d-status owned">OWNED — pick it on the frame select screen.</div>';
@@ -1850,6 +1907,7 @@
       '<ul><li><b>' + L('forward') + ' / ' + L('back') + '</b> walk forward / back · <b>' + L('turnLeft') + ' / ' + L('turnRight') + '</b> turn · <b>' + L('strafeLeft') + ' / ' + L('strafeRight') + '</b> strafe</li>' +
       '<li><b>Hold RIGHT MOUSE</b> and drag to look around; <b>WHEEL</b> zooms. <b>' + L('camera') + '</b> switches to the tactical top-down camera (mouse aims there).</li>' +
       '<li><b>LEFT CLICK</b> attacks and marks the hostile under the cursor as your target. <b>' + L('target') + '</b> cycles targets.</li>' +
+      '<li><b>' + L('ability5') + '</b> casts your frame\'s SIGNATURE — one per lineage (SHIELD WALL, BARRAGE, POUNCE, SPELLSTORM, SHADOW STEP, HARVEST, RAIL CHARGE, SIEGE STANCE).</li>' +
       '<li><b>' + L('ability1') + '–' + L('ability4') + '</b> cast abilities (spend ENERGY). <b>' + L('ward1') + ' ' + L('ward2') + ' ' + L('ward3') + '</b> raise a ward matching the incoming damage.</li>' +
       '<li><b>' + L('boost') + '</b> dashes (hold to drift in skimmer form). <b>' + L('special') + '</b> fires your frame\'s special, or nitro when driving.</li>' +
       '<li><b>' + L('transform') + '</b> folds into the skimmer: ' + L('forward') + ' throttle, ' + L('back') + ' brake, ' + L('turnLeft') + '/' + L('turnRight') + ' steer.</li>' +
@@ -1876,6 +1934,7 @@
       '<li><b>Daily task board</b> (BROKER or PILOT): three tasks a day, claim each, sweep all three for a bonus core and a growing streak.</li>' +
       '<li><b>Alloy veins</b>: grey crystal clusters in every territory. Press ' + L('interact') + ' to mine. Danger III–IV veins can hold a frame core. They regrow daily.</li>' +
       '<li><b>Cache signals</b>: every few minutes a treasure site pings and is marked gold on the minimap. Worth the detour.</li>' +
+      '<li><b>Hunts</b>: fifty named bosses, four or five per territory. One roams each territory per day at a skull totem (☠ on the minimap, listed on the WORLD MAP). Each has its own mechanics — WEAK POINT bosses take 2.5× from behind, SHIELDED ones drop their shield when their adds die, BURROWERS erupt under you. They pay cores and fill the BESTIARY in the COLLECTION LOG. ARENA and CLASSIC midboss waves draw from the same pool.</li>' +
       '<li>Higher DANGER zones pay more alloy per drop, richer veins, and richer signals — Albion rules: risk buys reward.</li></ul>' +
       '<div class="hp-h">TIPS</div>' +
       '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run CLASSIC to wave 20 for cores.</li>' +
@@ -2124,6 +2183,7 @@
     }
     GH.game.update(dt, input, window.innerWidth, window.innerHeight);
     renderer.render(GH.game.scene(), GH.game.camera());
+    wsTick(dt);
   }
 
   if (document.readyState === 'loading') {
