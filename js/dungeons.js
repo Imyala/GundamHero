@@ -1,4 +1,4 @@
-// HERO FRAME — dungeon archetype data & generators
+// STAALREUS — dungeon archetype data & generators
 // Every territory carries THREE dungeon gates, each leading to a
 // different kind of run (inspired by the classic dungeon-crawler and
 // bullet-hell traditions — shifting floors included). Clearing tier 1

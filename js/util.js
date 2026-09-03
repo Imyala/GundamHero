@@ -1,4 +1,4 @@
-// HERO FRAME — small helpers, shared namespace
+// STAALREUS — small helpers, shared namespace
 window.GH = {};
 
 GH.clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };

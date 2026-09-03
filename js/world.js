@@ -1,4 +1,4 @@
-// HERO FRAME — THE SHATTERED REACH
+// STAALREUS — THE SHATTERED REACH
 // A zone-streamed world: each territory is its own HUGE map (500×500),
 // linked by travel gates, and every territory hides a gated DUNGEON —
 // a separate dark map holding its guardian packs, its sealed vault, and

@@ -1,4 +1,4 @@
-// HERO FRAME — built territories: the big shapes a zone is made of.
+// STAALREUS — built territories: the big shapes a zone is made of.
 // layout() runs before the ground mesh exists (it appends flat pads and
 // records footprints); build() runs after, dropping merged meshes onto
 // the field and registering colliders so nothing walks through a wall.

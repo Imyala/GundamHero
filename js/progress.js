@@ -1,4 +1,4 @@
-// HERO FRAME — long-horizon progression: hunt contracts, stage trials,
+// STAALREUS — long-horizon progression: hunt contracts, stage trials,
 // collection log helpers. All state lives in GH.meta.data (per profile).
 GH.progress = (function () {
   var P = {};

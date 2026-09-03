@@ -1,4 +1,4 @@
-// HERO FRAME — low-poly procedural meshes (mechs, enemies, pickups, props)
+// STAALREUS — low-poly procedural meshes (mechs, enemies, pickups, props)
 GH.models = (function () {
   var M = {};
   var mat = function (c, o) { return GH.assets.mat(c, o); };

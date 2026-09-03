@@ -1,4 +1,4 @@
-// HERO FRAME — enemy definitions.
+// STAALREUS — enemy definitions.
 // Corrupt shell bosses are dark-mirror versions of unlockable frames:
 // beating one on wave 20 unlocks that frame and the next stage.
 GH.enemyDefs = {

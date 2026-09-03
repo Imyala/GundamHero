@@ -1,4 +1,4 @@
-// HERO FRAME — gem socket & resonance system
+// STAALREUS — gem socket & resonance system
 // Every weapon (primary + secondaries) has 4 sockets. Gems give per-socket
 // bonuses to that weapon; filling all 4 grants a Resonance decided by the
 // exact type counts: 4-of-a-kind (pure), 2+2 (hybrid of both), 4 distinct

@@ -1,4 +1,4 @@
-// HERO FRAME — vehicle (VECTOR) designs. Every lineage folds into two
+// STAALREUS — vehicle (VECTOR) designs. Every lineage folds into two
 // different machines; relics have their own. A design pairs a drivetrain
 // (GH.VECTORS kind — how it handles) with a silhouette (models.buildSpeeder
 // shape) and a name. The first design of a lineage is free; the second is

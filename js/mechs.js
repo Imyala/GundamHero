@@ -1,4 +1,4 @@
-// HERO FRAME — playable frame definitions.
+// STAALREUS — playable frame definitions.
 // Archetypes mirror the classic survivor-mech lineup: a block-healing paladin
 // starter, a dodge-fed light striker, an element-cycling wizard, a dagger
 // rogue, a wounded-fury reaper, plus gunner / railgun / artillery frames.

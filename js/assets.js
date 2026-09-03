@@ -1,4 +1,4 @@
-// HERO FRAME — procedural textures, PSX material patch, shared materials.
+// STAALREUS — procedural textures, PSX material patch, shared materials.
 // Everything is generated at runtime on canvases; no binary assets.
 GH.assets = (function () {
   var A = {};

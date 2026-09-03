@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Build a single-file playable HTML bundle of HERO FRAME.
+// Build a single-file playable HTML bundle of STAALREUS.
 // Inlines the stylesheet and every script (vendored Three.js included) so the
 // result runs anywhere a lone .html can be opened or hosted.
 // Usage: node tools/build-single.js [outfile]
@@ -7,7 +7,7 @@ var fs = require('fs');
 var path = require('path');
 
 var root = path.join(__dirname, '..');
-var out = process.argv[2] || path.join(root, 'dist', 'heroframe.html');
+var out = process.argv[2] || path.join(root, 'dist', 'staalreus.html');
 
 var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 

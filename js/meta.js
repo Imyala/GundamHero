@@ -1,4 +1,4 @@
-// HERO FRAME — persistent meta progression (localStorage)
+// STAALREUS — persistent meta progression (localStorage)
 // Pilot profiles (Standard / Iron Frame / Iron Core), salvage bank, shell &
 // stage unlocks, devotions, contracts, collection log, stage trials, records.
 GH.meta = (function () {
@@ -204,7 +204,7 @@ GH.meta = (function () {
       var t = (text || '').trim();
       if (t.indexOf('HF1.') === 0) return M.importCode(t);
       var blob = JSON.parse(t);
-      if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Not a HERO FRAME save file.' };
+      if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Not a STAALREUS save file.' };
       M.backup('before import');
       var count = 0;
       for (var p in blob.profiles) {
@@ -315,7 +315,7 @@ GH.meta = (function () {
   M.importCode = function (code) {
     try {
       code = (code || '').trim();
-      if (code.indexOf('HF1.') !== 0) return { ok: false, error: 'Not a HERO FRAME save code.' };
+      if (code.indexOf('HF1.') !== 0) return { ok: false, error: 'Not a STAALREUS save code.' };
       var blob = JSON.parse(decodeURIComponent(escape(atob(code.slice(4)))));
       if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Code is damaged or truncated.' };
       M.backup('before import');

@@ -1,4 +1,4 @@
-// HERO FRAME — the five houses, reputation, pledges, betrayal, and the
+// STAALREUS — the five houses, reputation, pledges, betrayal, and the
 // player's own banner. Rules of the house:
 //   1. Any frame line can be built by anyone; a house you stand with just
 //      sheds its parts more readily (reward rolls weight its families).

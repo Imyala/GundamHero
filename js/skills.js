@@ -1,4 +1,4 @@
-// HERO FRAME — the pilot skill tree + combat abilities
+// STAALREUS — the pilot skill tree + combat abilities
 // Replaces mid-run power-up cards with persistent, deliberate character
 // building (in the spirit of the classic MMO/ARPG trees): every level-up
 // pays one skill point, spent here across three disciplines. Points and

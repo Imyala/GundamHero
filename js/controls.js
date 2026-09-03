@@ -1,4 +1,4 @@
-// HERO FRAME — key bindings and control settings.
+// STAALREUS — key bindings and control settings.
 // MMO-style defaults: W/S walk, A/D turn, Q/E strafe, hold RIGHT MOUSE to
 // look around, wheel to zoom. Every action can be rebound on the
 // CONTROLS screen; bindings persist in localStorage independent of the

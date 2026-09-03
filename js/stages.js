@@ -1,4 +1,4 @@
-// HERO FRAME — stage definitions (6 arenas, 20 waves each)
+// STAALREUS — stage definitions (6 arenas, 20 waves each)
 // Beating a stage's wave-20 CORRUPTED shell unlocks that shell + the next stage.
 GH.stages = [
   {

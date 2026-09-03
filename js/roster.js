@@ -1,4 +1,4 @@
-// HERO FRAME — the full 135-frame roster.
+// STAALREUS — the full 135-frame roster.
 // 8 base frames (mechs.js) + 120 lineage variants (8 lineages × 5 packs ×
 // 3 marks) + 7 RELIC frames. Two starters are free, four base frames are
 // earned by feats, everything else is BUILT in the Frame Workshop from

@@ -1,4 +1,4 @@
-// HERO FRAME — wave reward pool: weapons, traits, protocols, gems.
+// STAALREUS — wave reward pool: weapons, traits, protocols, gems.
 // kind: 'weapon' (adds/levels a secondary), 'trait' (stat buff),
 // 'protocol' (passive ability), 'gem' (socket into a chosen weapon).
 GH.upgrades = [

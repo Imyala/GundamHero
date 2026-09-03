@@ -1,4 +1,4 @@
-// HERO FRAME — core game logic
+// STAALREUS — core game logic
 GH.game = (function () {
   var G = {};
 

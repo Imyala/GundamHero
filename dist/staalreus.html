@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HERO FRAME — a mech arena survivor</title>
+<title>STAALREUS — steel giants, a mech arena survivor</title>
 <link rel="icon" href="data:,">
 <style>
-/* HERO FRAME — PS1-flavoured UI */
+/* STAALREUS — PS1-flavoured UI */
 
 * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
 
@@ -1311,8 +1311,8 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== TITLE ===================== -->
   <div id="title-screen" class="screen">
     <div class="title-grid"></div>
-    <h1 class="game-title">HERO&nbsp;FRAME</h1>
-    <div class="title-sub">A MECH ARENA SURVIVOR</div>
+    <h1 class="game-title">STAALREUS</h1>
+    <div class="title-sub">STEEL GIANT · A MECH ARENA SURVIVOR</div>
     <div class="title-menu">
       <button id="btn-play-first" class="menu-btn hidden">PLAY — ZERO HOUR</button>
       <div id="first-desc" class="menu-desc hidden">Your first sortie: ten guided minutes that teach the controls, the vehicle, and the workshop.</div>
@@ -1600,7 +1600,7 @@ console.warn( 'Scripts "build/three.js" and "build/three.min.js" are deprecated 
 
 </script>
 <script>
-// HERO FRAME — small helpers, shared namespace
+// STAALREUS — small helpers, shared namespace
 window.GH = {};
 
 GH.clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };
@@ -1642,7 +1642,7 @@ GH.weightedPick = function (arr) {
 
 </script>
 <script>
-// HERO FRAME — procedural textures, PSX material patch, shared materials.
+// STAALREUS — procedural textures, PSX material patch, shared materials.
 // Everything is generated at runtime on canvases; no binary assets.
 GH.assets = (function () {
   var A = {};
@@ -1926,7 +1926,7 @@ GH.assets = (function () {
 
 </script>
 <script>
-// HERO FRAME — gem socket & resonance system
+// STAALREUS — gem socket & resonance system
 // Every weapon (primary + secondaries) has 4 sockets. Gems give per-socket
 // bonuses to that weapon; filling all 4 grants a Resonance decided by the
 // exact type counts: 4-of-a-kind (pure), 2+2 (hybrid of both), 4 distinct
@@ -2048,7 +2048,7 @@ GH.gems = (function () {
 
 </script>
 <script>
-// HERO FRAME — stage definitions (6 arenas, 20 waves each)
+// STAALREUS — stage definitions (6 arenas, 20 waves each)
 // Beating a stage's wave-20 CORRUPTED shell unlocks that shell + the next stage.
 GH.stages = [
   {
@@ -2321,7 +2321,7 @@ GH.wavePlan = function (stage, wave, arena) {
 
 </script>
 <script>
-// HERO FRAME — low-poly procedural meshes (mechs, enemies, pickups, props)
+// STAALREUS — low-poly procedural meshes (mechs, enemies, pickups, props)
 GH.models = (function () {
   var M = {};
   var mat = function (c, o) { return GH.assets.mat(c, o); };
@@ -4645,7 +4645,7 @@ GH.models = (function () {
 
 </script>
 <script>
-// HERO FRAME — terrain: height fields, biomes, surfaces, and the map rim.
+// STAALREUS — terrain: height fields, biomes, surfaces, and the map rim.
 // Every zone owns an analytic height function h(x,z) built from seeded
 // value noise plus biome shaping (dune ridges, mountain ranges, terraced
 // mesas, lava basins). The same function drives the ground mesh, every
@@ -5708,7 +5708,7 @@ GH.terrain = (function () {
 
 </script>
 <script>
-// HERO FRAME — atmosphere: weather particles that live around the pilot.
+// STAALREUS — atmosphere: weather particles that live around the pilot.
 // Snow over the frost range, rain under the canopy and on the highlands,
 // rising embers over the cinder wastes, blown sand on the dune coast,
 // drifting motes in the void. One Points (or LineSegments) cloud per
@@ -5809,7 +5809,7 @@ GH.atmos = (function () {
 
 </script>
 <script>
-// HERO FRAME — built territories: the big shapes a zone is made of.
+// STAALREUS — built territories: the big shapes a zone is made of.
 // layout() runs before the ground mesh exists (it appends flat pads and
 // records footprints); build() runs after, dropping merged meshes onto
 // the field and registering colliders so nothing walks through a wall.
@@ -6080,7 +6080,7 @@ GH.structures = (function () {
 
 </script>
 <script>
-// HERO FRAME — the five houses, reputation, pledges, betrayal, and the
+// STAALREUS — the five houses, reputation, pledges, betrayal, and the
 // player's own banner. Rules of the house:
 //   1. Any frame line can be built by anyone; a house you stand with just
 //      sheds its parts more readily (reward rolls weight its families).
@@ -6329,7 +6329,7 @@ GH.factions = (function () {
 
 </script>
 <script>
-// HERO FRAME — playable frame definitions.
+// STAALREUS — playable frame definitions.
 // Archetypes mirror the classic survivor-mech lineup: a block-healing paladin
 // starter, a dodge-fed light striker, an element-cycling wizard, a dagger
 // rogue, a wounded-fury reaper, plus gunner / railgun / artillery frames.
@@ -6518,7 +6518,7 @@ GH.elements = {
 
 </script>
 <script>
-// HERO FRAME — key bindings and control settings.
+// STAALREUS — key bindings and control settings.
 // MMO-style defaults: W/S walk, A/D turn, Q/E strafe, hold RIGHT MOUSE to
 // look around, wheel to zoom. Every action can be rebound on the
 // CONTROLS screen; bindings persist in localStorage independent of the
@@ -6648,7 +6648,7 @@ GH.controls = (function () {
 
 </script>
 <script>
-// HERO FRAME — persistent meta progression (localStorage)
+// STAALREUS — persistent meta progression (localStorage)
 // Pilot profiles (Standard / Iron Frame / Iron Core), salvage bank, shell &
 // stage unlocks, devotions, contracts, collection log, stage trials, records.
 GH.meta = (function () {
@@ -6854,7 +6854,7 @@ GH.meta = (function () {
       var t = (text || '').trim();
       if (t.indexOf('HF1.') === 0) return M.importCode(t);
       var blob = JSON.parse(t);
-      if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Not a HERO FRAME save file.' };
+      if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Not a STAALREUS save file.' };
       M.backup('before import');
       var count = 0;
       for (var p in blob.profiles) {
@@ -6965,7 +6965,7 @@ GH.meta = (function () {
   M.importCode = function (code) {
     try {
       code = (code || '').trim();
-      if (code.indexOf('HF1.') !== 0) return { ok: false, error: 'Not a HERO FRAME save code.' };
+      if (code.indexOf('HF1.') !== 0) return { ok: false, error: 'Not a STAALREUS save code.' };
       var blob = JSON.parse(decodeURIComponent(escape(atob(code.slice(4)))));
       if (!blob || blob.v !== 1 || !blob.profiles) return { ok: false, error: 'Code is damaged or truncated.' };
       M.backup('before import');
@@ -7008,7 +7008,7 @@ GH.meta = (function () {
 
 </script>
 <script>
-// HERO FRAME — wave reward pool: weapons, traits, protocols, gems.
+// STAALREUS — wave reward pool: weapons, traits, protocols, gems.
 // kind: 'weapon' (adds/levels a secondary), 'trait' (stat buff),
 // 'protocol' (passive ability), 'gem' (socket into a chosen weapon).
 GH.upgrades = [
@@ -7188,7 +7188,7 @@ GH.rollRewards = function (player, wave, count) {
 
 </script>
 <script>
-// HERO FRAME — enemy definitions.
+// STAALREUS — enemy definitions.
 // Corrupt shell bosses are dark-mirror versions of unlockable frames:
 // beating one on wave 20 unlocks that frame and the next stage.
 GH.enemyDefs = {
@@ -7502,7 +7502,7 @@ GH.buildCorrupt = function (mechId) {
 
 </script>
 <script>
-// HERO FRAME — the HUNT roster: fifty named bosses, four or five per
+// STAALREUS — the HUNT roster: fifty named bosses, four or five per
 // territory, each built from a mechanics library so every one fights
 // differently. One hunt roams each territory per day (a skull totem
 // marks it); ARENA and CLASSIC midboss waves also draw from the pool.
@@ -7732,7 +7732,7 @@ GH.bosses = (function () {
 
 </script>
 <script>
-// HERO FRAME — long-horizon progression: hunt contracts, stage trials,
+// STAALREUS — long-horizon progression: hunt contracts, stage trials,
 // collection log helpers. All state lives in GH.meta.data (per profile).
 GH.progress = (function () {
   var P = {};
@@ -8302,7 +8302,7 @@ GH.progress = (function () {
 
 </script>
 <script>
-// HERO FRAME — the pilot skill tree + combat abilities
+// STAALREUS — the pilot skill tree + combat abilities
 // Replaces mid-run power-up cards with persistent, deliberate character
 // building (in the spirit of the classic MMO/ARPG trees): every level-up
 // pays one skill point, spent here across three disciplines. Points and
@@ -8503,7 +8503,7 @@ GH.skills = (function () {
 
 </script>
 <script>
-// HERO FRAME — the full 135-frame roster.
+// STAALREUS — the full 135-frame roster.
 // 8 base frames (mechs.js) + 120 lineage variants (8 lineages × 5 packs ×
 // 3 marks) + 7 RELIC frames. Two starters are free, four base frames are
 // earned by feats, everything else is BUILT in the Frame Workshop from
@@ -8822,7 +8822,7 @@ GH.roster = (function () {
 
 </script>
 <script>
-// HERO FRAME — vehicle (VECTOR) designs. Every lineage folds into two
+// STAALREUS — vehicle (VECTOR) designs. Every lineage folds into two
 // different machines; relics have their own. A design pairs a drivetrain
 // (GH.VECTORS kind — how it handles) with a silhouette (models.buildSpeeder
 // shape) and a name. The first design of a lineage is free; the second is
@@ -8965,7 +8965,7 @@ GH.vehicles = (function () {
 
 </script>
 <script>
-// HERO FRAME — world life: the loops that make the Reach worth living in.
+// STAALREUS — world life: the loops that make the Reach worth living in.
 // Borrowed shapes, not content:
 //   RuneScape  — Achievement Diaries (per-area task ladders paying area
 //                perks), daily challenges, slayer-style hunt tasks.
@@ -9248,7 +9248,7 @@ GH.worldlife = (function () {
 
 </script>
 <script>
-// HERO FRAME — tiny procedural WebAudio SFX
+// STAALREUS — tiny procedural WebAudio SFX
 GH.audio = (function () {
   var ctx = null, master = null, muted = false, volume = 0.25;
 
@@ -9386,7 +9386,7 @@ GH.audio = (function () {
 
 </script>
 <script>
-// HERO FRAME — generative music (WebAudio step sequencer).
+// STAALREUS — generative music (WebAudio step sequencer).
 // Every track is original and written here as data: a chord progression,
 // a bass figure, a composed lead motif, and a drum feel. Nothing is
 // sampled or transcribed. The moods take their cues from mecha anime
@@ -9659,7 +9659,7 @@ GH.music = (function () {
 
 </script>
 <script>
-// HERO FRAME — dungeon archetype data & generators
+// STAALREUS — dungeon archetype data & generators
 // Every territory carries THREE dungeon gates, each leading to a
 // different kind of run (inspired by the classic dungeon-crawler and
 // bullet-hell traditions — shifting floors included). Clearing tier 1
@@ -10321,7 +10321,7 @@ GH.dungeons = (function () {
 
 </script>
 <script>
-// HERO FRAME — THE SHATTERED REACH
+// STAALREUS — THE SHATTERED REACH
 // A zone-streamed world: each territory is its own HUGE map (500×500),
 // linked by travel gates, and every territory hides a gated DUNGEON —
 // a separate dark map holding its guardian packs, its sealed vault, and
@@ -11156,7 +11156,7 @@ GH.world = (function () {
 
 </script>
 <script>
-// HERO FRAME — transformed-frame racing in THE SHATTERED REACH
+// STAALREUS — transformed-frame racing in THE SHATTERED REACH
 // Two disciplines for frames folded into skimmer form:
 //   TRACE DUEL — light-trail survival in the camp pit. Your thrusters
 //     cut a hard-light wall behind you; touch any wall and you're out.
@@ -11586,7 +11586,7 @@ GH.race = (function () {
 
 </script>
 <script>
-// HERO FRAME — core game logic
+// STAALREUS — core game logic
 GH.game = (function () {
   var G = {};
 
@@ -19623,7 +19623,7 @@ GH.game = (function () {
 
 </script>
 <script>
-// HERO FRAME — boot, renderer, input, screen wiring
+// STAALREUS — boot, renderer, input, screen wiring
 (function () {
   var renderer, canvas;
   var PIXEL_SCALE = 3;   // render at 1/3 resolution for the retro look
@@ -20068,7 +20068,7 @@ GH.game = (function () {
       nudge.innerHTML = '⚠ ' + Math.round(GH.meta.data.playtimeMin / 60) + ' h played and no backup in a while — <a href="#" id="nudge-save">HANGAR → SAVE: download your save file</a>.';
       document.getElementById('nudge-save').onclick = function (e) { e.preventDefault(); openSave(); };
     } else nudge.classList.add('hidden');
-    document.getElementById('title-version').innerHTML = 'HERO FRAME v' + GH.meta.VERSION +
+    document.getElementById('title-version').innerHTML = 'STAALREUS v' + GH.meta.VERSION +
       (touchCapable ? ' · best played on a desktop with a mouse' : '') +
       ' · <a href="https://github.com/Imyala/GundamHero/issues" target="_blank" rel="noopener">report a bug / feedback</a>';
     // a parked arena run
@@ -21752,7 +21752,7 @@ GH.game = (function () {
       var blob = new Blob([text], { type: 'application/json' });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'heroframe-save-' + new Date().toISOString().slice(0, 10) + '.json';
+      a.download = 'staalreus-save-' + new Date().toISOString().slice(0, 10) + '.json';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
       byId('save-feedback').textContent = 'Save file downloaded — keep it somewhere safe.';

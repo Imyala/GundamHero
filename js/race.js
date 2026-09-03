@@ -1,4 +1,4 @@
-// HERO FRAME — transformed-frame racing in THE SHATTERED REACH
+// STAALREUS — transformed-frame racing in THE SHATTERED REACH
 // Two disciplines for frames folded into skimmer form:
 //   TRACE DUEL — light-trail survival in the camp pit. Your thrusters
 //     cut a hard-light wall behind you; touch any wall and you're out.

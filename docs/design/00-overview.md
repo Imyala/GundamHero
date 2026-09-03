@@ -1,6 +1,6 @@
-# Gundam Circuit — Design Bible (v1)
+# STAALREUS — Design Bible (v1)
 
-> Working title from the README is **Gundam Circuit**. The code still calls the game **HERO FRAME**.
+> The game is **STAALREUS** (Afrikaans: "steel giant"). Earlier drafts called it Gundam Circuit or HERO FRAME.
 > One IP note, stated once: "Gundam" is a Bandai Namco trademark. Everything in these documents is
 > *original work inspired by* the referenced anime and games. Frames, weapons and names below are
 > original placeholders; before any public release the title should be changed to an original name

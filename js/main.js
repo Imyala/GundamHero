@@ -1,4 +1,4 @@
-// HERO FRAME — boot, renderer, input, screen wiring
+// STAALREUS — boot, renderer, input, screen wiring
 (function () {
   var renderer, canvas;
   var PIXEL_SCALE = 3;   // render at 1/3 resolution for the retro look
@@ -443,7 +443,7 @@
       nudge.innerHTML = '⚠ ' + Math.round(GH.meta.data.playtimeMin / 60) + ' h played and no backup in a while — <a href="#" id="nudge-save">HANGAR → SAVE: download your save file</a>.';
       document.getElementById('nudge-save').onclick = function (e) { e.preventDefault(); openSave(); };
     } else nudge.classList.add('hidden');
-    document.getElementById('title-version').innerHTML = 'HERO FRAME v' + GH.meta.VERSION +
+    document.getElementById('title-version').innerHTML = 'STAALREUS v' + GH.meta.VERSION +
       (touchCapable ? ' · best played on a desktop with a mouse' : '') +
       ' · <a href="https://github.com/Imyala/GundamHero/issues" target="_blank" rel="noopener">report a bug / feedback</a>';
     // a parked arena run
@@ -2127,7 +2127,7 @@
       var blob = new Blob([text], { type: 'application/json' });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'heroframe-save-' + new Date().toISOString().slice(0, 10) + '.json';
+      a.download = 'staalreus-save-' + new Date().toISOString().slice(0, 10) + '.json';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
       byId('save-feedback').textContent = 'Save file downloaded — keep it somewhere safe.';

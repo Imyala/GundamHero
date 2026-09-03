@@ -1,4 +1,4 @@
-// HERO FRAME — the HUNT roster: fifty named bosses, four or five per
+// STAALREUS — the HUNT roster: fifty named bosses, four or five per
 // territory, each built from a mechanics library so every one fights
 // differently. One hunt roams each territory per day (a skull totem
 // marks it); ARENA and CLASSIC midboss waves also draw from the pool.

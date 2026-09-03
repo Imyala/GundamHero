@@ -1,4 +1,4 @@
-// HERO FRAME — generative music (WebAudio step sequencer).
+// STAALREUS — generative music (WebAudio step sequencer).
 // Every track is original and written here as data: a chord progression,
 // a bass figure, a composed lead motif, and a drum feel. Nothing is
 // sampled or transcribed. The moods take their cues from mecha anime

@@ -1,4 +1,4 @@
-// HERO FRAME — atmosphere: weather particles that live around the pilot.
+// STAALREUS — atmosphere: weather particles that live around the pilot.
 // Snow over the frost range, rain under the canopy and on the highlands,
 // rising embers over the cinder wastes, blown sand on the dune coast,
 // drifting motes in the void. One Points (or LineSegments) cloud per

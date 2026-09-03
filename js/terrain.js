@@ -1,4 +1,4 @@
-// HERO FRAME — terrain: height fields, biomes, surfaces, and the map rim.
+// STAALREUS — terrain: height fields, biomes, surfaces, and the map rim.
 // Every zone owns an analytic height function h(x,z) built from seeded
 // value noise plus biome shaping (dune ridges, mountain ranges, terraced
 // mesas, lava basins). The same function drives the ground mesh, every

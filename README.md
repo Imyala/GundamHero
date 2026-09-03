@@ -1,16 +1,16 @@
-# Gundam Circuit
+# STAALREUS
 
-Build your Gundam. Enter the Circuit. Become a legend.
+Build your steel giant. Enter the Reach. Become a legend.
 
-**Gundam Circuit** is a browser-based mech action game focused on developing custom Gundams through dangerous quests, high-speed races, and escalating combat challenges.
+**STAALREUS** (Afrikaans: "steel giant") is a browser-based mech action game about building steel giants — frames — and taking them through an open world, high-speed races, and escalating combat challenges.
 
 ## Overview
 
-In Gundam Circuit, you pilot an evolving machine through a world of missions and arenas where performance, upgrades, and strategy all matter. Every run helps you gather resources, unlock new parts, and shape a Gundam built for your playstyle.
+In STAALREUS, you pilot an evolving machine through a world of missions and arenas where performance, upgrades, and strategy all matter. Every run helps you gather resources, unlock new parts, and shape a frame built for your playstyle.
 
 ## Core Gameplay
 
-- **Develop Your Gundam**  
+- **Develop Your Frame**  
   Upgrade frame stats, tune loadouts, and refine your build for different mission types.
 - **Take On Quests**  
   Complete objectives across hostile zones to earn progression rewards and unlock tougher operations.
@@ -23,13 +23,13 @@ In Gundam Circuit, you pilot an evolving machine through a world of missions and
 
 1. Accept missions and challenges.
 2. Earn parts, currency, and upgrade materials.
-3. Improve your Gundam with better systems and weapons.
+3. Improve your frame with better systems and weapons.
 4. Re-enter harder quests and races for greater rewards.
 
 ## Key Features
 
 - Single-player mech action in the browser
-- Build-focused Gundam development system
+- Build-focused frame development system: 135 frames, 23 vehicles
 - Quest, race, and challenge pillars for varied progression
 - Fast restart loops designed for repeated improvement
 
@@ -92,7 +92,7 @@ No complex setup required.
 python3 -m http.server
 ```
 
-Then visit `http://localhost:8000`. `node tools/build-single.js` rebuilds `dist/heroframe.html`, a single-file build.
+Then visit `http://localhost:8000`. `node tools/build-single.js` rebuilds `dist/staalreus.html`, a single-file build.
 Dev URL flags: `?unlock=all`, `?salvage=N`, `?mats=N`, `?wave=N`.
 
 ## Design Bible
@@ -101,7 +101,7 @@ The target design (a Gun Metal style transforming mech game with NFS Underground
 form and Sacred/WoW build depth) lives in [`docs/design/`](docs/design/00-overview.md). The research
 it is distilled from (Gun Metal, Granvir, Vital Shell, NFS Underground, Armagetron, Sacred Gold, WoW,
 Mobile Suit Gundam, Evangelion, Gurren Lagann) is in [`docs/research/`](docs/research/README.md).
-Note: the code currently calls the game **HERO FRAME**; the design docs explain the gap and the roadmap.
+Note: older design docs call the game HERO FRAME or Gundam Circuit; the name is now STAALREUS.
 
 ## Project Structure
 
@@ -114,7 +114,7 @@ Note: the code currently calls the game **HERO FRAME**; the design docs explain 
 
 ## Roadmap Ideas
 
-- Expanded Gundam part families and specialization paths
+- Expanded frame part families and specialization paths
 - Additional Circuit race tracks and modifiers
 - New quest biomes and boss challenge tiers
 - Seasonal challenge ladders and rewards

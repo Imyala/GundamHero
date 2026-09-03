@@ -1,4 +1,4 @@
-// HERO FRAME — tiny procedural WebAudio SFX
+// STAALREUS — tiny procedural WebAudio SFX
 GH.audio = (function () {
   var ctx = null, master = null, muted = false, volume = 0.25;
 

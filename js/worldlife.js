@@ -1,4 +1,4 @@
-// HERO FRAME — world life: the loops that make the Reach worth living in.
+// STAALREUS — world life: the loops that make the Reach worth living in.
 // Borrowed shapes, not content:
 //   RuneScape  — Achievement Diaries (per-area task ladders paying area
 //                perks), daily challenges, slayer-style hunt tasks.
