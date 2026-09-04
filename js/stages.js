@@ -1,5 +1,10 @@
-// STAALREUS — stage definitions (6 arenas, 20 waves each)
-// Beating a stage's wave-20 CORRUPTED shell unlocks that shell + the next stage.
+// STAALREUS — stage definitions (6 arenas; the GAUNTLET runs GH.WAVES assaults each)
+// Bringing down a stage's REVENANT frame on the last assault recovers that
+// frame's hulk (or blueprint data) and opens the next stage.
+GH.WAVES = 16;        // assaults in a GAUNTLET run
+GH.WAVE_HUNT = 8;     // the warden / hunt assault
+GH.WAVE_OVERRUN = 12; // the spike
+GH.WAVE_CARAPACE = 14;
 GH.stages = [
   {
     id: 'wreck', hazard: null, name: 'TIDE WRECKAGE', sub: 'Stage 1', biome: 'dune coast — sand seas, a drowned fleet, the beach camp',
@@ -236,9 +241,9 @@ GH.extraZones = [
 ];
 GH.allStages = function () { return GH.stages.concat(GH.extraZones); };
 
-// Wave plan for a stage: timers, spawn rates, set-piece waves.
-// Wave 10: warden midboss. Wave 16: OVERRUN spike. Wave 18: carapace midboss.
-// Wave 20: CORRUPTED shell boss (the next unlockable frame).
+// Assault plan for a stage: timers, spawn rates, set-piece waves.
+// Wave 8: warden / hunt. Wave 12: OVERRUN spike. Wave 14: carapace midboss.
+// Wave 16: the REVENANT frame (the next recoverable frame), then the clear.
 GH.wavePlan = function (stage, wave, arena) {
   var plan = {
     duration: 22 + wave * 0.9,
@@ -254,7 +259,7 @@ GH.wavePlan = function (stage, wave, arena) {
   // gentler first minutes on the opening stage for new pilots
   if (stage.id === 'wreck' && wave <= 2) plan.rate *= 0.7;
   if (arena) {
-    // endless: scale forever, corrupt shells appear as roaming bosses every 10
+    // endless: scale forever, a warden or hunt every ten
     plan.hpMult = (1 + (wave - 1) * 0.24) * 1.4;
     plan.dmgMult = 1 + (wave - 1) * 0.07;
     plan.types = stage.roster(Math.min(wave, 12));
@@ -262,9 +267,11 @@ GH.wavePlan = function (stage, wave, arena) {
     if (wave >= 14) plan.rate *= 1.25;
     return plan;
   }
-  if (wave === 10) plan.midboss = 'warden';
-  if (wave === 16) { plan.overrun = true; plan.rate *= 2.4; plan.duration = 26; }
-  if (wave === 18) plan.midboss = 'carapace';
-  if (wave === 20) { plan.boss = stage.unlocks; plan.rate *= 0.5; }
+  // a shorter ladder climbs a little steeper so the revenant lands as hard
+  plan.hpMult *= 1 + (wave - 1) * 0.03;
+  if (wave === GH.WAVE_HUNT) plan.midboss = 'warden';
+  if (wave === GH.WAVE_OVERRUN) { plan.overrun = true; plan.rate *= 2.4; plan.duration = 26; }
+  if (wave === GH.WAVE_CARAPACE) plan.midboss = 'carapace';
+  if (wave === GH.WAVES) { plan.boss = stage.unlocks; plan.rate *= 0.5; }
   return plan;
 };

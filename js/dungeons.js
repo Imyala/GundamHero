@@ -39,7 +39,7 @@ GH.dungeons = (function () {
     raceway: { name: 'RACEWAY', desc: 'a combat race — drift, nitro, three laps of live fire', size: 300 },
     halls: { name: 'CIPHER HALLS', desc: 'beams, plates, the jammer — think your way through', size: 200 },
     convoy: { name: 'CONVOY', desc: 'ESCORT the hauler through the ambush line', size: 260 },
-    crucible: { name: 'CRUCIBLE', desc: 'a boss rush — corrupt frames back to back', size: 180 },
+    crucible: { name: 'CRUCIBLE', desc: 'a boss rush — revenant frames back to back', size: 180 },
     heist: { name: 'HEIST', desc: 'seize the relic, then outrun the alarm', size: 240 }
   };
 

@@ -2,7 +2,7 @@
 
 The codebase (HERO FRAME, ~12.7k lines vanilla JS + Three.js, no build step) already has a lot the
 design needs: 8 frames, a transform, a momentum driving model, a 6-zone streamed world, 11 dungeon
-archetypes, gems/resonances, a skill tree, devotions, mastery, seasons, save codes. This maps the
+archetypes, gems/resonances, a skill tree, attributes and art runes, mastery, seasons, save codes. This maps the
 design onto it and orders the work.
 
 ## 1. Keep as-is
@@ -13,8 +13,8 @@ design onto it and orders the work.
 | World streaming, zones, nests, weather, HARROW | world.js | terrain gets height (below) |
 | 11 dungeon archetypes incl. Cipher Halls | dungeons.js + game.js | RACEWAY/CONVOY/GAUNTLET become Vector content |
 | Gems, sockets, 16 resonances | gems.js | doc 05 §3 adds runes and cores to the same sockets |
-| Devotions, mastery, seasons, trials, broker, collection, save codes | meta.js, progress.js | collection log becomes completable |
-| Corrupted mirror bosses as frame unlocks | enemies.js, game.js | doc 06 keeps them |
+| Attributes, art runes, mastery, seasons, trials, broker, collection, save codes | meta.js, progress.js | collection log becomes completable |
+| Revenant mirror bosses as frame unlocks | enemies.js, game.js | doc 06 keeps them |
 | Procedural audio/music | audio.js, music.js | add per-form engine loops |
 | Onboarding hints, announce queue | game.js | reuse for Mission 1 |
 

@@ -12,10 +12,10 @@ GH.roster = (function () {
   // Feat frames: earned by doing something, not by spending
   // ---------------------------------------------------------------
   R.FEATS = {
-    fang: { stage: 'wreck', desc: 'Clear TIDE WRECKAGE in CLASSIC — bring down CORRUPTED FANG on wave 20 (or its lair in the Reach).' },
-    hexen: { stage: 'glacier', desc: 'Clear GLACIER HOLLOW in CLASSIC — bring down CORRUPTED HEXEN on wave 20 (or its lair in the Reach).' },
-    viper: { stage: 'cloister', desc: 'Clear VERDANT CLOISTER in CLASSIC — bring down CORRUPTED VIPER on wave 20 (or its lair in the Reach).' },
-    morrow: { stage: 'ember', desc: 'Clear EMBER FURNACE in CLASSIC — bring down CORRUPTED MORROW on wave 20 (or its lair in the Reach).' }
+    fang: { stage: 'wreck', desc: 'Run the TIDE WRECKAGE gauntlet — bring down REVENANT FANG on the final assault (or in its lair in the Reach).' },
+    hexen: { stage: 'glacier', desc: 'Run the GLACIER HOLLOW gauntlet — bring down REVENANT HEXEN on the final assault (or in its lair in the Reach).' },
+    viper: { stage: 'cloister', desc: 'Run the VERDANT CLOISTER gauntlet — bring down REVENANT VIPER on the final assault (or in its lair in the Reach).' },
+    morrow: { stage: 'ember', desc: 'Run the EMBER CORE gauntlet — bring down REVENANT MORROW on the final assault (or in its lair in the Reach).' }
   };
 
   // ---------------------------------------------------------------
@@ -83,7 +83,7 @@ GH.roster = (function () {
       stats: { maxHP: 150, speed: 19, armor: 6, block: 14, crit: 12, lifesteal: 3 },
       weapon: { damage: 1.3, interval: 0.85, range: 1.2, knockback: 1.4 },
       desc: 'A white relic that eats its pilot slowly and gives back everything. The finest blade in the hangar.',
-      feat: { kind: 'stages', n: 6, desc: 'Clear all six CLASSIC stages.' } },
+      feat: { kind: 'stages', n: 6, desc: 'Clear all six GAUNTLET stages.' } },
     { id: 'relic_ark', name: 'ARK HULL', icon: '⛫', base: 'titan', vector: 'tank', prop: 'mortar',
       role: 'Relic frame · walking fortress', model: { body: 0x3a3a48, accent: 0xff6020, dark: 0x181820, trim: 0x707080 },
       stats: { maxHP: 215, speed: 12, armor: 10, block: 7, crit: 4, lifesteal: 0 },
@@ -307,8 +307,9 @@ GH.roster = (function () {
   // where materials come from — shown in the workshop and the help screen
   R.SOURCES = [
     'ALLOY drops from any hostile (about one kill in eight), always from elites, and in piles from bosses, nests, dungeon caches and cleared stages.',
-    'FRAME CORES come from bosses: wave-20 corrupted frames, wardens, THE HARROW, dungeon reward caches, and every CLASSIC stage clear.',
-    'SALVAGE is the coin you already bank at the end of every run and at the survivor camp.',
+    'FRAME CORES come from bosses: revenant frames, wardens, THE HARROW, dungeon reward caches, and every GAUNTLET stage clear.',
+    'SALVAGE is the coin you already bank at the end of every run and at the outpost.',
+    'ART RUNES drop from every boss and sometimes from elites; read one in the hangar to deepen a Combat Art (more power, longer recharge).',
     'Each pack climbs MK.II → CUSTOM → PROTOTYPE: build the earlier mark first. RELIC frames need a feat plus a heavy bill of cores.'
   ];
 

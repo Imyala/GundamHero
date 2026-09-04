@@ -201,6 +201,7 @@
         else if (a === 'skills' && (playing || GH.game.state === 'title')) openSkills(playing);
         else if (a === 'map' && (playing || GH.game.state === 'title')) openWorldMap(playing);
         else if (a === 'pilot' && (playing || GH.game.state === 'title')) openPilot(playing, 'title');
+        else if (a === 'journal' && (playing || GH.game.state === 'title')) openJournal(playing);
         else if (a === 'pause') onEscape();
         else if (a === 'crt') {
           GH.controls.settings.crt = !GH.controls.settings.crt;
@@ -383,7 +384,7 @@
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
     'trials-screen', 'season-screen', 'hub-screen', 'save-screen', 'factions-screen',
     'reward-screen', 'pause-screen', 'end-screen', 'skills-screen', 'map-screen',
-    'workshop-screen', 'pilot-screen', 'controls-screen', 'help-screen'];
+    'workshop-screen', 'pilot-screen', 'controls-screen', 'help-screen', 'journal-screen'];
   var curScreen = null;
   var backHandlers = {};
 
@@ -474,6 +475,7 @@
     cont.classList.toggle('hidden', !has);
     if (has) cont.textContent = 'CONTINUE RUN — ' + GH.game.suspendedLabel();
     document.getElementById('title-foot').textContent = GH.controls.summary();
+    renderChronicle();
     var memEl = document.getElementById('title-memorial');
     var mem = GH.meta.memorial();
     if (GH.meta.isHardcore() && mem.length) {
@@ -534,7 +536,7 @@
     document.getElementById('select-mode').textContent =
       mode === 'expedition' ? 'THE SHATTERED REACH — pick the frame your pilot will fly' :
       mode === 'arena' ? 'ARENA — ENDLESS — pick a frame, then a stage' :
-      'CLASSIC — 20 WAVES — pick a frame, then a stage';
+      'THE GAUNTLET — ' + GH.WAVES + ' ASSAULTS — pick a frame, then a stage';
     GH.game.onSelectChange = renderSelectExtras;
     GH.game.onOpenWorkshop = function () { workshopReturn = 'select'; openWorkshop(); };
     GH.game.enterSelect();
@@ -652,7 +654,7 @@
       var tier = GH.progress.trialTier(st.id);
       var tierBadge = tier ? '<span class="sc-trial">TRIAL ' + ['I', 'II', 'III', 'IV'][tier - 1] + '</span>' : '';
       var rewardLine = GH.meta.data.shells[st.unlocks] ? ''
-        : (reward.kind === 'feat' ? '<br>— defeat to unlock the frame' : '<br>— defeat for blueprint data + 3 cores');
+        : (reward.kind === 'feat' ? '<br>— bring it down to recover the frame' : '<br>— bring it down for blueprint data + 3 cores');
       div.innerHTML =
         '<div class="sc-band" style="background:linear-gradient(' +
         st.sky[0] + ',' + st.sky[1] + ')"></div>' +
@@ -660,7 +662,7 @@
         '<div class="sc-name">' + st.name + '</div>' +
         '<div class="sc-info">' + (unlocked
           ? (arena ? 'Endless waves.<br>How deep can you go?'
-            : 'Wave 20 boss:<br>CORRUPTED ' + reward.name + rewardLine)
+            : 'Final assault (' + GH.WAVES + '):<br>REVENANT ' + reward.name + rewardLine)
           : 'Clear the previous stage<br>to unlock') + '</div>' +
         '<div class="sc-best">' + (won ? '★ CLEARED · ' : '') +
         (best ? 'best wave ' + best : '') + ' ' + tierBadge + '</div>';
@@ -851,9 +853,12 @@
         sub: 'permanent stage perks', open: openTrials },
       { id: 'hub-log', glyph: '📖', name: 'COLLECTION LOG',
         sub: comp.pct + '% complete', open: openCollection },
-      { id: 'hub-devotions', glyph: '☀', name: 'DEVOTIONS',
-        sub: GH.meta.isIron() ? 'sealed on iron profiles' : GH.meta.data.salvage + ' salvage to spend',
+      { id: 'hub-attrs', glyph: '⚖', name: 'ATTRIBUTES & ARTS',
+        sub: (GH.attrs.free() > 0 ? '<b class="pl-hot">' + GH.attrs.free() + ' ATTRIBUTE POINT' + (GH.attrs.free() > 1 ? 'S' : '') + ' READY</b> · ' : 'six attributes · ') +
+          (GH.attrs.runeStock() > 0 ? '<b class="pl-hot">' + GH.attrs.runeStock() + ' RUNE' + (GH.attrs.runeStock() > 1 ? 'S' : '') + ' TO READ</b>' : 'combat art runes'),
         open: openHangar },
+      { id: 'hub-journal', glyph: '✎', name: 'QUEST JOURNAL',
+        sub: 'every open task in one ledger', open: function () { openJournal(false); } },
       { id: 'hub-save', glyph: '⛃', name: 'SAVE CODE',
         sub: 'back up or restore progress', open: openSave },
       { id: 'hub-factions', glyph: '⚑', name: 'THE HOUSES',
@@ -1320,47 +1325,234 @@
     show('hangar-screen');
   }
 
-  var DEVOTIONS = [
-    { id: 'sol', glyph: '☀', name: 'Sol', css: '#fff2c8', desc: '+8 max health per rank. Rank 4: +0.5 HP/s regen.' },
-    { id: 'pyre', glyph: '🔥', name: 'Pyre', css: '#ff9070', desc: '+3% damage per rank.' },
-    { id: 'keen', glyph: '👁', name: 'Keen', css: '#90d0ff', desc: '+2% attack speed and +1% crit per rank.' },
-    { id: 'verd', glyph: '🌿', name: 'Verd', css: '#90f0a0', desc: '+8% magnet and +4% XP per rank.' },
-    { id: 'ruin', glyph: '☠', name: 'Ruin', css: '#d0a0ff', desc: '+6% crit damage per rank. Rank 3: faster boost.' }
-  ];
+  // ----------------------------------------------------------------
+  // ATTRIBUTES & ARTS — the character under the frame. Six attributes
+  // grow on their own each pilot level and take one free point per
+  // level; runes read into Combat Arts trade recharge for power.
+  function chronicleFrame() {
+    var exp = GH.meta.data.world.exp;
+    if (exp && exp.mechId && GH.mechById(exp.mechId)) return GH.mechById(exp.mechId);
+    var idx = GH.game.getSelectedMech ? GH.game.getSelectedMech() : 0;
+    return GH.mechs[idx] || GH.mechs[0];
+  }
 
   function renderHangar() {
-    document.getElementById('hangar-salvage').innerHTML =
-      'SALVAGE: <span style="color:#fff">' + GH.meta.data.salvage + '</span>' +
-      (GH.meta.isIron() ? ' — <span style="color:#ff8080">IRON RULES: DEVOTIONS SEALED</span>' : '');
-    var wrap = document.getElementById('devotion-list');
+    var A = GH.attrs, def = chronicleFrame(), pp = GH.skills.pilotProgress();
+    document.getElementById('attr-head').innerHTML =
+      'PILOT LEVEL <b>' + pp.lvl + '</b> · FREE POINTS <b class="' + (A.free() ? 'pl-hot' : '') + '">' + A.free() + '</b>' +
+      ' · RUNES HELD <b class="' + (A.runeStock() ? 'pl-hot' : '') + '">' + A.runeStock() + '</b>' +
+      ' · SALVAGE <b>' + GH.meta.data.salvage + '</b>' +
+      ' · auto-growth shown for <b>' + def.name + '</b> (' + (def.lineage || def.id).toUpperCase() + ' lineage)';
+    var wrap = document.getElementById('attr-list');
     wrap.innerHTML = '';
-    DEVOTIONS.forEach(function (d) {
-      var rank = GH.meta.data.devotion[d.id];
-      var active = GH.meta.data.activeDevotion === d.id;
-      var cost = GH.meta.devotionCost(d.id);
-      var div = document.createElement('div');
-      div.className = 'devotion-card' + (active ? ' active' : '');
-      var pips = '';
-      for (var i = 0; i < 5; i++) pips += '<span class="dv-pip' + (i < rank ? ' on' : '') + '"></span>';
-      div.innerHTML =
-        '<div class="dv-glyph">' + d.glyph + '</div>' +
-        '<div class="dv-name" style="color:' + d.css + '">DEVOTION TO ' + d.name.toUpperCase() + '</div>' +
-        '<div class="dv-desc">' + d.desc + '</div>' +
-        '<div class="dv-pips">' + pips + '</div>' +
-        '<button class="dv-buy" ' + (rank >= 5 || GH.meta.data.salvage < cost ? 'disabled' : '') + '>' +
-        (rank >= 5 ? 'MAXED' : 'RANK UP · ' + cost) + '</button>' +
-        '<button class="dv-activate">' + (active ? '◆ ACTIVE PATH' : 'set active') + '</button>';
-      div.querySelector('.dv-buy').onclick = function () {
-        if (GH.meta.buyDevotion(d.id)) { GH.audio.levelup(); renderHangar(); }
+    var maxTotal = 1;
+    A.LIST.forEach(function (a) { maxTotal = Math.max(maxTotal, A.total(a.id, def)); });
+    A.LIST.forEach(function (a) {
+      var auto = A.auto(a.id, def), spent = A.spent(a.id), total = auto + spent;
+      var row = document.createElement('div');
+      row.className = 'attr-row';
+      row.innerHTML =
+        '<div class="attr-glyph" style="color:' + a.css + '">' + a.glyph + '</div>' +
+        '<div class="attr-main"><div class="attr-name" style="color:' + a.css + '">' + a.name +
+        ' <span class="attr-total">' + Math.round(total) + '</span></div>' +
+        '<div class="attr-bar"><span class="attr-fill" style="width:' + Math.round(total / maxTotal * 100) + '%;background:' + a.css + '"></span></div>' +
+        '<div class="attr-desc">' + a.desc + '</div>' +
+        '<div class="attr-sub">lineage ' + auto.toFixed(1) + ' · placed <b>' + spent + '</b></div></div>' +
+        '<button class="attr-plus" ' + (A.free() ? '' : 'disabled') + ' title="place one free point">+</button>';
+      row.querySelector('.attr-plus').onclick = function () {
+        if (A.spend(a.id)) { GH.audio.levelup(); renderHangar(); if (GH.game.refreshPilot) GH.game.refreshPilot(); }
+        else GH.audio.hit();
       };
-      div.querySelector('.dv-activate').onclick = function () {
-        GH.meta.data.activeDevotion = d.id;
-        GH.meta.save();
-        GH.audio.card();
-        renderHangar();
-      };
-      wrap.appendChild(div);
+      wrap.appendChild(row);
     });
+    // what those numbers do, as one derived block
+    var b = A.bonus(def);
+    var pct = function (v) { return (v >= 0 ? '+' : '') + Math.round(v * 100) + '%'; };
+    document.getElementById('attr-derived').innerHTML =
+      '<div class="bk-label">DERIVED FROM YOUR ATTRIBUTES</div>' +
+      '<span>weapon damage <b>' + pct(b.damageMult) + '</b></span>' +
+      '<span>max hull <b>+' + Math.round(b.maxHP) + '</b></span>' +
+      '<span>armor <b>+' + b.armor.toFixed(1) + '</b></span>' +
+      '<span>attack speed <b>' + pct(b.atkSpdMult) + '</b></span>' +
+      '<span>block <b>+' + b.block.toFixed(1) + '%</b></span>' +
+      '<span>crit <b>+' + b.crit.toFixed(1) + '%</b></span>' +
+      '<span>hull regen <b>' + b.regen.toFixed(2) + '/s</b></span>' +
+      '<span>boost regen <b>' + pct(b.boostRegen) + '</b></span>' +
+      '<span>magnet <b>' + pct(b.magnet) + '</b></span>' +
+      '<span>XP <b>' + pct(b.xpGain) + '</b></span>' +
+      '<span>loot find <b>+' + Math.round(b.lootFind) + '%</b></span>' +
+      '<span>art power <b>×' + b.artMult.toFixed(2) + '</b></span>' +
+      '<span>art recharge <b>×' + b.artCd.toFixed(2) + '</b></span>';
+    document.getElementById('btn-attr-reset').textContent = 'RECALIBRATE · ' + A.RESET_COST + ' SALVAGE';
+    document.getElementById('btn-attr-reset').disabled = A.spentTotal() === 0;
+
+    // combat arts and runes
+    var arts = document.getElementById('arts-list');
+    arts.innerHTML = '';
+    var skl = GH.skills.bonuses();
+    A.ART_SLOTS.forEach(function (slot) {
+      var ab = A.artLabel(slot, def), rank = A.artRank(slot);
+      var locked = slot !== 'sig' && !skl.slots[slot];
+      var cd = ab.cd * skl.cdMult * b.artCd * A.artRecharge(slot);
+      var card = document.createElement('div');
+      card.className = 'art-card' + (rank >= A.MAX_RANK ? ' maxed' : '') + (locked ? ' locked' : '');
+      var pips = '';
+      for (var i = 0; i < A.MAX_RANK; i++) pips += '<span class="sk-pip' + (i < rank ? ' on' : '') + '"></span>';
+      card.innerHTML =
+        '<div class="art-glyph">' + ab.glyph + '</div>' +
+        '<div class="art-name">' + ab.name + (slot === 'sig' ? ' <i>signature · ' + def.name + '</i>' : ' <i>slot ' + slot + '</i>') + '</div>' +
+        '<div class="art-desc">' + ab.desc + '</div>' +
+        '<div class="art-stats">rank <b>' + rank + '</b>/' + A.MAX_RANK + ' · power <b>×' + (A.artPower(slot) * b.artMult).toFixed(2) + '</b> · recharge <b>' + cd.toFixed(1) + ' s</b> (base ' + ab.cd + ')' + (locked ? ' · <span class="ws-short">not yet trained (PILOT TRAINING)</span>' : '') + '</div>' +
+        '<div class="sk-pips">' + pips + '</div>' +
+        '<button class="dv-buy art-read" ' + (A.runeStock() > 0 && rank < A.MAX_RANK ? '' : 'disabled') + '>' +
+        (rank >= A.MAX_RANK ? 'MASTERED' : 'READ A RUNE · +12% power · +8% recharge') + '</button>';
+      card.querySelector('.art-read').onclick = function () {
+        if (A.readRune(slot)) { GH.audio.levelup(); renderHangar(); }
+        else GH.audio.hit();
+      };
+      arts.appendChild(card);
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // PILOT CHRONICLE — the title screen's standing record of who you are
+  function renderChronicle() {
+    var el = document.getElementById('title-chronicle');
+    if (!el) return;
+    var A = GH.attrs, d = GH.meta.data, def = chronicleFrame(), pp = GH.skills.pilotProgress();
+    var prof = GH.meta.PROFILES[GH.meta.profile];
+    var comp = GH.progress.completion();
+    var s = GH.progress.seasonCheck();
+    var b = d.broker.active;
+    var band = GH.worldlife.band();
+    var maxT = 1;
+    A.LIST.forEach(function (a) { maxT = Math.max(maxT, A.total(a.id, def)); });
+    var attrs = A.LIST.map(function (a) {
+      var t = A.total(a.id, def);
+      return '<div class="ch-attr"><span class="ch-attr-n" style="color:' + a.css + '">' + a.glyph + ' ' + a.name + '</span>' +
+        '<span class="ch-attr-bar"><span style="width:' + Math.round(t / maxT * 100) + '%;background:' + a.css + '"></span></span>' +
+        '<span class="ch-attr-v">' + Math.round(t) + '</span></div>';
+    }).join('');
+    var exp = d.world.exp;
+    el.innerHTML =
+      '<div class="ch-head">PILOT CHRONICLE</div>' +
+      '<div class="ch-row"><b>' + prof.name + '</b> · ' + (exp && exp.mechId ? 'flying <b>' + def.name + '</b>' : 'last frame <b>' + def.name + '</b>') + '</div>' +
+      '<div class="ch-row">PILOT LEVEL <b class="ch-big">' + pp.lvl + '</b><span class="ch-xp"><span style="width:' + Math.round(pp.into / pp.need * 100) + '%"></span></span></div>' +
+      (A.free() || d.skillPoints || A.runeStock() ? '<div class="ch-row ch-hot">' +
+        (A.free() ? A.free() + ' attribute point' + (A.free() > 1 ? 's' : '') + ' to place' : '') +
+        (d.skillPoints ? (A.free() ? ' · ' : '') + d.skillPoints + ' skill point' + (d.skillPoints > 1 ? 's' : '') : '') +
+        (A.runeStock() ? ((A.free() || d.skillPoints) ? ' · ' : '') + A.runeStock() + ' rune' + (A.runeStock() > 1 ? 's' : '') + ' to read' : '') + '</div>' : '') +
+      '<div class="ch-attrs">' + attrs + '</div>' +
+      '<div class="ch-grid">' +
+      '<span>$ salvage <b>' + d.salvage + '</b></span><span>⬡ alloy <b>' + d.mats.alloy + '</b></span>' +
+      '<span>◈ cores <b>' + d.mats.cores + '</b></span><span>✦ runes <b>' + A.runeStock() + '</b></span>' +
+      '<span>frames <b>' + GH.roster.owned() + '/' + GH.roster.TOTAL + '</b></span><span>log <b>' + comp.pct + '%</b></span>' +
+      '<span>season <b>' + s.pts + ' pts</b></span><span>band <b style="color:' + band.css + '">' + band.name + '</b></span>' +
+      '</div>' +
+      '<div class="ch-row ch-quest">' + (b ? '✎ ' + GH.progress.contractLabel(b) + ' <b>' + b.have + '/' + b.need + '</b>' : '✎ no contract — the BROKER has work') + '</div>' +
+      (exp ? '<div class="ch-row">saved in the Reach at <b>' + (exp.zone ? GH.world.stageFor(exp.zone).name : 'the outpost') + '</b> · Lv ' + exp.level + '</div>' : '');
+  }
+
+  // ----------------------------------------------------------------
+  // QUEST JOURNAL — every open task, one ledger (J in the field, the
+  // hub, the pilot sheet, or the title)
+  var journalFrom = 'hub';
+  function openJournal(fromPlay) {
+    GH.audio.card();
+    if (fromPlay) expEntry = 'journal';
+    journalFrom = GH.game.state === 'title' ? 'title' : 'hub';
+    if (GH.game.state !== 'play' || fromPlay) GH.game.state = 'hangar';
+    renderJournal();
+    show('journal-screen');
+  }
+
+  function renderJournal() {
+    var d = GH.meta.data;
+    var box = function (title, body, cls) { return '<div class="jn-block' + (cls ? ' ' + cls : '') + '"><div class="jn-h">' + title + '</div>' + body + '</div>'; };
+    var line = function (done, text, right) {
+      return '<div class="jn-task' + (done ? ' done' : '') + '"><span class="jn-tick">' + (done ? '☑' : '☐') + '</span><span class="jn-text">' + text + '</span>' + (right ? '<span class="jn-right">' + right + '</span>' : '') + '</div>';
+    };
+    var left = '', right = '';
+
+    // the guided first sortie, if it is running
+    if (GH.game.tutorialActive && GH.game.tutorialActive()) {
+      var ot = document.getElementById('objective-text');
+      left += box('ZERO HOUR — CURRENT OBJECTIVE', '<div class="jn-task"><span class="jn-tick">➤</span><span class="jn-text">' + (ot ? ot.textContent : '') + '</span></div>', 'jn-main');
+    }
+    // contract
+    var c = d.broker.active;
+    left += box('BROKER CONTRACT', c
+      ? line(false, GH.progress.contractLabel(c), c.have + '/' + c.need + ' · ' + c.salvage + ' salvage + ' + c.pts + ' pts')
+      : '<div class="jn-empty">No contract taken. The BROKER always has one.</div>', 'jn-main');
+    // daily board
+    var dl = GH.worldlife.daily();
+    var dhtml = '';
+    dl.tasks.forEach(function (t) {
+      var rw = [];
+      if (t.reward.alloy) rw.push('+' + t.reward.alloy + ' alloy');
+      if (t.reward.cores) rw.push('+' + t.reward.cores + ' core');
+      if (t.reward.salvage) rw.push('+' + t.reward.salvage + ' salvage');
+      dhtml += line(t.claimed, t.desc + (t.done && !t.claimed ? ' <b class="pl-hot">— CLAIM AT THE BROKER</b>' : ''), t.have + '/' + t.need + ' · ' + rw.join(', '));
+    });
+    left += box('DAILY BOARD — ' + dl.day + ' · streak ' + dl.streak, dhtml);
+    // this territory's diary (or the nearest unfinished ones)
+    var here = GH.game.debugInfo ? GH.game.debugInfo().zone : null;
+    var zones = GH.world.ZONES.slice();
+    if (here) zones.sort(function (a, b2) { return (a.id === here ? -1 : 0) - (b2.id === here ? -1 : 0); });
+    var dcount = 0, dhtml2 = '';
+    zones.forEach(function (zn) {
+      if (dcount >= 3) return;
+      var dp = GH.worldlife.diaryProgress(zn.id);
+      var next = null;
+      dp.tiers.forEach(function (t) { if (!next && !t.done) next = t; });
+      if (!next) return;
+      dcount++;
+      dhtml2 += '<div class="jn-sub">' + GH.world.stageFor(zn.id).name + (zn.id === here ? ' <b>(here)</b>' : '') + ' — ' + next.name +
+        ' <span class="jn-right">+' + next.reward.alloy + ' alloy' + (next.reward.cores ? ', +' + next.reward.cores + ' cores' : '') + (next.perk ? ', ' + next.perk.label : '') + '</span></div>';
+      next.tasks.forEach(function (t) { dhtml2 += line(t.done, t.desc, t.have + '/' + t.need); });
+    });
+    left += box('ZONE DIARIES', dhtml2 || '<div class="jn-empty">Every diary tier is complete.</div>');
+
+    // stage trials: the next tier per unlocked stage
+    var thtml = '';
+    GH.stages.forEach(function (st, si) {
+      if ((si + 1) > d.stages) return;
+      var tier = GH.progress.trialTier(st.id);
+      if (tier >= GH.progress.trialTiers.length) return;
+      var tr = GH.progress.trialTiers[tier];
+      thtml += '<div class="jn-sub">' + st.name + ' — ' + tr.name + ' <span class="jn-right">' + tr.perk + '</span></div>';
+      tr.tasks.forEach(function (task) { thtml += line(GH.progress.trialDone(st.id, task.id), task.desc); });
+    });
+    right += box('GAUNTLET TRIALS', thtml || '<div class="jn-empty">Every trial tier is complete.</div>');
+    // season tasks left
+    var s = GH.progress.seasonCheck();
+    var shtml = '', sn = 0;
+    GH.progress.seasonTasks.forEach(function (t) {
+      if (s.done[t.id] || sn >= 8) return;
+      sn++;
+      shtml += line(false, t.desc, '+' + t.pts + ' pts');
+    });
+    right += box('SEASON OF THE ' + GH.progress.seasonName(s.id) + ' — ' + s.pts + ' PTS', shtml || '<div class="jn-empty">Every season task is done.</div>');
+    // feats: frames still to earn
+    var fhtml = '';
+    Object.keys(GH.roster.FEATS).forEach(function (id) {
+      if (d.shells[id]) return;
+      fhtml += line(false, '<b>' + GH.mechById(id).name + '</b> — ' + GH.roster.FEATS[id].desc);
+    });
+    GH.roster.relics.forEach(function (m) {
+      if (d.shells[m.id]) return;
+      var rc = GH.roster.recipes[m.id];
+      var fp = GH.roster.featProgress(rc.feat);
+      fhtml += line(fp.done, '<b>' + m.name + '</b> (relic) — ' + rc.feat.desc, fp.have + '/' + fp.need);
+    });
+    right += box('FEATS — FRAMES STILL TO EARN', fhtml || '<div class="jn-empty">Every feat frame is yours.</div>');
+    // next band
+    var nb = nextBand();
+    var ns = GH.worldlife.bandStatus(nb.id);
+    if (nb.id !== GH.worldlife.band().id && !ns.unlocked) {
+      right += box('NEXT REACH BAND — ' + nb.name, ns.missing.map(function (m) { return line(false, m); }).join(''));
+    }
+    document.getElementById('journal-body').innerHTML = '<div class="jn-col">' + left + '</div><div class="jn-col">' + right + '</div>';
   }
 
   // ----------------------------------------------------------------
@@ -1729,11 +1921,11 @@
         var r = new THREE.WebGLRenderer({ canvas: cv, antialias: false });
         r.setPixelRatio(1); r.setSize(cv.width, cv.height, false);
         var sc = new THREE.Scene();
-        sc.background = new THREE.Color(0x0a1030);
+        sc.background = new THREE.Color(0x1a1410);
         sc.add(new THREE.HemisphereLight(0xdfe8ff, 0x303848, 1.0));
         var sun = new THREE.DirectionalLight(0xfff0d0, 0.9); sun.position.set(3, 6, 4); sc.add(sun);
         var cam = new THREE.PerspectiveCamera(38, cv.width / cv.height, 0.1, 60);
-        var floor = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.2, 24), new THREE.MeshLambertMaterial({ color: 0x1a2450 }));
+        var floor = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.2, 24), new THREE.MeshLambertMaterial({ color: 0x4a3620 }));
         floor.position.y = -0.1; sc.add(floor);
         wsView = { r: r, sc: sc, cam: cam, group: null, t: 0 };
       }
@@ -1821,7 +2013,10 @@
     var prof = GH.meta.PROFILES[GH.meta.profile];
     var f = GH.factions.state();
     var art = d.world.equipped ? GH.progress.artifactById(d.world.equipped) : null;
-    var devName = { sol: 'Sol', pyre: 'Pyre', keen: 'Keen', verd: 'Verd', ruin: 'Ruin' }[d.activeDevotion] || '—';
+    var frameDef = chronicleFrame();
+    var attrLine = GH.attrs.LIST.map(function (a) {
+      return '<span class="pl-attr" style="color:' + a.css + '" title="' + a.desc + '">' + a.glyph + ' ' + a.name + ' <b>' + Math.round(GH.attrs.total(a.id, frameDef)) + '</b></span>';
+    }).join(' ');
     var live = GH.game.state === 'hangar' && expEntry === 'pilot' && GH.game.debugInfo().hp > 0
       ? GH.game.pauseInfo() : null;
     var frames = [];
@@ -1831,7 +2026,9 @@
       '<div class="pl-block"><div class="pl-h">PILOT</div>' +
       '<div class="pl-row">Profile <b>' + prof.name + '</b> — ' + prof.desc + '</div>' +
       '<div class="pl-row">Pilot level <b>' + pp.lvl + '</b> · ' + Math.floor(pp.into) + '/' + Math.ceil(pp.need) + ' XP to next</div>' +
-      '<div class="pl-row">Skill points ready <b class="' + (d.skillPoints ? 'pl-hot' : '') + '">' + d.skillPoints + '</b> · trained ranks <b>' + GH.skills.spentTotal() + '</b></div>' +
+      '<div class="pl-row">Skill points ready <b class="' + (d.skillPoints ? 'pl-hot' : '') + '">' + d.skillPoints + '</b> · trained ranks <b>' + GH.skills.spentTotal() + '</b> · attribute points ready <b class="' + (GH.attrs.free() ? 'pl-hot' : '') + '">' + GH.attrs.free() + '</b></div>' +
+      '<div class="pl-row pl-attrs">' + attrLine + ' <i>(as ' + frameDef.name + ')</i></div>' +
+      '<div class="pl-row">Combat Arts ' + GH.attrs.ART_SLOTS.map(function (sl) { var ab = GH.attrs.artLabel(sl, frameDef); return ab.glyph + ' <b>' + GH.attrs.artRank(sl) + '</b>'; }).join(' · ') + ' · runes to read <b class="' + (GH.attrs.runeStock() ? 'pl-hot' : '') + '">' + GH.attrs.runeStock() + '</b></div>' +
       '<div class="pl-row">Mastery total <b>' + GH.progress.masteryTotal() + '</b> · runs <b>' + d.collection.totalRuns + '</b> · wins <b>' + d.collection.totalWins + '</b> · kills <b>' + d.collection.totalKills + '</b></div>' +
       '</div>' +
       '<div class="pl-block"><div class="pl-h">INVENTORY</div>' +
@@ -1839,7 +2036,7 @@
       '<div class="pl-row">⬡ Alloy <b>' + d.mats.alloy + '</b> · ◈ Frame cores <b>' + d.mats.cores + '</b></div>' +
       '<div class="pl-row">Artifact equipped <b>' + (art ? art.name : 'none') + '</b> (' + Object.keys(d.world.artifacts).length + '/' + GH.progress.artifacts.length + ' found — equip in COLLECTION LOG)</div>' +
       '<div class="pl-row">Cosmetics owned <b>' + Object.keys(d.style.owned).length + '</b> — set on the frame select screen</div>' +
-      '<div class="pl-row">Active devotion <b>' + devName + '</b> · broker points <b>' + d.broker.points + '</b></div>' +
+      '<div class="pl-row">Broker points <b>' + d.broker.points + '</b></div>' +
       '<div class="pl-row">House: <b>' + factionsSub() + '</b></div>' +
       '<div class="pl-row">Reach band <b style="color:' + GH.worldlife.band().css + '">' + GH.worldlife.band().name + '</b> · <span class="band-row">' + GH.worldlife.BANDS.map(function (bb) {
         var st = GH.worldlife.bandStatus(bb.id);
@@ -1860,7 +2057,8 @@
       '<button class="menu-btn tiny" data-go="skills">PILOT TRAINING</button>' +
       '<button class="menu-btn tiny" data-go="workshop">FRAME WORKSHOP</button>' +
       '<button class="menu-btn tiny" data-go="collection">COLLECTION LOG</button>' +
-      '<button class="menu-btn tiny" data-go="hangar">DEVOTIONS</button>' +
+      '<button class="menu-btn tiny" data-go="hangar">ATTRIBUTES &amp; ARTS</button>' +
+      '<button class="menu-btn tiny" data-go="journal">QUEST JOURNAL</button>' +
       '<button class="menu-btn tiny" data-go="controls">CONTROLS</button>' +
       '<button class="menu-btn tiny" data-go="help">HOW TO PLAY</button>' +
       '</div></div></div>';
@@ -1880,6 +2078,7 @@
         else if (g === 'workshop') { workshopReturn = 'pilot'; openWorkshop(); }
         else if (g === 'collection') openCollection();
         else if (g === 'hangar') openHangar();
+        else if (g === 'journal') openJournal(false);
         else if (g === 'controls') openControls();
         else if (g === 'help') openHelp();
       };
@@ -1976,13 +2175,18 @@
       '<li><b>' + L('interact') + '</b> uses gates, chests, camp stations. <b>ESC</b> pauses or closes any menu. Rebind everything under CONTROLS.</li></ul>' +
       '<div class="hp-h">GAME MODES</div>' +
       '<ul><li><b>THE SHATTERED REACH</b> — the open world. Your pilot, level and gear are saved automatically; EXIT keeps them, ABANDON deletes them.</li>' +
-      '<li><b>CLASSIC</b> — 20 waves on one stage; the wave-20 boss unlocks the next stage and pays a frame or blueprint data.</li>' +
+      '<li><b>THE GAUNTLET</b> — ' + GH.WAVES + ' assaults on one stage: a warden on the 8th, an OVERRUN on the 12th, and a REVENANT frame on the last. Bring it down to recover that frame (or its blueprint data) and open the next stage.</li>' +
       '<li><b>ARENA</b> — endless waves. <b>WEEKLY</b> — a fixed frame and modifiers shared by everyone that week.</li>' +
-      '<li>EXIT RUN from the pause menu parks a CLASSIC/ARENA run; CONTINUE RUN on the title resumes it at that wave.</li></ul>' +
+      '<li>EXIT RUN from the pause menu parks a GAUNTLET/ARENA run; CONTINUE RUN on the title resumes it at that wave.</li></ul>' +
+      '<div class="hp-h">YOUR PILOT (ATTRIBUTES, ARTS, RUNES)</div>' +
+      '<ul><li><b>Six attributes</b> — MIGHT, REACTOR, HULL, SERVO, COOLANT, UPLINK. They grow on their own every pilot level (a tenth of your lineage\'s starting spread), and every level also pays <b>one free point</b> to place where you like. RECALIBRATE in the hangar refunds them for salvage.</li>' +
+      '<li><b>Combat Arts</b> — your four abilities and your signature. <b>ART RUNES</b> drop from every boss and sometimes from elites; reading one into an art raises its rank: +12% power, but +8% recharge. REACTOR shortens recharges again, so a rune-heavy build wants REACTOR.</li>' +
+      '<li><b>UPLINK</b> raises loot find: more alloy, coin and rune drops.</li>' +
+      '<li><b>QUEST JOURNAL</b> (' + L('journal') + ') — every open contract, daily task, diary tier, trial, season task and feat in one ledger.</li></ul>' +
       '<div class="hp-h">WHERE THINGS ARE</div>' +
-      '<ul><li><b>HANGAR</b> — every progression screen: FRAME WORKSHOP (build frames), PILOT TRAINING (skill tree), DEVOTIONS, BROKER, COLLECTION LOG (artifacts), TRIALS, SEASON, HOUSES, SAVE CODE.</li>' +
+      '<ul><li><b>HANGAR</b> — every progression screen: FRAME WORKSHOP (build frames), PILOT TRAINING (skill tree), ATTRIBUTES &amp; ARTS, QUEST JOURNAL, BROKER, COLLECTION LOG (artifacts), TRIALS, SEASON, HOUSES, SAVE CODE.</li>' +
       '<li><b>PILOT</b> — your character sheet and inventory: materials, artifact, cosmetics, frames owned.</li>' +
-      '<li>In the Reach, the camp stations (console, shrine, memorial, broker) open the same screens without leaving the world.</li></ul>' +
+      '<li>In the Reach, the outpost stations (console, shrine, memorial, broker) open the same screens without leaving the world.</li></ul>' +
       '</div><div class="hp-col">' +
       '<div class="hp-h">UNLOCKING FRAMES (' + GH.roster.owned() + ' / ' + GH.roster.TOTAL + ')</div>' +
       '<ul><li><b>Starters</b>: AEGIS and VULCAN are yours from the first sortie.</li>' +
@@ -1996,12 +2200,12 @@
       '<li><b>Daily task board</b> (BROKER or PILOT): three tasks a day, claim each, sweep all three for a bonus core and a growing streak.</li>' +
       '<li><b>Alloy veins</b>: grey crystal clusters in every territory. Press ' + L('interact') + ' to mine. Danger III–IV veins can hold a frame core. They regrow daily.</li>' +
       '<li><b>Cache signals</b>: every few minutes a treasure site pings and is marked gold on the minimap. Worth the detour.</li>' +
-      '<li><b>Hunts</b>: fifty named bosses, four or five per territory. One roams each territory per day at a skull totem (☠ on the minimap, listed on the WORLD MAP). Each has its own mechanics — WEAK POINT bosses take 2.5× from behind, SHIELDED ones drop their shield when their adds die, BURROWERS erupt under you. They pay cores and fill the BESTIARY in the COLLECTION LOG. ARENA and CLASSIC midboss waves draw from the same pool.</li>' +
+      '<li><b>Hunts</b>: fifty named bosses, four or five per territory. One roams each territory per day at a skull totem (☠ on the minimap, listed on the WORLD MAP). Each has its own mechanics — WEAK POINT bosses take 2.5× from behind, SHIELDED ones drop their shield when their adds die, BURROWERS erupt under you. They pay cores and fill the BESTIARY in the COLLECTION LOG. ARENA and GAUNTLET midboss waves draw from the same pool.</li>' +
       '<li>Higher DANGER zones pay more alloy per drop, richer veins, and richer signals — Albion rules: risk buys reward.</li>' +
-      '<li><b>Reach bands</b> (title screen or PILOT sheet): BRONZE → SILVER → GOLD → PLATINUM. Each band scales enemy hull and damage, spawns elites in the open world, and pays more alloy, salvage and cores per hunt. Bands unlock by slaying hunts, finishing diary tiers, pilot level and CLASSIC clears — never bought.</li></ul>' +
+      '<li><b>Reach bands</b> (title screen or PILOT sheet): BRONZE → SILVER → GOLD → PLATINUM. Each band scales enemy hull and damage, spawns elites in the open world, and pays more alloy, salvage and cores per hunt. Bands unlock by slaying hunts, finishing diary tiers, pilot level and GAUNTLET clears — never bought.</li></ul>' +
       '<div class="hp-h">TIPS</div>' +
-      '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run CLASSIC to wave 20 for cores.</li>' +
-      '<li>Sparks feed your persistent PILOT LEVEL — every level is a skill point for PILOT TRAINING.</li>' +
+      '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run the GAUNTLET to its last assault for cores and runes.</li>' +
+      '<li>Sparks feed your persistent PILOT LEVEL — every level is a skill point for PILOT TRAINING and an attribute point for ATTRIBUTES &amp; ARTS.</li>' +
       '<li>Wards cut matched damage by 75%. Watch the colour of what is hitting you.</li>' +
       '<li>Your save lives in this browser. HANGAR → SAVE CODE exports it; paste it on another machine to restore.</li></ul>' +
       '</div>';
@@ -2043,6 +2247,7 @@
     byId('btn-title-pilot').onclick = function () { openPilot(false, 'title'); };
     byId('btn-title-controls').onclick = openControls;
     byId('btn-title-help').onclick = openHelp;
+    byId('btn-title-journal').onclick = function () { openJournal(false); };
     byId('btn-profile').onclick = cycleProfile;
 
     back('hub-screen', 'btn-hub-back', metaBack('hub', toTitle));
@@ -2075,6 +2280,18 @@
       else openHub();
     });
     back('save-screen', 'btn-save-back', openHub);
+    back('journal-screen', 'btn-journal-back', function () {
+      if (expEntry === 'journal') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else if (journalFrom === 'title') toTitle();
+      else openHub();
+    });
+    byId('btn-attr-reset').onclick = function () {
+      confirmBox('RECALIBRATE ATTRIBUTES?', 'Every point you placed is refunded for ' + GH.attrs.RESET_COST + ' salvage. Auto-grown values are untouched.', 'RECALIBRATE', function () {
+        if (GH.attrs.reset()) { GH.audio.win(); renderHangar(); if (GH.game.refreshPilot) GH.game.refreshPilot(); }
+        else GH.audio.hit();
+      });
+    };
     back('workshop-screen', 'btn-ws-back', function () {
       if (expEntry === 'workshop') resumeExpedition();
       else if (workshopReturn === 'select') { workshopReturn = 'hub'; enterSelect(GH.game.mode); }

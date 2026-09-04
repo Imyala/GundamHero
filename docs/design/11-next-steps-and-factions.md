@@ -66,7 +66,7 @@ the seats. The hub camp on the dune coast stays neutral.
 ### Making your own
 
 - After clearing three seats' inner districts you can **raise a banner**: pick a name, a paint
-  (the cosmetics system), a doctrine (one of five stat lines, which replaces devotions), and a
+  (the cosmetics system), a doctrine (one of five stat lines, on top of the attributes), and a
   seat: any cleared nest cluster becomes your outpost with a beacon, a broker and a race gate.
 - Your faction recruits **wingmates** from captured or pledged frames (the wingmate code exists),
   levies **tithes** from territories you hold (nests cleansed = income), and must **defend** them
@@ -79,7 +79,7 @@ the seats. The hub camp on the dune coast stays neutral.
 1. Reputation counters and a faction panel in the hangar (a day).
 2. Faction patrols: each built zone's fauna tagged with a house, hostile or neutral by reputation.
 3. Pledge gates: one inner-district dungeon per seat, reusing the DEPTHS archetype with a house
-   boss (the Corrupted mirrors already exist as bosses; give each house one).
+   boss (the Revenant mirrors already exist as bosses; give each house one).
 4. Race series per house with the existing tracks.
 5. Then the player banner.
 

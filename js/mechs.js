@@ -1,7 +1,8 @@
 // STAALREUS — playable frame definitions.
-// Archetypes mirror the classic survivor-mech lineup: a block-healing paladin
-// starter, a dodge-fed light striker, an element-cycling wizard, a dagger
-// rogue, a wounded-fury reaper, plus gunner / railgun / artillery frames.
+// Eight lineages, each a distinct verb set in the action-RPG tradition: a
+// block-healing paladin starter, a dodge-fed light striker, an element-
+// cycling battlemage, a dagger rogue, a wounded-fury reaper, plus gunner /
+// railgun / artillery frames.
 // stats.speed is in UI units (game speed = speed * 0.42).
 // vehicle forms: what each frame folds into, and how it drives
 GH.VECTORS = {

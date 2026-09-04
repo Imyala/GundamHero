@@ -16,7 +16,7 @@ Each class introduced by exactly one mission. All have Stability for the stagger
 | **Jet** | enemy fighters | 250 | dogfight targets; Vector-form content |
 | **Ace custom** | red-comet trope (3× speed) | 900 | a named grunt suit in custom colours with a Signature weapon; drops it |
 | **Newtype frame** | funnel users | 1200 | bits; kill the bits first or eat crossfire |
-| **Corrupted mirror** | codebase corrupt bosses | 1500 | black/red mirror of a player frame; phases at 50% and 25% |
+| **Revenant mirror** | codebase revenant bosses | 1500 | black/red mirror of a player frame; phases at 50% and 25% |
 | **Capital ship** | Leviathan / Big Zam / Dendrobium | n/a | walkable hull, turrets as sub-targets, boarding |
 | **Mother ship** | finale | n/a | act 4 |
 
@@ -33,7 +33,7 @@ Elite modifiers stay (blazing, shielded, swift, volatile, vampiric). Territorial
 | 5 | **Vault Spider** | Matarael | vertical shaft blackout, acid from above; rotate Veil / fetch / fire with the wingmate |
 | 6 | **Skyfall** | Sahaquiel | city-sized body drops from orbit; sprint to the predicted impact point, catch (hold), open field, stab core; fail changes the campaign map |
 | 7 | **Shadow Well** | Leliel | sphere is a decoy, the shadow is the body; firing on it traps you in a pocket where the battery drains; exit by triggering Feral (doc 06) |
-| 8 | **Corrupted Wingman** | Bardiel | your wingmate is infected mid-mission; non-lethal route (parasite mass, keep cockpit HP) vs lethal; Dummy autopilot finishes it brutally |
+| 8 | **Revenant Wingman** | Bardiel | your wingmate is infected mid-mission; non-lethal route (parasite mass, keep cockpit HP) vs lethal; Dummy autopilot finishes it brutally |
 | 9 | **Paperblade** | Zeruel | ribbon arms one-shot plates; unbeatable on standard power; let the battery die, win in Feral, eat the core for perpetual power (permanent unlock) |
 | 10 | **Orbital Gaze** | Arael | out of reach; HUD disabled and controls inverted in waves; throw the artifact lance from a ramp with a timing minigame |
 | 11 | **Helix Ring** | Armisael | rotating ring merges with your frame, converting HP to boss HP; de-sync fast or self-destruct (lose the chassis for the run) |
@@ -44,7 +44,7 @@ Elite modifiers stay (blazing, shielded, swift, volatile, vampiric). Territorial
 | 16 | **Cube Swarm** | Mugann | fast shielded enemies that explode into cubes on death near allies; kill at range or drag with Harpoon first |
 | 17 | **Mirror Titan** | Granzeboma | matches whatever combination tier you have reached; beaten only by spending the full Hype meter on a tier-skip Helix Break |
 
-Bosses 1, 3, 12, 13 are act bosses. The Corrupted mirrors (one per unlockable frame) remain the
+Bosses 1, 3, 12, 13 are act bosses. The Revenant mirrors (one per unlockable frame) remain the
 frame-unlock bosses inside dungeons.
 
 ## 3. Campaign: 4 acts × (5 missions + 2 races)
@@ -70,7 +70,7 @@ traversal every third mission forces the Vector; dogfights force jet Vectors; bo
 | 12 | Fortification | hold a fort, 6 waves, siege | Mega Particle Cannon | ember |
 | R3 | Ember Drag | drag with perfect shifts | gearbox | ember |
 | 13 | Skyfall | catch the falling body | Veil Projector | ember |
-| 14 | Corrupted Wingman | betrayal | Dummy plug | storm |
+| 14 | Revenant Wingman | betrayal | Dummy plug | storm |
 | 15 | **General Thunder** | act boss, capture the fortress | hub-ship, Spike-Dock | storm |
 | 16 | Operation Prism | siege cannon puzzle | Satellite Cannon | storm |
 | 17 | Leviathan | boarding at scale | I-Field | null |

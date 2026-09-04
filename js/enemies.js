@@ -1,6 +1,7 @@
 // STAALREUS — enemy definitions.
-// Corrupt shell bosses are dark-mirror versions of unlockable frames:
-// beating one on wave 20 unlocks that frame and the next stage.
+// REVENANT bosses are recoverable frames still driven by the pilots who
+// died in them: bring one down on the last assault to recover the frame
+// and open the next stage.
 GH.enemyDefs = {
   husk: {
     name: 'Husk',
@@ -228,18 +229,18 @@ GH.enemyDefs = {
     behavior: 'boss', slamInterval: 5, summonInterval: 9, summonCount: 4
   },
 
-  // ---- corrupt shell bosses (wave 20) — one per unlockable frame ----
-  fang:  { name: 'CORRUPTED FANG', boss: true, corrupt: true,
+  // ---- revenant frames (the final assault) — one per recoverable frame ----
+  fang:  { name: 'REVENANT FANG', boss: true, corrupt: true,
     hp: 2200, speed: 3.6, damage: 24, radius: 1.15, xp: 60, mass: 10, behavior: 'corrupt' },
-  hexen: { name: 'CORRUPTED HEXEN', boss: true, corrupt: true,
+  hexen: { name: 'REVENANT HEXEN', boss: true, corrupt: true,
     hp: 2600, speed: 2.6, damage: 26, radius: 1.15, xp: 70, mass: 10, behavior: 'corrupt' },
-  viper: { name: 'CORRUPTED VIPER', boss: true, corrupt: true,
+  viper: { name: 'REVENANT VIPER', boss: true, corrupt: true,
     hp: 3000, speed: 3.4, damage: 26, radius: 1.15, xp: 80, mass: 10, behavior: 'corrupt' },
-  morrow:{ name: 'CORRUPTED MORROW', boss: true, corrupt: true,
+  morrow:{ name: 'REVENANT MORROW', boss: true, corrupt: true,
     hp: 3600, speed: 2.9, damage: 30, radius: 1.2, xp: 90, mass: 12, behavior: 'corrupt' },
-  strix: { name: 'CORRUPTED STRIX', boss: true, corrupt: true,
+  strix: { name: 'REVENANT STRIX', boss: true, corrupt: true,
     hp: 4200, speed: 3.2, damage: 32, radius: 1.15, xp: 100, mass: 10, behavior: 'corrupt' },
-  titan: { name: 'CORRUPTED TITAN', boss: true, corrupt: true,
+  titan: { name: 'REVENANT TITAN', boss: true, corrupt: true,
     hp: 5600, speed: 2.2, damage: 38, radius: 1.5, xp: 140, mass: 20, behavior: 'corrupt' }
 };
 
@@ -299,7 +300,7 @@ GH.enemyBuilders = {
   }
 };
 
-// corrupt bosses reuse the mech builder in corrupt colors at boss scale
+// revenants reuse the mech builder in dead-pilot colours at boss scale
 GH.buildCorrupt = function (mechId) {
   var def = GH.mechById(mechId);
   var cfg = {};

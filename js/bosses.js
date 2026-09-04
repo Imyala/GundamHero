@@ -1,7 +1,7 @@
 // STAALREUS — the HUNT roster: fifty named bosses, four or five per
 // territory, each built from a mechanics library so every one fights
 // differently. One hunt roams each territory per day (a skull totem
-// marks it); ARENA and CLASSIC midboss waves also draw from the pool.
+// marks it); ARENA and GAUNTLET midboss waves also draw from the pool.
 //
 // Mechanics (game.js huntAI implements these):
 //   slam       telegraphed ring at your feet          ring     radial shot burst
@@ -210,7 +210,7 @@ GH.bosses = (function () {
     return null; // every hunt in this zone is down for today
   };
 
-  // a random hunt for arena / classic midboss waves, capped by tier
+  // a random hunt for arena / gauntlet midboss waves, capped by tier
   B.pickFor = function (zone, maxTier) {
     var pool = B.LIST.filter(function (b) { return (!zone || b.zone === zone) && b.tier <= maxTier; });
     if (!pool.length) pool = B.LIST.filter(function (b) { return b.tier <= maxTier; });

@@ -117,7 +117,7 @@ GH.worldlife = (function () {
     { id: 'nests', need: 1, desc: 'Break a nest', reward: { alloy: 40, cores: 1 } },
     { id: 'caches', need: 1, desc: 'Open a dungeon reward cache', reward: { cores: 1 } },
     { id: 'races', need: 1, desc: 'Finish a race or duel', reward: { alloy: 50 } },
-    { id: 'wave10', need: 1, desc: 'Reach wave 10 in CLASSIC or ARENA', reward: { alloy: 40 } },
+    { id: 'wave10', need: 1, desc: 'Reach wave 10 in the GAUNTLET or ARENA', reward: { alloy: 40 } },
     { id: 'build', need: 1, desc: 'Build a frame or a vehicle in the workshop', reward: { cores: 1 } },
     { id: 'alloy', need: 60, desc: 'Pick up 60 alloy', reward: { salvage: 150 } },
     { id: 'signals', need: 2, desc: 'Recover 2 cache signals', reward: { alloy: 45 } },
@@ -256,7 +256,7 @@ GH.worldlife = (function () {
     if (u.hunts && have.hunts < u.hunts) missing.push('slay ' + u.hunts + ' hunts (' + have.hunts + ')');
     if (u.diaries && have.diaries < u.diaries) missing.push('complete ' + u.diaries + ' diary tiers (' + have.diaries + ')');
     if (u.pilot && have.pilot < u.pilot) missing.push('reach pilot level ' + u.pilot + ' (' + have.pilot + ')');
-    if (u.stages && have.stages < u.stages) missing.push('clear ' + u.stages + ' CLASSIC stage' + (u.stages > 1 ? 's' : '') + ' (' + have.stages + ')');
+    if (u.stages && have.stages < u.stages) missing.push('clear ' + u.stages + ' GAUNTLET stage' + (u.stages > 1 ? 's' : '') + ' (' + have.stages + ')');
     return { band: b, unlocked: missing.length === 0, missing: missing };
   };
   L.setBand = function (id) {

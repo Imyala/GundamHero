@@ -40,25 +40,25 @@ catalog's ladder: T0 trainer, T1 production, T2 ace custom, T3 prototype, T3b re
 |---|---|---|---|---|---|---|---|
 | 6 | **CYCLOPS** | T1 | none (mono-eye tracks the player) | enemy backbone, capturable · FRM+, UPL− | *Commander horn* variant: +30% thrust, custom colour, leads squads ("the red one") | Spike-Dock capture, act 1 | — |
 | 7 | **LINE** | T1 | mini core-jet | squadmate / cheap repair · FRM−, OUT− | *Modular kit*: any weapon fits; only frame repaired free | after 3 sorties | vulcan |
-| 8 | **SKATER** | T1 heavy | **Hover-tank** (kneels into skirt-down slide with fixed forward cannon) | heavy ground assault · FRM++, OUT+ | *Formation strike*: with two LINE allies, a three-in-a-row unblockable dash | Corrupted mirror in ember DEPTHS | titan |
-| 9 | **SAUCER** | T1 | **Disc** (round, loiter, underslung rifle fires along flight vector) | air patrol · SRV+, UPL+, melee− | *Endless loiter*: no flight fuel drain in disc | Corrupted mirror in glacier | — |
+| 8 | **SKATER** | T1 heavy | **Hover-tank** (kneels into skirt-down slide with fixed forward cannon) | heavy ground assault · FRM++, OUT+ | *Formation strike*: with two LINE allies, a three-in-a-row unblockable dash | Revenant mirror in ember DEPTHS | titan |
+| 9 | **SAUCER** | T1 | **Disc** (round, loiter, underslung rifle fires along flight vector) | air patrol · SRV+, UPL+, melee− | *Endless loiter*: no flight fuel drain in disc | Revenant mirror in glacier | — |
 | 10 | **ARSENAL** | T2 | **Siege crouch** (four-point stance, cannons lock, cannot move) | suppression artillery · OUT++, FRM+, SRV−− | *Open all hatches* alpha strike, then dry → falls back to a knife | mission 12 Fortification | — |
 
 ### Line C — Ace and Newtype (Frame tree: Vector/Striker)
 
 | # | Frame | Tier | Vector | Role · stat lean | Gimmick | Unlock | Codebase |
 |---|---|---|---|---|---|---|---|
-| 11 | **CRIMSON** | T2 rival | none | rival boss / late unlock · all +, SRV− outside burst | *Abdominal cannon*; escape-pod head keeps the pilot alive; palette locked red until beaten | mission 8 Red Comet then Corrupted mirror | — |
+| 11 | **CRIMSON** | T2 rival | none | rival boss / late unlock · all +, SRV− outside burst | *Abdominal cannon*; escape-pod head keeps the pilot alive; palette locked red until beaten | mission 8 Red Comet then Revenant mirror | — |
 | 12 | **SEER** | T3 | none | remote-weapons specialist · UPL++, REA+, FRM− | *Fin bits* 6–24 that orbit, snipe or lock into a barrier; needs Uplink 20; T3b version hijacks enemy drones | Labyrinth blueprint | — |
-| 13 | **REAPER** | T3 | **Hover-bike**, cloak folds closed = invisible, jammed, no shields | stealth assassin · SRV+, melee++, FRM− | one scythe swing from invisibility crits ×2.5 | Corrupted mirror in cloister | viper |
-| 14 | **CLAW** | T3 | **X-claw** flyer that grabs an enemy and fires a chest cannon point-blank | grappler-interceptor · SRV++, melee+, UPL+ | *Wolf-pack net* with two allies | Corrupted mirror in wreck | fang |
+| 13 | **REAPER** | T3 | **Hover-bike**, cloak folds closed = invisible, jammed, no shields | stealth assassin · SRV+, melee++, FRM− | one scythe swing from invisibility crits ×2.5 | Revenant mirror in cloister | viper |
+| 14 | **CLAW** | T3 | **X-claw** flyer that grabs an enemy and fires a chest cannon point-blank | grappler-interceptor · SRV++, melee+, UPL+ | *Wolf-pack net* with two allies | Revenant mirror in wreck | fang |
 | 15 | **WITCH** | T3 | none; 11 staves attach to limbs for form change (rifle / wing / boosters) | technical duelist · UPL++, REA++, FRM only via staves | *Link score* tiers control more staves; antidote fields shut it all down | Halls blueprint | hexen |
 
 ### Line D — Bio-organic "Revenant" (battery, sync; Frame tree: Bastion/Striker)
 
 | # | Frame | Tier | Vector | Role · stat lean | Gimmick | Unlock | Codebase |
 |---|---|---|---|---|---|---|---|
-| 16 | **REVENANT-0** | T3 proto | none (crawls on all fours as a fast "beast" gait) | field support · REA++, FRM+, COO−− | strongest *Veil* projector; clamp release trades 30% armour for a strength surge; battery 60 s / 300 s low | Corrupted mirror in storm | — |
+| 16 | **REVENANT-0** | T3 proto | none (crawls on all fours as a fast "beast" gait) | field support · REA++, FRM+, COO−− | strongest *Veil* projector; clamp release trades 30% armour for a strength surge; battery 60 s / 300 s low | Revenant mirror in storm | — |
 | 17 | **REVENANT-1 FERAL** | T3 | beast gait | last-stand brawler · OUT+, FRM+ | at 0 battery it doesn't stop: *Feral* AI melee, limb regen, no ranged; eat a boss core to remove the battery | mission 18 Paperblade | morrow |
 | 18 | **REVENANT-2 QUAD** | T3b | beast gait | the conventional one · even, UPL+ | four optics = 60° lock cone in Frame; environmental packs (heat, dive) swap per mission | act 3 mission | — |
 | 19 | **REVENANT-13 TWIN** | T5 | none | co-op frame · OUT++, REA++ | four arms, two-seat cockpit; P2 or wingmate drives the second pair; sync gates dual spears | act 4 | — |
@@ -82,7 +82,7 @@ catalog's ladder: T0 trainer, T1 production, T2 ace custom, T3 prototype, T3b re
 
 26 listed; **24 at launch** (ARK HULL and REVENANT-13 are post-M5 stretch). Non-player: **CHOIR**
 (white eyeless mass-production drones with membrane wings and a lance; hunt in packs, regenerate,
-resurrect once; capturable late as a pilot-less auto-fighting frame) and the **Corrupted mirrors**.
+resurrect once; capturable late as a pilot-less auto-fighting frame) and the **Revenant mirrors**.
 
 ## 3. Tiering as progression
 
@@ -90,7 +90,7 @@ resurrect once; capturable late as a pilot-less auto-fighting frame) and the **C
 T0 trainer (KEYHEAD) → T1 production (LINE, CYCLOPS, SKATER, SAUCER) → T2 ace custom (ARSENAL,
 CRIMSON, ANCHOR, RIDGE-CAT) → T3 prototype (VANGUARD, SEER, REAPER, CLAW, WITCH, REVENANT-0/1,
 PUGILIST, ARROW) → T3b rebuilt (DELTA, TRIAD, REVENANT-2, COREBREAKER) → T5 overdrive (CHRYSALIS,
-REVENANT-13) → T6 relic (MOUSTACHE, ARK HULL) → rival mirrors (the Corrupted bosses)
+REVENANT-13) → T6 relic (MOUSTACHE, ARK HULL) → rival mirrors (the Revenant bosses)
 ```
 
 - **Rebuilt** frames visibly accumulate salvaged enemy parts (Barbatos forms, Build Fighters kitbash):
@@ -103,7 +103,7 @@ REVENANT-13) → T6 relic (MOUSTACHE, ARK HULL) → rival mirrors (the Corrupted
 ## 4. Unlock paths (five, so no single grind)
 
 1. **Story**: one frame per act boss (VANGUARD start, DELTA, TRIAD, CHRYSALIS, MOUSTACHE).
-2. **Corrupted mirrors** in zone DEPTHS (codebase rule): SKATER, SAUCER, REAPER, CLAW, REVENANT-0, CRIMSON.
+2. **Revenant mirrors** in zone DEPTHS (codebase rule): SKATER, SAUCER, REAPER, CLAW, REVENANT-0, CRIMSON.
 3. **Blueprints** from dungeon archetypes: SEER (Labyrinth), WITCH (Halls), PUGILIST (Crucible), ARROW (Raceway), RIDGE-CAT (Convoy).
 4. **Capture** via Spike-Dock: CYCLOPS, CHOIR, ARK HULL.
 5. **Ladders**: LINE (sorties), ANCHOR (Trace), ARSENAL (Fortification), KEYHEAD/COREBREAKER (missions 11/15).

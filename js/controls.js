@@ -32,6 +32,7 @@ GH.controls = (function () {
     { id: 'skills', name: 'Pilot training (skill tree)', def: 'KeyK', group: 'MENUS' },
     { id: 'map', name: 'World map', def: 'KeyM', group: 'MENUS' },
     { id: 'pilot', name: 'Pilot sheet (character)', def: 'KeyP', group: 'MENUS' },
+    { id: 'journal', name: 'Quest journal', def: 'KeyJ', group: 'MENUS' },
     { id: 'pause', name: 'Pause (ESC always works)', def: 'Backquote', group: 'MENUS' },
     { id: 'crt', name: 'Toggle CRT filter', def: 'KeyH', group: 'MENUS' }
   ];
@@ -119,7 +120,7 @@ GH.controls = (function () {
       'LEFT-CLICK attack / target · ' + L('target') + ' cycle target · ' +
       L('ability1') + '–' + L('ability4') + ' abilities · ' + L('ward1') + ' ' + L('ward2') + ' ' + L('ward3') + ' wards · ' +
       L('boost') + ' boost / drift · ' + L('special') + ' special / nitro · ' + L('transform') + ' transform · ' +
-      L('interact') + ' interact · ' + L('camera') + ' camera · ' + L('skills') + ' training · ' + L('map') + ' map · ESC menu';
+      L('interact') + ' interact · ' + L('camera') + ' camera · ' + L('skills') + ' training · ' + L('map') + ' map · ' + L('journal') + ' journal · ESC menu';
   };
 
   C.load();

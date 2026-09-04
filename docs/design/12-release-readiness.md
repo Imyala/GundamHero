@@ -7,14 +7,14 @@
 - **Menus**: a header bar with BACK on every screen (nothing overlaps the HUD any more), ESC closes whatever
   is on top, HUD hidden behind menus, dark backdrops for legibility, descriptions under the title buttons,
   a PILOT SHEET (character + inventory), a HOW TO PLAY screen, an in-page confirm box for destructive actions.
-- **Run lifecycle**: EXIT RUN saves (the Reach character, or a parked CLASSIC/ARENA/WEEKLY run resumed from
+- **Run lifecycle**: EXIT RUN saves (the Reach character, or a parked GAUNTLET/ARENA/WEEKLY run resumed from
   the title), NEW RUN / ABANDON RUN delete after a confirm, NEW EXPEDITION wipes the saved pilot only.
 - **135 frames**: 8 base + 120 lineage variants + 7 relics, with ALLOY / FRAME CORE materials, a FRAME
   WORKSHOP, feat gating, and pack/mark silhouettes on the models.
 
 ## Shipped in the third round
 
-- **ZERO HOUR**, the guided first ten minutes: twelve steps on top of the survivor camp (walk, look,
+- **ZERO HOUR**, the guided first ten minutes: twelve steps on top of the outpost (walk, look,
   fight, cast, ward, transform, drive, drift-turbo, mine a vein, chase a signal, drop a warden, build a
   frame), each with one sentence, a progress readout and a beacon. First PLAY on a fresh profile starts
   it; it can be replayed or skipped from the pause menu; finishing pays alloy, cores, salvage and a
@@ -40,7 +40,7 @@
 - **Fifty HUNT bosses** (`js/bosses.js`), four or five per territory, built from a mechanics library
   (slam, ring, line, charge, spiral, mines, blink, summon, shield, weak point, enrage, regen, pull,
   artillery, split, burrow, sweep, drain, burn, frost) with phases at 66% and 33% hull. One roams each
-  territory per day at a skull totem; ARENA and CLASSIC midboss waves draw from the pool. Kills pay
+  territory per day at a skull totem; ARENA and GAUNTLET midboss waves draw from the pool. Kills pay
   cores and alloy and fill a BESTIARY in the collection log; the world map lists today's hunt per zone.
 
 ## Shipped in the fifth round
@@ -48,7 +48,7 @@
 - **Reach difficulty bands** (BRONZE / SILVER / GOLD / PLATINUM, `worldlife.js` BANDS): enemy hull
   ×1 / 1.45 / 2.1 / 3, damage ×1 / 1.25 / 1.55 / 1.9, open-world elite chance 0 / 6 / 12 / 20%, alloy
   ×1 / 1.4 / 1.9 / 2.6, salvage ×1 / 1.3 / 1.7 / 2.2, +0 / 1 / 2 / 3 cores per hunt; PLATINUM hunts
-  arrive already wounded. Gated on hunts slain, diary tiers, pilot level and CLASSIC clears. Picked on
+  arrive already wounded. Gated on hunts slain, diary tiers, pilot level and GAUNTLET clears. Picked on
   the title or the PILOT sheet; shown in the HUD danger line and the world map.
 
 ## Still to do before calling it 1.0
@@ -93,7 +93,7 @@ python3 -m http.server 8123
 NODE_PATH=/opt/node22/lib/node_modules node scratchpad/smoke.js   # or run the same steps by hand:
 ```
 
-1. Title → CLASSIC → pick AEGIS → SELECT STAGE → TIDE WRECKAGE: A turns, W walks, right-drag looks, Q strafes.
+1. Title → THE GAUNTLET → pick AEGIS → SELECT STAGE → TIDE WRECKAGE: A turns, W walks, right-drag looks, Q strafes.
 2. ESC → CONTROLS → rebind a key → ESC → ESC resumes.
 3. ESC → EXIT RUN → title shows CONTINUE RUN → resumes at the wave → ESC → ABANDON → confirm.
 4. HANGAR → FRAME WORKSHOP → `?mats=2000&salvage=5000` → build a MK.II → it appears on the select rack.

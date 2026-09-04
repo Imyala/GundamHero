@@ -3,19 +3,50 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>STAALREUS — steel giants, a mech arena survivor</title>
+<title>STAALREUS — steel giants of the Shattered Reach</title>
 <link rel="icon" href="data:,">
 <style>
-/* STAALREUS — PS1-flavoured UI */
+/* STAALREUS — forged-steel ledger UI
+   Riveted iron plates, bronze filigree, parchment lettering: the menus of a
+   frontier armoury rather than a console. Every id / class the game scripts
+   touch keeps its name; only the dress changes. */
+
+:root {
+  --ink: #0b0a08;
+  --iron: #17150f;
+  --iron2: #221e17;
+  --plate: #2b2620;
+  --plate2: #191612;
+  --steel: #46403a;
+  --seam: #5a4a30;
+  --bronze: #b8823c;
+  --bronze2: #7a5324;
+  --brass: #e2b25c;
+  --gold: #f2cf7a;
+  --parchment: #eadfc4;
+  --parch2: #bdb096;
+  --dim: #7f7663;
+  --verdigris: #4fb39a;
+  --ember: #e0663a;
+  --blood: #9a2f22;
+  --arcane: #a98cd9;
+  --ice: #8ec6e6;
+  --font-head: "Palatino Linotype", "Book Antiqua", Palatino, "URW Palladio L", Georgia, "Times New Roman", serif;
+  --font-body: "Trebuchet MS", "Lucida Grande", "Segoe UI", Verdana, Tahoma, sans-serif;
+  --plate-bg: linear-gradient(165deg, #2e2921 0%, #1c1813 55%, #14110d 100%);
+  --plate-shadow: inset 0 0 0 1px #0a0806, inset 0 0 0 3px #3a3128, inset 0 0 24px rgba(0, 0, 0, 0.55), 0 10px 26px rgba(0, 0, 0, 0.6);
+  --forge-bg: radial-gradient(ellipse at 50% 18%, #2c241a 0%, #16120e 52%, #070605 100%);
+  --hatch: repeating-linear-gradient(135deg, rgba(255, 220, 160, 0.025) 0 2px, transparent 2px 9px);
+}
 
 * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
 
 html, body {
   width: 100%; height: 100%;
-  background: #000;
+  background: var(--ink);
   overflow: hidden;
-  font-family: "Courier New", monospace;
-  color: #e8e8e8;
+  font-family: var(--font-body);
+  color: var(--parchment);
 }
 
 #game-root { position: relative; width: 100%; height: 100%; }
@@ -28,6 +59,8 @@ html, body {
 }
 
 .hidden { display: none !important; }
+button { font-family: inherit; }
+b { color: var(--gold); font-weight: bold; }
 
 /* ---------------- HUD ---------------- */
 
@@ -45,50 +78,50 @@ html, body {
 .bar-frame {
   position: relative;
   height: 22px;
-  border: 2px solid #c8b060;
-  background: #1a1408;
-  box-shadow: 0 0 0 1px #000, inset 0 0 6px #000;
+  border: 1px solid var(--bronze);
+  background: #120f0b;
+  box-shadow: 0 0 0 1px #000, 0 0 0 2px #3a2e1c, inset 0 0 8px #000;
 }
 
 .bar-fill { position: absolute; inset: 0; width: 100%; transform-origin: left; }
-.hp-fill   { background: linear-gradient(#4be04b, #1d8a1d); }
+.hp-fill   { background: linear-gradient(#d9473a, #7a1d14); }
 .xp-frame  { width: 100%; }
-.xp-fill   { background: linear-gradient(#a86ae8, #5c2a9a); }
-.boost-frame { height: 8px; width: 55%; margin-top: 3px; border-color: #8a7840; }
-.boost-fill  { background: linear-gradient(#f0c040, #a87010); }
-.boss-frame  { height: 18px; border-color: #907040; }
-.boss-fill   { background: linear-gradient(#e04040, #7a1010); }
+.xp-fill   { background: linear-gradient(#e6c06a, #8a5e1c); }
+.boost-frame { height: 8px; width: 55%; margin-top: 3px; border-color: var(--bronze2); }
+.boost-fill  { background: linear-gradient(#8fc6e6, #2c5f86); }
+.boss-frame  { height: 18px; border-color: #8a5a3a; }
+.boss-fill   { background: linear-gradient(#e04a3a, #5a0c08); }
 
 .bar-text {
   position: absolute; inset: 0;
   text-align: center; line-height: 20px;
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: 15px; color: #fff;
+  font-family: var(--font-head); font-weight: bold;
+  font-size: 15px; color: #fff4dc;
   text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000;
 }
 
 #coin-row {
   margin-top: 4px;
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 17px;
-  color: #ffd9a0; text-shadow: 1px 1px 0 #000;
+  font-family: var(--font-head); font-weight: bold; font-size: 16px;
+  color: var(--gold); text-shadow: 1px 1px 0 #000;
 }
 .coin-icon {
-  display: inline-block; width: 18px; height: 18px; line-height: 18px;
-  background: radial-gradient(#ffd070, #b03030); border-radius: 50%;
-  border: 1px solid #601010;
-  color: #fff; text-align: center; font-size: 13px; margin-right: 4px;
+  display: inline-block; width: 18px; height: 18px; line-height: 17px;
+  background: radial-gradient(#f4d98a, #a0641c); border-radius: 50%;
+  border: 1px solid #3a2208;
+  color: #2a1a06; text-align: center; font-size: 12px; margin-right: 4px;
 }
 
 #hud-center { text-align: center; }
 #wave-label {
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 20px;
-  color: #f5e6b8;
+  font-family: var(--font-head); font-weight: bold; font-size: 19px; letter-spacing: 2px;
+  color: var(--parchment);
   text-shadow: 1px 1px 0 #000, 2px 2px 3px #000;
 }
 #wave-timer {
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 44px;
-  color: #e8c860;
-  text-shadow: 2px 2px 0 #6a4a10, 3px 3px 4px #000;
+  font-family: var(--font-head); font-weight: bold; font-size: 42px;
+  color: var(--brass);
+  text-shadow: 2px 2px 0 #4a2e0c, 3px 3px 4px #000;
   line-height: 0.9;
 }
 
@@ -96,34 +129,33 @@ html, body {
 .stat-icon {
   width: 44px; height: 44px;
   border-radius: 50%;
-  background: radial-gradient(#cfcfcf, #6a6a6a);
-  border: 2px solid #3a3a3a;
-  box-shadow: 0 0 0 1px #000;
+  background: radial-gradient(#d8ccb0, #6b5f4c);
+  border: 2px solid #2a2016;
+  box-shadow: 0 0 0 1px #000, inset 0 0 6px rgba(0,0,0,0.5);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-family: "Times New Roman", serif; font-weight: bold;
+  font-family: var(--font-head); font-weight: bold;
 }
 .stat-icon .si-g { font-size: 16px; line-height: 1; }
-.stat-icon .si-v { font-size: 12px; color: #101010; }
+.stat-icon .si-v { font-size: 12px; color: #14100a; }
 
 #boss-bar-wrap {
-  /* riding above the ability hotbar so neither hides the other */
   position: absolute; bottom: calc(3.5vh + 74px); left: 50%;
   width: 46%; min-width: 300px;
   transform: translateX(-50%);
 }
 #boss-name {
   text-align: center;
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 16px;
-  color: #ffd0d0; text-shadow: 1px 1px 0 #000;
+  font-family: var(--font-head); font-weight: bold; font-size: 16px; letter-spacing: 2px;
+  color: #ffd6c8; text-shadow: 1px 1px 0 #000;
   margin-bottom: 2px;
 }
 
 #announce {
   position: absolute; top: 30%; left: 0; right: 0;
   text-align: center;
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 40px;
-  color: #f0d888;
-  text-shadow: 2px 2px 0 #503810, 3px 3px 5px #000;
+  font-family: var(--font-head); font-weight: bold; font-size: 40px; letter-spacing: 3px;
+  color: var(--gold);
+  text-shadow: 2px 2px 0 #4a2e0c, 3px 3px 5px #000;
   animation: announce-pop 0.35s ease-out;
 }
 @keyframes announce-pop {
@@ -136,8 +168,8 @@ html, body {
 #damage-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .dmg-num {
   position: absolute;
-  font-family: "Times New Roman", serif; font-weight: bold;
-  color: #e8e8e8;
+  font-family: var(--font-head); font-weight: bold;
+  color: #efe6d2;
   text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000;
   transform: translate(-50%, -50%);
   will-change: transform, opacity;
@@ -148,8 +180,7 @@ html, body {
 .dmg-num.elem   { color: #90d8ff; }
 .dmg-num.dot    { color: #ff9040; }
 
-/* CRT fallback overlay: only shown when the WebGL CRT pass (js/crt.js)
-   can't run; toggled with the CRT filter setting / H key */
+/* CRT fallback overlay: only when the WebGL pass (js/crt.js) can't run */
 #crt-overlay {
   position: absolute; inset: 0;
   pointer-events: none;
@@ -170,314 +201,453 @@ html, body {
   align-items: center; justify-content: center;
   gap: 18px;
   z-index: 10;
+  padding-top: 68px;
+  background: var(--forge-bg);
 }
+.screen::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: var(--hatch);
+}
+.screen > * { position: relative; }
 
-#title-screen { background: radial-gradient(ellipse at 50% 35%, #10184a 0%, #050718 65%, #000 100%); }
-.title-grid {
-  position: absolute; inset: 0;
-  background-image:
-    linear-gradient(rgba(90,120,255,0.16) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(90,120,255,0.16) 1px, transparent 1px);
-  background-size: 42px 42px;
-  transform: perspective(400px) rotateX(35deg) scale(1.6);
-  transform-origin: 50% 30%;
+/* ---------------- title ---------------- */
+
+#title-screen {
+  padding-top: 0;
+  background: radial-gradient(ellipse at 22% 40%, #2f2618 0%, rgba(24, 19, 13, 0) 55%),
+              radial-gradient(ellipse at 78% 110%, #5a2e12 0%, rgba(40, 20, 8, 0) 50%),
+              linear-gradient(#0e0c09, #17130d 60%, #0a0806);
+  justify-content: stretch; align-items: stretch;
+}
+.title-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.title-gear {
+  position: absolute; right: -14vw; top: -18vh;
+  width: 62vh; height: 62vh; border-radius: 50%;
+  border: 2.6vh dashed rgba(184, 130, 60, 0.16);
+  box-shadow: 0 0 0 4vh rgba(0,0,0,0), inset 0 0 0 1.2vh rgba(226, 178, 92, 0.05), inset 0 0 0 2.4vh rgba(0,0,0,0.3);
+  animation: gear-turn 90s linear infinite;
+}
+.title-gear::after {
+  content: ''; position: absolute; inset: 22%; border-radius: 50%;
+  border: 1.4vh double rgba(184, 130, 60, 0.18);
+}
+.title-gear.small {
+  right: 26vw; top: 46vh; width: 30vh; height: 30vh;
+  border-width: 1.6vh; animation-direction: reverse; animation-duration: 60s;
+}
+@keyframes gear-turn { to { transform: rotate(360deg); } }
+.title-horizon {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 30vh;
+  background: linear-gradient(rgba(0,0,0,0), rgba(60, 30, 10, 0.35) 60%, rgba(0,0,0,0.7));
+}
+.title-frame {
+  position: relative; z-index: 1;
+  display: flex; width: 100%; height: 100%;
+  padding: 5vh 5vw 9vh;
+  gap: 4vw;
+  align-items: center;
+}
+.title-left { flex: 1 1 60%; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.title-right { flex: 0 0 min(360px, 32vw); display: flex; justify-content: flex-end; }
+.title-crest {
+  font-size: 30px; color: var(--bronze); line-height: 1;
+  text-shadow: 0 0 12px rgba(226, 178, 92, 0.45);
+  animation: gear-turn 30s linear infinite;
+  display: inline-block;
 }
 
 .game-title {
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: clamp(44px, 9vw, 96px);
-  letter-spacing: 6px;
-  color: #f0d888;
-  text-shadow: 3px 3px 0 #6a4a10, 6px 6px 0 #201404, 0 0 30px rgba(240,200,80,0.35);
+  font-family: var(--font-head); font-weight: bold;
+  font-size: clamp(42px, 8vw, 92px);
+  letter-spacing: 8px; line-height: 1;
+  color: var(--gold);
+  background: linear-gradient(#fff2c4, #e2b25c 45%, #8a5a20 55%, #f2cf7a);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(2px 3px 0 #2a1a08) drop-shadow(0 0 18px rgba(226, 178, 92, 0.25));
   z-index: 1;
 }
-.game-title.small { font-size: clamp(30px, 6vw, 58px); }
+.game-title.small { font-size: clamp(30px, 6vw, 58px); -webkit-text-fill-color: initial; background: none; color: var(--gold); text-shadow: 2px 2px 0 #4a2e0c, 4px 4px 0 #000; filter: none; }
 .title-sub {
-  font-size: 15px; letter-spacing: 5px; color: #9ab0ff; z-index: 1;
-  text-shadow: 1px 1px 0 #000;
+  font-family: var(--font-head);
+  font-size: 14px; letter-spacing: 6px; color: var(--parch2); z-index: 1;
+  text-shadow: 1px 1px 0 #000; margin-top: 4px;
+}
+.title-rule {
+  width: min(520px, 100%); height: 6px; margin: 14px 0 12px;
+  background:
+    linear-gradient(90deg, transparent, var(--bronze) 15%, var(--brass) 50%, var(--bronze) 85%, transparent);
+  -webkit-mask: linear-gradient(#000 0 0) top/100% 1px no-repeat, linear-gradient(#000 0 0) bottom/100% 1px no-repeat, radial-gradient(circle at 50% 50%, #000 3px, transparent 3.5px);
+  mask: linear-gradient(#000 0 0) top/100% 1px no-repeat, linear-gradient(#000 0 0) bottom/100% 1px no-repeat, radial-gradient(circle at 50% 50%, #000 3px, transparent 3.5px);
 }
 .title-foot {
   position: absolute; bottom: 26px; left: 0; right: 0;
-  text-align: center; font-size: 12px; color: #8090c0; z-index: 1;
+  text-align: center; font-size: 11px; color: var(--dim); z-index: 1;
+  padding: 0 6vw;
 }
 
+/* ---------------- buttons ---------------- */
+
 .menu-btn {
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: 24px; letter-spacing: 3px;
-  color: #f0e0b0;
-  background: linear-gradient(#2a3a7a, #101c48);
-  border: 2px solid #c8b060;
-  box-shadow: 0 0 0 2px #000, inset 0 0 12px rgba(0,0,0,0.6);
-  padding: 10px 34px;
+  font-family: var(--font-head); font-weight: bold;
+  font-size: 22px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--parchment);
+  background: linear-gradient(#4a3a26, #2a2016 60%, #1e1710);
+  border: 1px solid var(--bronze);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 224, 170, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.55),
+    0 0 0 2px #0a0806, 0 3px 0 #3a2a14, 0 6px 12px rgba(0, 0, 0, 0.55);
+  padding: 9px 30px;
   cursor: pointer;
   z-index: 1;
+  text-shadow: 1px 1px 0 #000;
+  transition: transform 0.06s, box-shadow 0.06s;
 }
-.menu-btn:hover { background: linear-gradient(#3a4e9a, #182864); color: #fff; }
-.menu-btn.small { font-size: 16px; padding: 6px 20px; }
+.menu-btn:hover { background: linear-gradient(#66502f, #3a2c1a 60%, #241b12); color: #fff8e6; border-color: var(--brass); box-shadow: inset 0 1px 0 rgba(255,224,170,0.4), inset 0 -2px 0 rgba(0,0,0,0.5), 0 0 0 2px #0a0806, 0 3px 0 #3a2a14, 0 0 18px rgba(226, 178, 92, 0.35); }
+.menu-btn:active { transform: translateY(2px); box-shadow: inset 0 1px 0 rgba(255,224,170,0.2), 0 0 0 2px #0a0806, 0 1px 0 #3a2a14; }
+.menu-btn:disabled { opacity: 0.45; cursor: default; }
+.menu-btn.small { font-size: 15px; padding: 6px 18px; letter-spacing: 2px; }
+.menu-btn.tiny { font-size: 12px; padding: 4px 12px; letter-spacing: 1.5px; }
+.menu-btn.primary {
+  font-size: 24px; padding: 11px 36px;
+  background: linear-gradient(#7a5a2a, #4a3416 60%, #2c1f0e);
+  border-color: var(--brass);
+  color: #fff4d6;
+  box-shadow: inset 0 1px 0 rgba(255,230,180,0.4), inset 0 -2px 0 rgba(0,0,0,0.5), 0 0 0 2px #0a0806, 0 3px 0 #3a2a14, 0 0 22px rgba(226, 178, 92, 0.25);
+}
+.menu-btn.primary:hover { background: linear-gradient(#9a7434, #5e4420 60%, #35260f); }
+
+.title-menu { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; z-index: 1; width: 100%; }
+.menu-desc { font-size: 11px; color: var(--dim); text-align: left; max-width: 560px; line-height: 1.45; z-index: 1; }
+.title-row { display: flex; gap: 8px; z-index: 1; flex-wrap: wrap; justify-content: flex-start; }
+.title-modes {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px;
+  padding: 10px 12px;
+  background: rgba(10, 8, 6, 0.55);
+  border-top: 1px solid var(--seam); border-bottom: 1px solid var(--seam);
+}
+.title-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.title-choice .menu-desc { max-width: 190px; text-align: left; }
+.title-doors { margin-top: 4px; }
+.continue-btn { border-color: var(--verdigris); color: #d8fff0; }
+.danger-btn { border-color: #b8433a; color: #ffd0c8; }
+.danger-btn:hover { background: linear-gradient(#7a2a2a, #481010); }
+.profile-btn { border-color: #8a9ab0; color: #dbe6f2; }
+.band-btn { border-color: #d09060; }
+#band-desc { max-width: 620px; }
+
+#title-salvage {
+  position: absolute; left: 5vw; bottom: 52px; z-index: 1;
+  font-family: var(--font-head); font-weight: bold; font-size: 13px; letter-spacing: 1px;
+  color: var(--brass); text-shadow: 1px 1px 0 #000;
+}
+#title-memorial {
+  position: absolute; right: 5vw; bottom: 52px; z-index: 1;
+  font-size: 11px; color: #b06868;
+}
+#title-version { position: absolute; bottom: 8px; right: 48px; font-size: 10px; color: var(--dim); z-index: 1; }
+#title-version a { color: var(--bronze); }
+#backup-nudge { color: var(--gold); }
+#backup-nudge a { color: var(--brass); }
+
+/* the chronicle: a standing record on the title */
+.chronicle {
+  width: 100%;
+  background: var(--plate-bg);
+  box-shadow: var(--plate-shadow);
+  border: 1px solid var(--seam);
+  padding: 14px 16px 12px;
+  font-size: 12px; line-height: 1.5; color: var(--parch2);
+  position: relative;
+}
+.chronicle::before, .plate-rivets::before {
+  content: ''; position: absolute; inset: 5px; pointer-events: none;
+  background:
+    radial-gradient(circle at 3px 3px, #9a7a44 1.6px, transparent 2.2px) top left / 100% 100% no-repeat,
+    radial-gradient(circle at calc(100% - 3px) 3px, #9a7a44 1.6px, transparent 2.2px) top right / 100% 100% no-repeat,
+    radial-gradient(circle at 3px calc(100% - 3px), #9a7a44 1.6px, transparent 2.2px) bottom left / 100% 100% no-repeat,
+    radial-gradient(circle at calc(100% - 3px) calc(100% - 3px), #9a7a44 1.6px, transparent 2.2px) bottom right / 100% 100% no-repeat;
+}
+.ch-head {
+  font-family: var(--font-head); font-weight: bold; font-size: 14px; letter-spacing: 4px;
+  color: var(--brass); text-align: center; margin-bottom: 8px;
+  border-bottom: 1px solid var(--seam); padding-bottom: 6px;
+}
+.ch-head::before { content: '◆ '; color: var(--bronze2); }
+.ch-head::after { content: ' ◆'; color: var(--bronze2); }
+.ch-row { margin: 3px 0; }
+.ch-big { font-family: var(--font-head); font-size: 22px; color: var(--gold); margin-left: 6px; }
+.ch-xp { display: inline-block; vertical-align: middle; width: 90px; height: 7px; margin-left: 10px; background: #0f0d0a; border: 1px solid var(--seam); }
+.ch-xp span { display: block; height: 100%; background: linear-gradient(90deg, #8a5e1c, #e6c06a); }
+.ch-hot { color: var(--gold); font-weight: bold; }
+.ch-attrs { margin: 8px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
+.ch-attr { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.ch-attr-n { min-width: 74px; font-family: var(--font-head); font-weight: bold; letter-spacing: 1px; }
+.ch-attr-bar { flex: 1; height: 6px; background: #0f0d0a; border: 1px solid #3a3128; }
+.ch-attr-bar span { display: block; height: 100%; opacity: 0.85; }
+.ch-attr-v { min-width: 22px; text-align: right; color: var(--parchment); font-weight: bold; }
+.ch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin: 6px 0; padding: 6px 0; border-top: 1px solid var(--seam); border-bottom: 1px solid var(--seam); }
+.ch-quest { color: var(--parchment); }
+
+/* ---------------- screen headers ---------------- */
+
+.screen-head {
+  position: absolute; top: 0; left: 0; right: 0; height: 58px;
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 16px;
+  background: linear-gradient(#2e2820, #1a1612 70%, #14110d);
+  border-bottom: 3px double var(--bronze);
+  box-shadow: 0 2px 0 #000, 0 4px 14px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,224,170,0.12);
+  z-index: 12;
+}
+.select-title, .reward-title {
+  font-family: var(--font-head); font-weight: bold;
+  font-size: clamp(30px, 5.5vw, 52px);
+  letter-spacing: 10px;
+  color: var(--gold);
+  text-shadow: 2px 2px 0 #4a2e0c, 4px 4px 0 #000;
+}
+.screen-head .select-title {
+  font-size: clamp(18px, 2.4vw, 26px); letter-spacing: 6px; margin: 0;
+  flex: 1; text-align: center; text-shadow: 1px 1px 0 #4a2e0c, 2px 2px 0 #000;
+}
+.screen-head .select-title::before { content: '◆  '; color: var(--bronze2); font-size: 0.6em; vertical-align: middle; }
+.screen-head .select-title::after { content: '  ◆'; color: var(--bronze2); font-size: 0.6em; vertical-align: middle; }
+.screen-head .back-btn { position: static; }
+.back-btn { position: absolute; top: 20px; left: 20px; }
+.esc-hint { font-size: 11px; color: var(--dim); letter-spacing: 1px; min-width: 70px; text-align: right; }
+.screen-sub { font-size: 12px; color: var(--parch2); letter-spacing: 0.5px; text-align: center; z-index: 1; }
+.screen-sub.wide { max-width: 760px; line-height: 1.5; }
+body.menu-open #hud, body.menu-open #crosshair, body.menu-open #minimap, body.menu-open #hotbar { visibility: hidden !important; }
+body.looking { cursor: none; }
+body.looking #crosshair { opacity: 0.4; }
 
 /* ---------------- player select ---------------- */
 
-#select-screen { justify-content: flex-start; padding-top: 4vh; pointer-events: none; }
+#select-screen { justify-content: flex-start; padding-top: 70px; pointer-events: none; background: none; }
+#select-screen::before { display: none; }
 #select-screen > * { pointer-events: auto; }
-
-.select-title, .reward-title {
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: clamp(30px, 5.5vw, 52px);
-  letter-spacing: 10px;
-  color: #f0d888;
-  text-shadow: 2px 2px 0 #6a4a10, 4px 4px 0 #000;
-}
+#select-mode { margin-top: 2px; }
 
 #select-panel {
-  position: absolute; left: 4%; top: 18%;
-  width: min(340px, 40%);
-  background: rgba(2, 4, 12, 0.88);
-  border: 2px solid #d8d8d8;
-  box-shadow: 0 0 0 2px #000;
+  position: absolute; left: 4%; top: 11%;
+  width: min(340px, 40%); max-height: 50vh; overflow-y: auto;
+  background: var(--plate-bg);
+  border: 1px solid var(--seam);
+  box-shadow: var(--plate-shadow);
   padding: 12px 14px;
   font-size: 13px;
   line-height: 1.45;
 }
-#select-name { font-weight: bold; font-size: 18px; letter-spacing: 2px; margin-bottom: 6px; color: #fff; }
-#select-desc { color: #c8c8c8; margin-bottom: 10px; }
-#select-stats { color: #b8c8b8; white-space: pre-line; }
-#select-stats b { color: #f0e0a0; }
+#select-name { font-family: var(--font-head); font-weight: bold; font-size: 18px; letter-spacing: 2px; margin-bottom: 4px; color: var(--gold); }
+#select-role { font-size: 11px; color: var(--parch2); margin-bottom: 6px; letter-spacing: 2px; }
+#select-desc { color: var(--parch2); margin-bottom: 10px; }
+#select-stats { color: #c9c0aa; white-space: pre-line; }
+#select-stats b { color: var(--gold); }
 
-#select-icons {
-  position: absolute; bottom: 9vh; left: 4%;
-  display: flex; gap: 8px;
+#select-rack {
+  position: absolute; bottom: 3vh; left: 4%; width: min(60%, 760px);
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
 }
+.rack-label { font-size: 11px; color: var(--parch2); letter-spacing: 1px; }
+#select-icons { display: flex; flex-wrap: wrap; gap: 6px; max-height: 22vh; overflow-y: auto; padding: 2px; }
 .mech-icon {
+  position: relative;
   width: 52px; height: 52px;
-  border: 2px solid #a0a0a0;
-  background: #0a0e20;
-  box-shadow: 0 0 0 1px #000;
+  border: 1px solid var(--seam);
+  background: linear-gradient(#211c16, #120f0b);
+  box-shadow: 0 0 0 1px #000, inset 0 0 8px rgba(0,0,0,0.6);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   font-size: 26px;
   filter: grayscale(60%);
 }
-.mech-icon.sel { border-color: #f0d060; filter: none; background: #1a2450; }
+.mech-icon.sel { border-color: var(--brass); filter: none; background: linear-gradient(#4a3a20, #2a2012); box-shadow: 0 0 0 1px #000, 0 0 10px rgba(226,178,92,0.4); }
+.mech-icon.locked { filter: grayscale(100%) brightness(0.5); }
+.mech-icon.locked::after { content: '🔒'; position: absolute; font-size: 13px; margin-top: 26px; }
+.mech-icon.build-more { border-style: dashed; color: var(--gold); font-size: 30px; filter: none; }
+.mech-icon.build-more:hover { background: #2a2410; }
 
 #btn-launch { position: absolute; bottom: 8vh; right: 6%; }
 
-/* ---------------- wave reward ---------------- */
+/* ---------------- cards ---------------- */
 
-#reward-screen {
-  background:
-    linear-gradient(rgba(20,30,120,0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20,30,120,0.25) 1px, transparent 1px),
-    radial-gradient(ellipse at center, rgba(6,10,40,0.92), rgba(0,0,4,0.96));
-  background-size: 34px 34px, 34px 34px, cover;
-}
-#reward-sub { color: #90a0d0; letter-spacing: 3px; font-size: 13px; }
+#reward-screen { background: radial-gradient(ellipse at center, rgba(34, 27, 19, 0.93), rgba(6, 5, 4, 0.97)); }
+#reward-sub { color: var(--parch2); letter-spacing: 3px; font-size: 12px; }
 
 #reward-cards { display: flex; gap: 22px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+.reward-card, .stage-card, .devotion-card, .hub-card, #weekly-brief, #broker-contract, .trial-stage, .art-card, .jn-block {
+  background: var(--plate-bg);
+  border: 1px solid var(--seam);
+  box-shadow: var(--plate-shadow);
+  position: relative;
+}
 .reward-card {
   width: 208px; min-height: 270px;
-  background: linear-gradient(#101838, #060a1c);
-  border: 2px solid #8090b8;
-  box-shadow: 0 0 0 2px #000, inset 0 0 20px rgba(0,0,0,0.7);
   padding: 14px 12px;
   cursor: pointer;
   display: flex; flex-direction: column; align-items: center;
   transition: transform 0.08s;
 }
-.reward-card:hover { transform: translateY(-6px) scale(1.03); border-color: #f0d060; }
-.reward-card.rare { border-color: #58c8f0; }
-.reward-card.epic { border-color: #c060f0; }
-.rc-kind { font-size: 11px; letter-spacing: 3px; color: #8898c8; }
+.reward-card:hover { transform: translateY(-6px) scale(1.03); border-color: var(--brass); box-shadow: var(--plate-shadow), 0 0 18px rgba(226,178,92,0.3); }
+.reward-card.rare { border-color: var(--ice); }
+.reward-card.epic { border-color: var(--arcane); }
+.reward-card.gem { border-color: #e8c8ff; }
+.rc-kind { font-size: 10px; letter-spacing: 3px; color: var(--bronze); font-family: var(--font-head); }
 .rc-glyph { font-size: 44px; margin: 12px 0; }
 .rc-name {
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: 19px; color: #f0e0b0; text-align: center;
+  font-family: var(--font-head); font-weight: bold;
+  font-size: 19px; color: var(--parchment); text-align: center;
   margin-bottom: 8px;
 }
-.rc-desc { font-size: 12px; color: #b8c0d8; text-align: center; line-height: 1.5; }
-.rc-key { margin-top: auto; padding-top: 10px; font-size: 11px; color: #6a78a8; }
+.rc-desc { font-size: 12px; color: var(--parch2); text-align: center; line-height: 1.5; }
+.rc-key { margin-top: auto; padding-top: 10px; font-size: 11px; color: var(--dim); }
+.rc-sockets { display: flex; gap: 6px; margin: 10px 0; }
+.socket-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--seam); background: #0f0d0a; }
+.rc-res { font-size: 11px; color: var(--gold); letter-spacing: 1px; margin-top: 4px; text-align: center; }
 
 /* ---------------- pause / end ---------------- */
 
-#pause-screen, #end-screen { background: rgba(2, 3, 10, 0.86); }
+#pause-screen, #end-screen { background: rgba(8, 6, 4, 0.9); }
 #pause-stats, #end-stats {
-  font-size: 14px; line-height: 1.7; color: #c0c8e0;
+  font-size: 14px; line-height: 1.7; color: var(--parch2);
   text-align: center; white-space: pre-line;
 }
-#end-stats b { color: #f0d888; }
+#end-stats b { color: var(--gold); }
+#pause-screen .menu-desc { max-width: 520px; text-align: center; }
 
 /* ---------------- hud extras ---------------- */
 
 #reload-line {
   margin-top: 2px;
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px;
+  font-family: var(--font-head); font-weight: bold; font-size: 13px;
   color: #ffcf80; text-shadow: 1px 1px 0 #000;
   min-height: 15px;
 }
 #buff-line {
   margin-top: 2px;
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 14px;
+  font-family: var(--font-head); font-weight: bold; font-size: 14px;
   color: #e8d8a0; text-shadow: 1px 1px 0 #000;
 }
-
-#select-role { font-size: 12px; color: #90a8d0; margin-bottom: 6px; letter-spacing: 2px; }
-
-.mech-icon.locked { filter: grayscale(100%) brightness(0.5); }
-.mech-icon.locked::after { content: '🔒'; position: absolute; font-size: 13px; margin-top: 26px; }
-.mech-icon { position: relative; }
-
-.back-btn { position: absolute; top: 20px; left: 20px; }
-.menu-btn.tiny { font-size: 13px; padding: 4px 14px; }
-
-#title-salvage {
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px;
-  color: #ffd9a0; text-shadow: 1px 1px 0 #000; z-index: 1;
+#contract-line {
+  margin-top: 2px;
+  font-family: var(--font-head); font-weight: bold; font-size: 13px;
+  color: #90f0a0; text-shadow: 1px 1px 0 #000;
 }
 
 /* ---------------- stage select ---------------- */
 
-#stage-screen, #hangar-screen {
-  background:
-    linear-gradient(rgba(20,30,120,0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20,30,120,0.25) 1px, transparent 1px),
-    radial-gradient(ellipse at center, rgba(6,10,40,0.94), rgba(0,0,4,0.97));
-  background-size: 34px 34px, 34px 34px, cover;
-}
-
 #stage-list { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; max-width: 1100px; }
 .stage-card {
   width: 180px; min-height: 190px;
-  background: linear-gradient(#101838, #060a1c);
-  border: 2px solid #8090b8;
-  box-shadow: 0 0 0 2px #000, inset 0 0 20px rgba(0,0,0,0.7);
   padding: 12px 10px;
   cursor: pointer;
   display: flex; flex-direction: column; align-items: center;
   text-align: center;
 }
-.stage-card:hover { border-color: #f0d060; transform: translateY(-4px); }
+.stage-card:hover { border-color: var(--brass); transform: translateY(-4px); }
 .stage-card.locked { filter: grayscale(80%) brightness(0.55); cursor: default; }
-.stage-card.locked:hover { border-color: #8090b8; transform: none; }
-.sc-band { width: 100%; height: 44px; margin-bottom: 8px; border: 1px solid #000; }
-.sc-sub { font-size: 10px; letter-spacing: 3px; color: #8898c8; }
-.sc-name {
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: 17px; color: #f0e0b0; margin: 4px 0 8px;
-}
-.sc-info { font-size: 11px; color: #b8c0d8; line-height: 1.5; }
-.sc-best { margin-top: auto; padding-top: 8px; font-size: 11px; color: #6a78a8; }
+.stage-card.locked:hover { border-color: var(--seam); transform: none; }
+.sc-band { width: 100%; height: 44px; margin-bottom: 8px; border: 1px solid #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+.sc-sub { font-size: 10px; letter-spacing: 3px; color: var(--bronze); font-family: var(--font-head); }
+.sc-name { font-family: var(--font-head); font-weight: bold; font-size: 17px; color: var(--parchment); margin: 4px 0 8px; }
+.sc-info { font-size: 11px; color: var(--parch2); line-height: 1.5; }
+.sc-best { margin-top: auto; padding-top: 8px; font-size: 11px; color: var(--dim); }
+.sc-trial { color: #90f0a0; font-size: 10px; letter-spacing: 1px; }
 
-/* ---------------- hangar ---------------- */
+/* ---------------- attributes & arts ---------------- */
 
-#hangar-salvage {
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 20px;
-  color: #ffd9a0; text-shadow: 1px 1px 0 #000;
+#hangar-screen { justify-content: flex-start; gap: 10px; }
+#attr-head { font-family: var(--font-head); font-size: 14px; color: var(--parch2); letter-spacing: 1px; text-align: center; }
+#attr-body { display: flex; gap: 18px; width: min(96vw, 1180px); flex: 1; min-height: 0; }
+#attr-col { flex: 0 0 440px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: calc(100vh - 190px); padding-right: 4px; }
+#arts-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: calc(100vh - 190px); padding: 0 4px; }
+#attr-list { display: flex; flex-direction: column; gap: 6px; }
+.attr-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--plate-bg); border: 1px solid var(--seam); box-shadow: var(--plate-shadow);
+  padding: 8px 10px;
 }
-#hangar-note { font-size: 12px; color: #90a0d0; max-width: 560px; text-align: center; }
-#devotion-list { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
-.devotion-card {
-  width: 168px;
-  background: linear-gradient(#101838, #060a1c);
-  border: 2px solid #8090b8;
-  box-shadow: 0 0 0 2px #000;
-  padding: 12px 10px;
-  display: flex; flex-direction: column; align-items: center;
-  text-align: center;
+.attr-glyph { font-size: 26px; width: 34px; text-align: center; text-shadow: 0 0 10px currentColor; }
+.attr-main { flex: 1; min-width: 0; }
+.attr-name { font-family: var(--font-head); font-weight: bold; font-size: 14px; letter-spacing: 2px; display: flex; justify-content: space-between; }
+.attr-total { color: var(--parchment); font-size: 17px; }
+.attr-bar { height: 6px; background: #0f0d0a; border: 1px solid #3a3128; margin: 3px 0; }
+.attr-fill { display: block; height: 100%; opacity: 0.85; }
+.attr-desc { font-size: 11px; color: var(--parch2); line-height: 1.35; }
+.attr-sub { font-size: 10px; color: var(--dim); letter-spacing: 1px; }
+.attr-plus {
+  width: 38px; height: 38px; font-size: 24px; font-family: var(--font-head); font-weight: bold;
+  color: var(--gold); cursor: pointer;
+  background: linear-gradient(#4a3a26, #2a2016); border: 1px solid var(--bronze);
+  box-shadow: 0 0 0 1px #0a0806, inset 0 1px 0 rgba(255,224,170,0.25);
 }
-.devotion-card.active { border-color: #f0d060; }
+.attr-plus:hover { background: linear-gradient(#66502f, #3a2c1a); box-shadow: 0 0 0 1px #0a0806, 0 0 12px rgba(226,178,92,0.4); }
+.attr-plus:disabled { opacity: 0.3; cursor: default; }
+#attr-derived { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--parch2); padding: 8px 10px; background: rgba(10, 8, 6, 0.6); border: 1px solid var(--seam); }
+#attr-derived .bk-label { width: 100%; }
+#btn-attr-reset { align-self: flex-start; }
+.art-card { padding: 10px 12px; display: grid; grid-template-columns: 44px 1fr; gap: 2px 10px; align-items: start; }
+.art-card.maxed { border-color: var(--verdigris); }
+.art-card.locked { opacity: 0.6; }
+.art-glyph { grid-row: 1 / span 4; font-size: 30px; text-align: center; color: var(--arcane); text-shadow: 0 0 10px rgba(169,140,217,0.6); line-height: 1.2; }
+.art-name { font-family: var(--font-head); font-weight: bold; font-size: 15px; letter-spacing: 2px; color: var(--parchment); }
+.art-name i { font-size: 10px; color: var(--dim); font-style: normal; letter-spacing: 1px; margin-left: 6px; }
+.art-desc { font-size: 11px; color: var(--parch2); line-height: 1.4; }
+.art-stats { font-size: 11px; color: var(--parch2); }
+.art-card .sk-pips { margin: 2px 0 4px; }
+.art-read { grid-column: 2; align-self: start; justify-self: start; white-space: nowrap; margin: 2px 0 0; }
+
+/* ---------------- shared small controls (broker shop, backups, board) ---------------- */
+
+.devotion-card { width: 168px; padding: 12px 10px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.devotion-card.active { border-color: var(--brass); }
 .dv-glyph { font-size: 30px; margin-bottom: 4px; }
-.dv-name { font-family: "Times New Roman", serif; font-weight: bold; font-size: 16px; }
-.dv-desc { font-size: 10.5px; color: #b8c0d8; min-height: 42px; margin: 4px 0; line-height: 1.45; }
+.dv-name { font-family: var(--font-head); font-weight: bold; font-size: 15px; color: var(--parchment); }
+.dv-desc { font-size: 10.5px; color: var(--parch2); min-height: 42px; margin: 4px 0; line-height: 1.45; }
 .dv-pips { display: flex; gap: 4px; margin-bottom: 8px; }
-.dv-pip { width: 14px; height: 14px; border: 1px solid #8090b8; background: #0a0e20; }
-.dv-pip.on { background: #f0d060; border-color: #fff; }
+.dv-pip { width: 14px; height: 14px; border: 1px solid var(--seam); background: #0f0d0a; }
+.dv-pip.on { background: var(--gold); border-color: #fff; }
 .dv-buy {
-  font-family: "Courier New", monospace; font-size: 12px;
-  background: #1a2450; color: #e0e0f0; border: 1px solid #8090b8;
+  font-family: var(--font-head); font-weight: bold; font-size: 11px; letter-spacing: 1px;
+  background: linear-gradient(#3a2e1c, #221a10); color: var(--parchment); border: 1px solid var(--bronze2);
   padding: 4px 10px; cursor: pointer; margin-bottom: 6px;
+  box-shadow: inset 0 1px 0 rgba(255,224,170,0.2), 0 0 0 1px #0a0806;
 }
-.dv-buy:hover { background: #2a3878; }
+.dv-buy:hover { border-color: var(--brass); color: #fff; }
 .dv-buy:disabled { opacity: 0.4; cursor: default; }
-.dv-activate {
-  font-size: 11px; background: none; color: #90a0d0;
-  border: 1px dashed #4a5888; padding: 3px 8px; cursor: pointer;
-}
-.devotion-card.active .dv-activate { color: #f0d060; border-color: #f0d060; }
-
-/* ---------------- gem socketing ---------------- */
-
-.rc-sockets { display: flex; gap: 6px; margin: 10px 0; }
-.socket-dot {
-  width: 16px; height: 16px; border-radius: 50%;
-  border: 2px solid #5a6890; background: #0a0e20;
-}
-.rc-res {
-  font-size: 11px; color: #f0d060; letter-spacing: 1px;
-  margin-top: 4px; text-align: center;
-}
-.reward-card.gem { border-color: #e8c8ff; }
+.dv-activate { font-size: 11px; background: none; color: var(--parch2); border: 1px dashed var(--seam); padding: 3px 8px; cursor: pointer; }
 
 /* ---------------- weekly challenge ---------------- */
 
-#weekly-screen {
-  background:
-    linear-gradient(rgba(20,30,120,0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20,30,120,0.25) 1px, transparent 1px),
-    radial-gradient(ellipse at center, rgba(6,10,40,0.94), rgba(0,0,4,0.97));
-  background-size: 34px 34px, 34px 34px, cover;
-}
 #weekly-brief {
-  background: linear-gradient(#101838, #060a1c);
-  border: 2px solid #8090b8;
-  box-shadow: 0 0 0 2px #000, inset 0 0 20px rgba(0,0,0,0.7);
   padding: 18px 26px;
   max-width: 460px;
   text-align: center;
-  font-size: 13px; line-height: 1.6; color: #b8c0d8;
+  font-size: 13px; line-height: 1.6; color: var(--parch2);
 }
-.wk-week {
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: 22px; color: #f0d888; letter-spacing: 3px; margin-bottom: 8px;
-}
-.wk-line b { color: #f0e0b0; }
+.wk-week { font-family: var(--font-head); font-weight: bold; font-size: 22px; color: var(--gold); letter-spacing: 3px; margin-bottom: 8px; }
+.wk-line b { color: var(--parchment); }
 .wk-mods { margin-top: 10px; color: #e8d8a0; text-align: left; display: inline-block; }
 .wk-best { margin-top: 10px; color: #90f0a0; }
 
 /* ---------------- co-op ---------------- */
 
-/* top-right, clear of the frame icons and the preview mech */
-.coop-btn { position: absolute; top: 20px; right: 20px; max-width: 38vw; }
+.coop-btn { position: absolute; top: 68px !important; right: 20px; max-width: 38vw; }
 #p2-row { margin-top: 4px; display: flex; align-items: center; gap: 6px; }
 .p2-frame { height: 12px; width: 45%; border-color: #4a7898; }
 .p2-fill { background: linear-gradient(#60c8ff, #1a6a9a); }
-#p2-text {
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 12px;
-  color: #a0d8ff; text-shadow: 1px 1px 0 #000;
-}
-
-/* ---------------- P2 frame picker ---------------- */
-
+#p2-text { font-family: var(--font-head); font-weight: bold; font-size: 12px; color: #a0d8ff; text-shadow: 1px 1px 0 #000; }
 #p2-select-row {
-  /* right side, above SELECT STAGE — clear of the info panel and P1 icons */
   position: absolute; bottom: calc(8vh + 70px); right: 6%;
   display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
   justify-content: flex-end; max-width: 44vw;
 }
-.p2-row-label {
-  font-size: 11px; letter-spacing: 2px; color: #a0d8ff;
-  margin-right: 4px;
-}
+.p2-row-label { font-size: 11px; letter-spacing: 2px; color: #a0d8ff; margin-right: 4px; }
 .mech-icon.p2-icon { width: 40px; height: 40px; font-size: 20px; }
 .mech-icon.p2-icon.sel { border-color: #60c8ff; background: #10304a; }
 
 /* ---------------- arena loadout ---------------- */
 
-#preset-screen {
-  background:
-    linear-gradient(rgba(20,30,120,0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20,30,120,0.25) 1px, transparent 1px),
-    radial-gradient(ellipse at center, rgba(6,10,40,0.94), rgba(0,0,4,0.97));
-  background-size: 34px 34px, 34px 34px, cover;
-}
 #preset-list { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; max-width: 1150px; }
 #preset-list .reward-card { width: 190px; min-height: 220px; }
 
@@ -487,7 +657,7 @@ html, body {
 .touch-zone {
   position: absolute; bottom: 4vh;
   width: 34vw; height: 34vw; max-width: 220px; max-height: 220px;
-  border: 2px solid rgba(160, 180, 255, 0.25);
+  border: 2px solid rgba(226, 178, 92, 0.25);
   border-radius: 50%;
   touch-action: none;
   z-index: 30;
@@ -498,8 +668,8 @@ html, body {
   position: absolute; left: 50%; top: 50%;
   width: 34%; height: 34%;
   margin: -17% 0 0 -17%;
-  background: rgba(160, 180, 255, 0.3);
-  border: 2px solid rgba(200, 220, 255, 0.5);
+  background: rgba(226, 178, 92, 0.25);
+  border: 2px solid rgba(242, 207, 122, 0.5);
   border-radius: 50%;
   pointer-events: none;
 }
@@ -507,201 +677,126 @@ html, body {
   position: absolute;
   width: 62px; height: 62px; line-height: 60px;
   border-radius: 50%;
-  border: 2px solid #c8b060;
-  background: rgba(20, 28, 72, 0.6);
-  color: #f0e0b0; text-align: center;
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px;
+  border: 2px solid var(--bronze);
+  background: rgba(40, 30, 18, 0.65);
+  color: var(--parchment); text-align: center;
+  font-family: var(--font-head); font-weight: bold; font-size: 13px;
   touch-action: none;
   z-index: 31;
 }
 #touch-boost { right: calc(4vw + 230px); bottom: 6vh; }
 #touch-special { right: calc(4vw + 230px); bottom: calc(6vh + 76px); }
+.touch-ward { bottom: calc(6vh + 152px); right: calc(4vw + 230px); }
+.touch-trans { bottom: calc(6vh + 228px); right: calc(4vw + 230px); }
 @media (max-width: 700px) {
-  #touch-boost { right: auto; left: calc(4vw + 230px); }
-  #touch-special { right: auto; left: calc(4vw + 230px); }
+  #touch-boost, #touch-special, .touch-ward, .touch-trans { right: auto; left: calc(4vw + 230px); }
 }
 
-/* ---------------- progression screens ---------------- */
+/* ---------------- broker, collection, trials ---------------- */
 
-.title-row { display: flex; gap: 8px; z-index: 1; flex-wrap: wrap; justify-content: center; }
-.profile-btn { border-color: #7a9ac8; color: #c8e0ff; }
-#title-memorial {
-  font-size: 11px; color: #b06868; z-index: 1;
-  font-family: "Courier New", monospace;
-}
+#broker-status, #log-head { font-family: var(--font-head); font-size: 15px; color: var(--parch2); }
+#broker-status b, #log-head b { color: var(--gold); }
 
-#broker-screen, #collection-screen, #trials-screen {
-  background:
-    linear-gradient(rgba(20,30,120,0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20,30,120,0.25) 1px, transparent 1px),
-    radial-gradient(ellipse at center, rgba(6,10,40,0.94), rgba(0,0,4,0.97));
-  background-size: 34px 34px, 34px 34px, cover;
-}
-
-#broker-status, #log-head {
-  font-family: "Times New Roman", serif; font-size: 15px;
-  color: #c0c8e0;
-}
-#broker-status b, #log-head b { color: #f0d888; }
-
-#broker-contract {
-  background: linear-gradient(#101838, #060a1c);
-  border: 2px solid #c8b060;
-  box-shadow: 0 0 0 2px #000, inset 0 0 20px rgba(0,0,0,0.7);
-  padding: 14px 24px;
-  text-align: center;
-  min-width: 340px;
-}
-.bk-label { font-size: 11px; letter-spacing: 3px; color: #8898c8; margin-bottom: 6px; }
-.bk-task {
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: 20px; color: #f0e0b0; margin-bottom: 4px;
-}
+#broker-contract { padding: 14px 24px; text-align: center; min-width: 340px; border-color: var(--bronze); }
+.bk-label { font-family: var(--font-head); font-size: 11px; letter-spacing: 3px; color: var(--bronze); margin-bottom: 6px; }
+.bk-task { font-family: var(--font-head); font-weight: bold; font-size: 20px; color: var(--parchment); margin-bottom: 4px; }
 .bk-progress { font-size: 13px; color: #90f0a0; margin-bottom: 10px; }
 
 #broker-shop { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 980px; }
 #broker-shop .devotion-card { width: 170px; }
 
-#log-body {
-  max-height: 56vh; overflow-y: auto;
-  max-width: 900px; width: 90%;
-  padding: 0 10px;
-}
+#log-body { max-height: 56vh; overflow-y: auto; max-width: 900px; width: 90%; padding: 0 10px; }
 .log-section {
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: 16px; letter-spacing: 4px; color: #f0d888;
+  font-family: var(--font-head); font-weight: bold;
+  font-size: 15px; letter-spacing: 4px; color: var(--brass);
   margin: 14px 0 6px;
-  border-bottom: 1px solid #3a4468;
+  border-bottom: 1px solid var(--seam);
 }
 .log-grid { display: flex; flex-wrap: wrap; gap: 6px; }
 .log-cell {
   width: 104px; padding: 6px 4px;
-  background: #0a0e20;
-  border: 1px solid #2a3454;
+  background: #0f0d0a;
+  border: 1px solid #2c2620;
   text-align: center;
   filter: grayscale(80%) brightness(0.6);
 }
-.log-cell.seen { filter: none; border-color: #6a78a8; background: #101838; }
+.log-cell.seen { filter: none; border-color: var(--seam); background: linear-gradient(#26211a, #17140f); }
 .lc-glyph { font-size: 18px; }
-.lc-name { font-size: 10.5px; color: #c8d0e8; }
-.lc-count { font-size: 11px; color: #90f0a0; font-family: "Times New Roman", serif; font-weight: bold; }
+.lc-name { font-size: 10.5px; color: var(--parch2); }
+.lc-count { font-size: 11px; color: #90f0a0; font-family: var(--font-head); font-weight: bold; }
+.art-cell { cursor: pointer; }
+.art-cell:hover { border-color: var(--brass); }
+.log-cell.art-on { border-color: var(--brass); box-shadow: 0 0 8px rgba(226, 178, 92, 0.35); }
+.log-cell.art-on .lc-count { color: var(--gold); }
+.log-cell.hunt .lc-name { color: #ffb060; }
 
-#trials-body {
-  max-height: 62vh; overflow-y: auto;
-  max-width: 980px; width: 92%;
-}
-.trial-stage {
-  background: linear-gradient(#101838, #060a1c);
-  border: 1px solid #3a4468;
-  padding: 8px 14px;
-  margin-bottom: 8px;
-}
+#trials-body { max-height: 62vh; overflow-y: auto; max-width: 980px; width: 92%; }
+.trial-stage { padding: 8px 14px; margin-bottom: 8px; }
 .trial-stage.locked { filter: grayscale(80%) brightness(0.55); }
-.ts-name {
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: 16px; color: #f0e0b0;
-}
+.ts-name { font-family: var(--font-head); font-weight: bold; font-size: 16px; color: var(--parchment); }
 .ts-tier { color: #90f0a0; font-size: 12px; letter-spacing: 2px; margin-left: 8px; }
-.ts-row { font-size: 11.5px; color: #a8b0c8; margin: 3px 0; display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; }
-.ts-tiername { color: #8898c8; letter-spacing: 2px; font-size: 10px; min-width: 52px; }
+.ts-row { font-size: 11.5px; color: var(--parch2); margin: 3px 0; display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; }
+.ts-tiername { color: var(--bronze); letter-spacing: 2px; font-size: 10px; min-width: 52px; font-family: var(--font-head); }
 .ts-task.done { color: #90f0a0; }
-.ts-perk { margin-left: auto; font-size: 10.5px; color: #5a6890; font-style: italic; }
-.ts-perk.on { color: #f0d888; }
-
-.sc-trial { color: #90f0a0; font-size: 10px; letter-spacing: 1px; }
+.ts-perk { margin-left: auto; font-size: 10.5px; color: var(--dim); font-style: italic; }
+.ts-perk.on { color: var(--gold); }
 
 /* ---------------- ward stances ---------------- */
 
 #ward-row { margin-top: 3px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .ward-chip {
-  font-family: "Courier New", monospace; font-size: 10px; letter-spacing: 1px;
-  color: #7a86a8;
-  border: 1px solid #3a4468;
-  background: rgba(8, 12, 28, 0.7);
+  font-size: 10px; letter-spacing: 1px;
+  color: var(--dim);
+  border: 1px solid var(--seam);
+  background: rgba(16, 12, 8, 0.7);
   padding: 1px 5px;
 }
-.ward-chip.on { background: rgba(20, 30, 60, 0.9); font-weight: bold; }
-.ward-energy {
-  display: inline-block; width: 52px; height: 7px;
-  background: #0a0e20; border: 1px solid #4a5888;
-  vertical-align: middle;
-}
+.ward-chip.on { background: rgba(50, 38, 20, 0.9); font-weight: bold; color: var(--parchment); }
+.ward-energy { display: inline-block; width: 52px; height: 7px; background: #0f0d0a; border: 1px solid var(--seam); vertical-align: middle; }
 .ward-energy-fill { display: block; height: 100%; background: linear-gradient(#a0c8ff, #4060a0); }
-.ward-counter {
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 12px;
-  color: #ffd050; text-shadow: 1px 1px 0 #000;
-}
-
-.touch-ward { bottom: calc(6vh + 152px); right: calc(4vw + 230px); }
-.touch-trans { bottom: calc(6vh + 228px); right: calc(4vw + 230px); }
-@media (max-width: 700px) {
-  .touch-ward { right: auto; left: calc(4vw + 230px); }
-  .touch-trans { right: auto; left: calc(4vw + 230px); }
-}
-
-#contract-line {
-  margin-top: 2px;
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px;
-  color: #90f0a0; text-shadow: 1px 1px 0 #000;
-}
+.ward-counter { font-family: var(--font-head); font-weight: bold; font-size: 12px; color: #ffd050; text-shadow: 1px 1px 0 #000; }
 
 /* ---------------- relic season ---------------- */
 
-#season-screen {
-  background:
-    linear-gradient(rgba(20,30,120,0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20,30,120,0.25) 1px, transparent 1px),
-    radial-gradient(ellipse at center, rgba(6,10,40,0.94), rgba(0,0,4,0.97));
-  background-size: 34px 34px, 34px 34px, cover;
-  gap: 10px;
-}
+#season-screen { gap: 10px; }
 .season-btn { border-color: #d8a840; color: #ffe8b0; }
-#season-head { font-family: "Times New Roman", serif; font-size: 16px; color: #c0c8e0; }
-#season-head b { color: #f0d888; }
-.sn-name { color: #ffd888; letter-spacing: 2px; font-weight: bold; }
-#season-meter { font-size: 12px; color: #8898c8; }
+#season-head { font-family: var(--font-head); font-size: 16px; color: var(--parch2); }
+#season-head b { color: var(--gold); }
+.sn-name { color: var(--gold); letter-spacing: 2px; font-weight: bold; }
+#season-meter { font-size: 12px; color: var(--dim); }
 .sn-hit { color: #90f0a0; font-weight: bold; }
-.sn-miss { color: #5a6890; }
-.sn-active { font-size: 12px; color: #b8c0d8; margin-bottom: 6px; text-align: center; }
-.sn-active b { color: #ffd888; margin: 0 4px; }
+.sn-miss { color: var(--dim); }
+.sn-active { font-size: 12px; color: var(--parch2); margin-bottom: 6px; text-align: center; }
+.sn-active b { color: var(--gold); margin: 0 4px; }
 .sn-offer { text-align: center; }
 .relic-card { width: 180px; min-height: 150px; border-color: #d8a840; }
 #season-tasks {
   display: grid; grid-template-columns: repeat(2, minmax(280px, 380px));
   gap: 3px 24px;
   max-height: 34vh; overflow-y: auto;
-  font-size: 12px; color: #a8b0c8;
+  font-size: 12px; color: var(--parch2);
 }
 .sn-task.done { color: #90f0a0; }
-.sn-pts { color: #f0d888; margin-left: 8px; }
-#season-counters { font-size: 11px; color: #5a6890; }
+.sn-pts { color: var(--gold); margin-left: 8px; }
+#season-counters { font-size: 11px; color: var(--dim); }
 
 /* ---------------- mastery & style ---------------- */
 
-#select-mastery {
-  margin: 6px 0 10px;
-  font-size: 12px; color: #b8c8b8;
-}
-#select-mastery b { color: #f0d888; }
-.ms-bar {
-  display: inline-block; width: 90px; height: 8px;
-  background: #0a0e20; border: 1px solid #4a5888;
-  margin: 0 8px; vertical-align: middle;
-}
+#select-mastery { margin: 6px 0 10px; font-size: 12px; color: #c9c0aa; }
+#select-mastery b { color: var(--gold); }
+.ms-bar { display: inline-block; width: 90px; height: 8px; background: #0f0d0a; border: 1px solid var(--seam); margin: 0 8px; vertical-align: middle; }
 .ms-fill { display: block; height: 100%; background: linear-gradient(#f0d060, #a87010); }
-.ms-on { color: #f0d888; margin-right: 5px; font-size: 10px; }
-.ms-off { color: #4a5888; margin-right: 5px; font-size: 10px; }
+.ms-on { color: var(--gold); margin-right: 5px; font-size: 10px; }
+.ms-off { color: var(--seam); margin-right: 5px; font-size: 10px; }
 
-#style-row {
-  position: absolute; bottom: 22vh; left: 4%;
-  display: flex; gap: 8px;
-}
+#style-row { position: absolute; bottom: 22vh; left: 4%; display: flex; gap: 8px; }
 .style-btn {
-  font-family: "Courier New", monospace; font-size: 11px;
-  background: #10182e; color: #c8d8f0; border: 1px solid #4a5888;
+  font-size: 11px; letter-spacing: 1px;
+  background: linear-gradient(#26211a, #15120e); color: var(--parch2); border: 1px solid var(--seam);
   padding: 4px 10px; cursor: pointer;
 }
-.style-btn:hover { border-color: #f0d060; color: #fff; }
+.style-btn:hover { border-color: var(--brass); color: #fff; }
+.vec-btn { border-color: #6aa8c8; }
 
 /* ---------------- onboarding hints ---------------- */
 
@@ -710,11 +805,11 @@ html, body {
   transform: translateX(-50%);
   max-width: 80%;
   padding: 6px 18px;
-  background: rgba(6, 10, 28, 0.85);
-  border: 1px solid #c8b060;
+  background: rgba(20, 15, 9, 0.9);
+  border: 1px solid var(--bronze);
   box-shadow: 0 0 0 1px #000;
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 16px;
-  color: #f0e0b0; text-align: center;
+  font-family: var(--font-head); font-weight: bold; font-size: 16px;
+  color: var(--parchment); text-align: center;
   text-shadow: 1px 1px 0 #000;
   animation: announce-pop 0.3s ease-out;
 }
@@ -733,13 +828,10 @@ html, body {
 /* ---------------- target combat + abilities ---------------- */
 
 .energy-frame { width: 190px; height: 8px; margin-top: 3px; }
-.energy-fill { background: linear-gradient(#7ac8ff, #2a5aa0); }
+.energy-fill { background: linear-gradient(#b9a0ea, #5a3c9a); }
 
 #target-panel { margin-top: 6px; }
-#target-name {
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px;
-  color: #ffd050; text-shadow: 1px 1px 0 #000; letter-spacing: 1px;
-}
+#target-name { font-family: var(--font-head); font-weight: bold; font-size: 15px; color: #ffd050; text-shadow: 1px 1px 0 #000; letter-spacing: 1px; }
 .target-frame { width: 210px; height: 10px; margin: 2px auto 0; }
 .target-fill { background: linear-gradient(#ff7050, #a02818); }
 
@@ -751,104 +843,69 @@ html, body {
 .hb-slot {
   position: relative;
   width: 52px; height: 52px;
-  background: rgba(8, 12, 24, 0.85);
-  border: 2px solid #4a5a6a;
-  box-shadow: 0 0 0 1px #000;
+  background: linear-gradient(rgba(38, 30, 20, 0.9), rgba(14, 11, 8, 0.9));
+  border: 1px solid var(--seam);
+  box-shadow: 0 0 0 1px #000, inset 0 0 8px rgba(0,0,0,0.6);
   text-align: center;
 }
-.hb-slot.ready { border-color: #ffd050; }
+.hb-slot.ready { border-color: var(--brass); box-shadow: 0 0 0 1px #000, 0 0 8px rgba(226,178,92,0.35); }
 .hb-slot.locked { opacity: 0.35; }
-.hb-glyph {
-  font-size: 24px; line-height: 46px; color: #e8e8f0;
-  text-shadow: 1px 1px 0 #000;
-}
-.hb-key {
-  position: absolute; top: 1px; left: 4px;
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 11px;
-  color: #c8b060;
-}
+.hb-slot.sig { border-color: var(--arcane); }
+.hb-slot.sig.ready { border-color: #e0b0ff; box-shadow: 0 0 8px rgba(200, 144, 255, 0.5); }
+.hb-glyph { font-size: 24px; line-height: 46px; color: #efe6d2; text-shadow: 1px 1px 0 #000; }
+.hb-key { position: absolute; top: 1px; left: 4px; font-family: var(--font-head); font-weight: bold; font-size: 11px; color: var(--brass); }
 .hb-cd {
   position: absolute; inset: 0;
   background: rgba(0, 0, 0, 0.55);
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 22px;
+  font-family: var(--font-head); font-weight: bold; font-size: 22px;
   color: #fff; line-height: 48px;
 }
 
 /* ---------------- world map ---------------- */
 
-#map-head {
-  font-family: "Times New Roman", serif; font-size: 14px;
-  color: #c8c8d8; text-shadow: 1px 1px 0 #000;
-  margin-bottom: 10px; letter-spacing: 1px;
-}
+#map-head { font-family: var(--font-head); font-size: 14px; color: var(--parch2); text-shadow: 1px 1px 0 #000; margin-bottom: 10px; letter-spacing: 1px; }
 #map-zones {
   display: grid; grid-template-columns: repeat(3, 300px);
   gap: 10px; justify-content: center;
   max-height: 62vh; overflow-y: auto; padding: 4px;
 }
-.mp-zone {
-  background: rgba(10, 14, 30, 0.9);
-  border: 1px solid #3a4456;
-  padding: 8px 10px; text-align: left;
-}
-.mp-name {
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px;
-  color: #f0f0f6; text-shadow: 1px 1px 0 #000;
-}
+.mp-zone { background: linear-gradient(rgba(38, 32, 24, 0.92), rgba(18, 15, 11, 0.95)); border: 1px solid var(--seam); padding: 8px 10px; text-align: left; }
+.mp-name { font-family: var(--font-head); font-weight: bold; font-size: 15px; color: var(--parchment); text-shadow: 1px 1px 0 #000; }
 .mp-danger { color: #c86060; font-size: 11px; }
 .mp-weather { font-size: 11px; color: #80d8ff; margin-top: 2px; }
 .mp-harrow { font-size: 11px; color: #ff5040; font-weight: bold; }
-.mp-dg {
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
-  border-top: 1px solid #222833;
-  padding: 4px 0; margin-top: 4px;
-  font-size: 11px;
-}
+.mp-dg { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; border-top: 1px solid #2c2620; padding: 4px 0; margin-top: 4px; font-size: 11px; }
 .mp-arch { color: #c050ff; font-weight: bold; min-width: 92px; }
 .mp-dg.cleared .mp-arch { color: #60c890; }
-.mp-tier { color: #a8a8b6; }
+.mp-tier { color: var(--parch2); }
 .mp-mods { color: #ffd050; width: 100%; }
+.mp-diary { font-size: 11px; color: var(--parch2); margin-top: 3px; }
+.mp-diary b { color: #ffd050; }
+.mp-diary-tasks { color: var(--dim); margin-top: 2px; line-height: 1.5; }
+.mp-diary-tasks span { margin-right: 8px; }
+.dt-done { color: #60c890; }
+.mp-hunt { font-size: 11px; color: #ffb060; margin-top: 2px; }
+.mp-hunt b { color: #fff; }
+.mp-hunt.slain { color: #60c890; }
 
 /* ---------------- skill tree ---------------- */
 
-#skills-head {
-  font-family: "Times New Roman", serif; font-size: 15px;
-  color: #c8c8d8; text-shadow: 1px 1px 0 #000;
-  margin-bottom: 12px; letter-spacing: 1px;
-}
+#skills-head { font-family: var(--font-head); font-size: 15px; color: var(--parch2); text-shadow: 1px 1px 0 #000; margin-bottom: 12px; letter-spacing: 1px; }
 .sk-pts { color: #ffd050; font-size: 18px; }
-#skills-tree {
-  display: flex; gap: 16px; justify-content: center;
-  max-width: 980px; max-height: 62vh; overflow-y: auto;
-  padding: 4px;
-}
+#skills-tree { display: flex; gap: 16px; justify-content: center; max-width: 980px; max-height: 62vh; overflow-y: auto; padding: 4px; }
 .sk-branch { width: 300px; }
-.sk-branch-name {
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 18px;
-  letter-spacing: 2px; margin-bottom: 8px; text-shadow: 1px 1px 0 #000;
-}
-.sk-spent { font-size: 12px; color: #8a8a96; letter-spacing: 0; }
-.sk-node {
-  background: rgba(10, 14, 30, 0.9);
-  border: 1px solid #3a4456;
-  padding: 8px 10px; margin-bottom: 8px;
-  cursor: pointer; text-align: left;
-}
-.sk-node.can { border-color: #ffd050; }
-.sk-node.can:hover { background: rgba(40, 34, 16, 0.95); }
+.sk-branch-name { font-family: var(--font-head); font-weight: bold; font-size: 18px; letter-spacing: 2px; margin-bottom: 8px; text-shadow: 1px 1px 0 #000; }
+.sk-spent { font-size: 12px; color: var(--dim); letter-spacing: 0; }
+.sk-node { background: linear-gradient(rgba(38, 32, 24, 0.92), rgba(18, 15, 11, 0.95)); border: 1px solid var(--seam); padding: 8px 10px; margin-bottom: 8px; cursor: pointer; text-align: left; }
+.sk-node.can { border-color: var(--brass); }
+.sk-node.can:hover { background: rgba(60, 46, 22, 0.95); }
 .sk-node.maxed { border-color: #60c890; cursor: default; }
 .sk-node.gated { opacity: 0.45; }
-.sk-name {
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 14px;
-  color: #f0f0f6; text-shadow: 1px 1px 0 #000;
-}
+.sk-name { font-family: var(--font-head); font-weight: bold; font-size: 14px; color: var(--parchment); text-shadow: 1px 1px 0 #000; }
 .sk-req { color: #c86060; font-size: 11px; }
-.sk-desc { font-size: 11px; color: #a8a8b6; margin: 3px 0; line-height: 1.35; }
-.sk-pip {
-  display: inline-block; width: 12px; height: 7px; margin-right: 3px;
-  background: #222833; border: 1px solid #444;
-}
-.sk-pip.on { background: #ffd050; border-color: #a08020; }
+.sk-desc { font-size: 11px; color: var(--parch2); margin: 3px 0; line-height: 1.35; }
+.sk-pip { display: inline-block; width: 12px; height: 7px; margin-right: 3px; background: #1c1712; border: 1px solid #3a3128; }
+.sk-pip.on { background: var(--gold); border-color: #a08020; }
 
 /* ---------------- the Shattered Reach ---------------- */
 
@@ -856,10 +913,10 @@ html, body {
   position: absolute; bottom: 19vh; left: 50%;
   transform: translateX(-50%);
   padding: 5px 16px;
-  background: rgba(6, 20, 12, 0.85);
+  background: rgba(10, 24, 16, 0.88);
   border: 1px solid #60c890;
   box-shadow: 0 0 0 1px #000;
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 16px;
+  font-family: var(--font-head); font-weight: bold; font-size: 16px;
   color: #b0f0c8; text-align: center;
   text-shadow: 1px 1px 0 #000;
   cursor: pointer;
@@ -868,10 +925,10 @@ html, body {
 
 #minimap {
   position: absolute; right: 14px; bottom: 14px;
-  width: 160px; height: 160px; /* square: zone maps are square */
-  border: 2px solid #6a7a8a;
+  width: 160px; height: 160px;
+  border: 2px solid var(--bronze2);
   box-shadow: 0 0 0 1px #000, 0 0 12px rgba(0, 0, 0, 0.6);
-  background: rgba(4, 6, 12, 0.85);
+  background: rgba(8, 6, 4, 0.85);
   image-rendering: pixelated;
 }
 
@@ -879,7 +936,7 @@ html, body {
   position: absolute; top: 9vh; left: 50%;
   transform: translateX(-50%);
   text-align: center;
-  font-family: "Times New Roman", serif; font-weight: bold;
+  font-family: var(--font-head); font-weight: bold;
   text-shadow: 2px 2px 0 #000;
   pointer-events: none;
 }
@@ -887,221 +944,128 @@ html, body {
 #race-time { font-size: 30px; color: #fff; }
 #race-place { font-size: 22px; color: #60c8ff; letter-spacing: 3px; }
 
-/* skimmer drive cluster: speed, the nitro bottle, the drift call */
 #drive-hud {
-  position: absolute; right: 16px; bottom: calc(3.5vh + 190px); /* clear of the larger minimap */
+  position: absolute; right: 16px; bottom: calc(3.5vh + 190px);
   text-align: right;
-  font-family: "Times New Roman", serif; font-weight: bold;
+  font-family: var(--font-head); font-weight: bold;
   text-shadow: 2px 2px 0 #000;
   pointer-events: none;
 }
-#dh-speed {
-  font-size: 38px; color: #fff; line-height: 0.9;
-  letter-spacing: 1px;
-}
-.dh-unit { font-size: 12px; color: #8fa0b8; letter-spacing: 4px; }
-#dh-nitro-wrap {
-  width: 110px; height: 9px; margin: 6px 0 0 auto;
-  border: 1px solid #4a5a6a;
-  box-shadow: 0 0 0 1px #000;
-  background: rgba(4, 6, 12, 0.8);
-}
-#dh-nitro-fill {
-  height: 100%; width: 0%;
-  background: linear-gradient(90deg, #2a6adf, #70c0ff);
-}
+#dh-speed { font-size: 38px; color: #fff; line-height: 0.9; letter-spacing: 1px; }
+.dh-unit { font-size: 12px; color: var(--parch2); letter-spacing: 4px; }
+#dh-nitro-wrap { width: 110px; height: 9px; margin: 6px 0 0 auto; border: 1px solid var(--seam); box-shadow: 0 0 0 1px #000; background: rgba(8, 6, 4, 0.8); }
+#dh-nitro-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2a6adf, #70c0ff); }
 #dh-nitro-fill.dh-burning { background: linear-gradient(90deg, #dfa02a, #ffe070); }
-#dh-drift {
-  margin-top: 4px;
-  font-size: 15px; color: #ffd050; letter-spacing: 5px;
-  animation: driftPulse 0.5s steps(2) infinite;
-}
+#dh-drift { margin-top: 4px; font-size: 15px; color: #ffd050; letter-spacing: 5px; animation: driftPulse 0.5s steps(2) infinite; }
 @keyframes driftPulse { 50% { opacity: 0.35; } }
-
-.art-cell { cursor: pointer; }
-.art-cell:hover { border-color: #ffd050; }
-.log-cell.art-on {
-  border-color: #ffd050;
-  box-shadow: 0 0 8px rgba(255, 208, 80, 0.35);
-}
-.log-cell.art-on .lc-count { color: #ffd050; }
 
 /* ---------------- hangar hub ---------------- */
 
-#hub-screen, #save-screen {
-  background:
-    linear-gradient(rgba(20,30,120,0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20,30,120,0.25) 1px, transparent 1px),
-    radial-gradient(ellipse at center, rgba(6,10,40,0.94), rgba(0,0,4,0.97));
-  background-size: 34px 34px, 34px 34px, cover;
-}
-#hub-cards {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(200px, 250px));
-  gap: 14px;
-}
-.hub-card {
-  background: linear-gradient(#101838, #060a1c);
-  border: 2px solid #8090b8;
-  box-shadow: 0 0 0 2px #000, inset 0 0 20px rgba(0,0,0,0.7);
-  padding: 16px 14px;
-  cursor: pointer;
-  text-align: center;
-}
-.hub-card:hover { border-color: #f0d060; transform: translateY(-3px); }
-.hc-glyph { font-size: 26px; margin-bottom: 6px; }
-.hc-name {
-  font-family: "Times New Roman", serif; font-weight: bold;
-  font-size: 16px; letter-spacing: 2px; color: #f0e0b0;
-}
-.hc-sub { font-size: 11px; color: #8898c8; margin-top: 4px; min-height: 26px; }
+#hub-cards { display: grid; grid-template-columns: repeat(3, minmax(200px, 250px)); gap: 14px; }
+.hub-card { padding: 16px 14px; cursor: pointer; text-align: center; }
+.hub-card:hover { border-color: var(--brass); transform: translateY(-3px); box-shadow: var(--plate-shadow), 0 0 16px rgba(226,178,92,0.25); }
+.hc-glyph { font-size: 26px; margin-bottom: 6px; color: var(--brass); }
+.hc-name { font-family: var(--font-head); font-weight: bold; font-size: 15px; letter-spacing: 2px; color: var(--parchment); }
+.hc-sub { font-size: 11px; color: var(--dim); margin-top: 4px; min-height: 26px; }
 @media (max-width: 760px) { #hub-cards { grid-template-columns: repeat(2, minmax(160px, 1fr)); } }
 
 /* ---------------- save code ---------------- */
 
-.save-note { font-size: 12px; color: #90a0d0; max-width: 480px; text-align: center; }
+.save-note { font-size: 12px; color: var(--parch2); max-width: 480px; text-align: center; }
 #save-export, #save-import {
   width: min(560px, 86%);
   height: 74px;
-  background: #0a0e20;
-  border: 1px solid #4a5888;
-  color: #c8d8f0;
+  background: #0f0d0a;
+  border: 1px solid var(--seam);
+  color: var(--parch2);
   font-family: "Courier New", monospace; font-size: 10px;
   padding: 8px;
   resize: none;
   user-select: text;
 }
 #save-feedback { font-size: 13px; color: #90f0a0; min-height: 18px; }
+#save-backups { width: min(92vw, 640px); font-size: 12px; }
+.bk-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid #2c2620; }
+.bk-row span { flex: 1; color: var(--parch2); }
 
 #mute-btn {
   position: absolute; right: 10px; bottom: 8px;
   width: 30px; height: 30px; line-height: 28px;
   text-align: center;
-  border: 1px solid #555; color: #aaa;
+  border: 1px solid var(--seam); color: var(--parch2);
   cursor: pointer; z-index: 40;
-  background: rgba(0,0,0,0.5);
+  background: rgba(10, 8, 6, 0.6);
 }
 #mute-btn.off { color: #444; text-decoration: line-through; }
 
-/* ---- 28. factions ---- */
-#fac-head { text-align: center; color: #d8d0b8; letter-spacing: .08em; margin: 6px 0 14px; font-size: 14px; }
+/* ---------------- factions ---------------- */
+#fac-head { text-align: center; color: var(--parch2); letter-spacing: .08em; margin: 6px 0 14px; font-size: 14px; }
 #fac-cards { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 10px; max-width: 1180px; margin: 0 auto; }
 @media (max-width: 1000px) { #fac-cards { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
-.fac-card { background: rgba(10, 14, 30, .85); border: 1px solid #3a4468; padding: 10px 12px; text-align: left; font-size: 12px; color: #c8c8d8; }
-.fac-card.pledged { border-color: #f0d060; box-shadow: 0 0 12px rgba(240, 208, 96, .25); }
+.fac-card { background: linear-gradient(rgba(38, 32, 24, 0.92), rgba(18, 15, 11, 0.95)); border: 1px solid var(--seam); padding: 10px 12px; text-align: left; font-size: 12px; color: var(--parch2); }
+.fac-card.pledged { border-color: var(--brass); box-shadow: 0 0 12px rgba(226, 178, 92, .25); }
 .fac-card.hostile { border-color: #b03030; }
-.fac-name { font-family: 'Times New Roman', serif; font-size: 15px; letter-spacing: .06em; color: #f0e8c8; }
-.fac-creed { color: #8890a8; font-style: italic; margin: 2px 0 6px; }
-.fac-bar { position: relative; height: 8px; background: #1a1e30; border: 1px solid #3a4468; margin: 6px 0; }
-.fac-bar .fb-zero { position: absolute; left: 50%; top: -2px; width: 1px; height: 12px; background: #6a7090; }
+.fac-name { font-family: var(--font-head); font-size: 15px; letter-spacing: .06em; color: var(--parchment); }
+.fac-creed { color: var(--dim); font-style: italic; margin: 2px 0 6px; }
+.fac-bar { position: relative; height: 8px; background: #14110d; border: 1px solid var(--seam); margin: 6px 0; }
+.fac-bar .fb-zero { position: absolute; left: 50%; top: -2px; width: 1px; height: 12px; background: var(--dim); }
 .fac-bar .fb-fill { position: absolute; top: 0; height: 100%; background: #60c8ff; }
 .fac-bar .fb-fill.neg { background: #c04040; }
 .fac-line { margin: 3px 0; }
-.fac-line b { color: #f0e8c8; }
-.fac-btn { display: inline-block; margin-top: 6px; padding: 4px 10px; border: 1px solid #6a7090; color: #e8e8f0; cursor: pointer; letter-spacing: .08em; font-size: 11px; }
-.fac-btn:hover { border-color: #f0d060; color: #f0d060; }
+.fac-line b { color: var(--parchment); }
+.fac-btn { display: inline-block; margin-top: 6px; padding: 4px 10px; border: 1px solid var(--bronze2); color: var(--parchment); cursor: pointer; letter-spacing: .08em; font-size: 11px; }
+.fac-btn:hover { border-color: var(--brass); color: var(--gold); }
 .fac-btn.off { opacity: .45; cursor: default; }
-#fac-banner { max-width: 760px; margin: 14px auto 0; background: rgba(10, 14, 30, .85); border: 1px solid #3a4468; padding: 12px 16px; font-size: 13px; color: #c8c8d8; text-align: left; }
-#fac-banner input, #fac-banner select { background: #0c1020; color: #f0e8c8; border: 1px solid #3a4468; padding: 4px 8px; margin: 4px 6px 4px 0; font-family: inherit; }
+#fac-banner { max-width: 760px; margin: 14px auto 0; background: rgba(18, 15, 11, .9); border: 1px solid var(--seam); padding: 12px 16px; font-size: 13px; color: var(--parch2); text-align: left; }
+#fac-banner input, #fac-banner select { background: #0f0d0a; color: var(--parchment); border: 1px solid var(--seam); padding: 4px 8px; margin: 4px 6px 4px 0; font-family: inherit; }
 #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; pointer-events: none; z-index: 5;
   border: 1px solid rgba(240, 240, 255, .6); border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
 #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(240, 240, 255, .7); }
 #crosshair::before { left: 50%; top: -6px; width: 1px; height: 6px; }
 #crosshair::after { left: -6px; top: 50%; width: 6px; height: 1px; }
 
-/* ---------------- screen headers (BACK never overlaps content) ---------------- */
-
-.screen { padding-top: 68px; }
-#title-screen { padding-top: 0; }
-.screen-head {
-  position: absolute; top: 0; left: 0; right: 0; height: 58px;
-  display: flex; align-items: center; gap: 18px;
-  padding: 0 16px;
-  background: linear-gradient(rgba(6, 10, 30, 0.97), rgba(4, 6, 20, 0.97));
-  border-bottom: 2px solid #c8b060;
-  box-shadow: 0 2px 0 #000, 0 4px 14px rgba(0,0,0,0.6);
-  z-index: 12;
-}
-.screen-head .select-title {
-  font-size: clamp(18px, 2.6vw, 28px); letter-spacing: 6px; margin: 0;
-  flex: 1; text-align: center;
-}
-.screen-head .back-btn { position: static; }
-.esc-hint { font-size: 11px; color: #8090c0; letter-spacing: 1px; min-width: 70px; text-align: right; }
-.screen-sub { font-size: 12px; color: #9ab0e0; letter-spacing: 1px; text-align: center; z-index: 1; }
-/* the HUD sits behind menus; hide it so nothing overlaps */
-body.menu-open #hud, body.menu-open #crosshair, body.menu-open #minimap, body.menu-open #hotbar { visibility: hidden !important; }
-body.looking { cursor: none; }
-body.looking #crosshair { opacity: 0.4; }
-
-/* ---------------- title menu ---------------- */
-
-.title-menu { display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 1; }
-.menu-desc { font-size: 11px; color: #8898c8; text-align: center; max-width: 560px; line-height: 1.4; z-index: 1; }
-.title-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.title-choice .menu-desc { max-width: 170px; }
-.continue-btn { border-color: #60e890; color: #c8ffe0; }
-.danger-btn { border-color: #c04040; color: #ffc0c0; }
-.danger-btn:hover { background: linear-gradient(#7a2a2a, #481010); }
-
-/* ---------------- frame select rack ---------------- */
-
-#select-rack {
-  position: absolute; bottom: 7vh; left: 4%; width: min(60%, 760px);
-  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
-}
-.rack-label { font-size: 11px; color: #9ab0e0; letter-spacing: 1px; }
-#select-icons { position: static; display: flex; flex-wrap: wrap; gap: 6px; max-height: 22vh; overflow-y: auto; padding: 2px; }
-.mech-icon.build-more { border-style: dashed; color: #ffd050; font-size: 30px; filter: none; }
-.mech-icon.build-more:hover { background: #2a2410; }
-
-/* ---------------- pause ---------------- */
-
-#pause-screen .menu-desc { max-width: 520px; }
-
 /* ---------------- frame workshop ---------------- */
 
-#workshop-screen { justify-content: flex-start; gap: 10px; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
-#ws-head { font-family: "Times New Roman", serif; font-size: 14px; color: #c8c8d8; letter-spacing: 1px; }
-#ws-head b { color: #f0d888; }
+#workshop-screen { justify-content: flex-start; gap: 10px; }
+#ws-head { font-family: var(--font-head); font-size: 14px; color: var(--parch2); letter-spacing: 1px; }
+#ws-head b { color: var(--gold); }
 .ws-mat { margin-left: 10px; }
 #ws-tabs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 1100px; }
 .ws-tab {
-  padding: 5px 10px; border: 1px solid #3a4456; background: rgba(10, 14, 30, 0.9);
-  font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px; letter-spacing: 1px;
-  color: #c0c8e0; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border: 1px solid var(--seam); background: linear-gradient(#26211a, #15120e);
+  font-family: var(--font-head); font-weight: bold; font-size: 13px; letter-spacing: 1px;
+  color: var(--parch2); cursor: pointer; display: flex; align-items: center; gap: 6px;
 }
-.ws-tab.on { border-color: #f0d060; color: #fff; background: #1a2450; }
-.ws-tab-n { font-size: 10px; color: #8898c8; font-weight: normal; }
+.ws-tab.on { border-color: var(--brass); color: #fff; background: linear-gradient(#4a3a20, #2a2012); }
+.ws-tab-n { font-size: 10px; color: var(--dim); font-weight: normal; }
 #ws-body { display: flex; gap: 14px; width: min(96vw, 1180px); flex: 1; min-height: 0; }
 #ws-grid {
   flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 8px; overflow-y: auto; padding: 4px; align-content: start; max-height: calc(100vh - 230px);
 }
-.ws-cell {
-  background: rgba(10, 14, 30, 0.9); border: 1px solid #3a4456; padding: 8px; cursor: pointer;
-  text-align: center;
-}
+.ws-cell { background: linear-gradient(rgba(38, 32, 24, 0.92), rgba(18, 15, 11, 0.95)); border: 1px solid var(--seam); padding: 8px; cursor: pointer; text-align: center; }
 .ws-cell.owned { border-color: #60c890; }
-.ws-cell.ready { border-color: #ffd050; box-shadow: 0 0 8px rgba(255, 208, 80, 0.35); }
+.ws-cell.ready { border-color: var(--gold); box-shadow: 0 0 8px rgba(255, 208, 80, 0.35); }
 .ws-cell.feat { border-color: #c090ff; }
 .ws-cell.locked { opacity: 0.6; }
-.ws-cell.pick { background: #1a2450; border-width: 2px; }
+.ws-cell.pick { background: linear-gradient(#4a3a20, #2a2012); border-width: 2px; }
 .ws-icon { font-size: 26px; }
-.ws-name { font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px; color: #f0f0f6; letter-spacing: 1px; }
-.ws-sub { font-size: 10px; color: #8898c8; margin-top: 2px; }
-.ws-state { font-size: 10px; color: #c0c8e0; margin-top: 4px; letter-spacing: 1px; }
+.ws-name { font-family: var(--font-head); font-weight: bold; font-size: 13px; color: var(--parchment); letter-spacing: 1px; }
+.ws-sub { font-size: 10px; color: var(--dim); margin-top: 2px; }
+.ws-state { font-size: 10px; color: var(--parch2); margin-top: 4px; letter-spacing: 1px; }
 .ws-cell.owned .ws-state { color: #60c890; }
-.ws-cell.ready .ws-state { color: #ffd050; }
+.ws-cell.ready .ws-state { color: var(--gold); }
+#ws-side { width: 320px; display: flex; flex-direction: column; gap: 8px; }
+#ws-view { width: 300px; height: 220px; border: 1px solid var(--seam); box-shadow: var(--plate-shadow); background: #1a1410; image-rendering: pixelated; }
 #ws-detail {
-  width: 320px; background: rgba(2, 4, 12, 0.9); border: 2px solid #d8d8d8; box-shadow: 0 0 0 2px #000;
-  padding: 12px 14px; font-size: 12px; line-height: 1.45; overflow-y: auto; max-height: calc(100vh - 230px);
+  width: 100%; background: var(--plate-bg); border: 1px solid var(--seam); box-shadow: var(--plate-shadow);
+  padding: 12px 14px; font-size: 12px; line-height: 1.45; overflow-y: auto; max-height: calc(100vh - 470px);
 }
-.ws-d-name { font-family: "Times New Roman", serif; font-weight: bold; font-size: 18px; color: #fff; letter-spacing: 2px; }
-.ws-d-role { font-size: 11px; color: #90a8d0; letter-spacing: 2px; margin-bottom: 8px; }
-.ws-d-desc { color: #c8c8c8; margin-bottom: 8px; }
-.ws-d-stats { color: #b8c8b8; margin-bottom: 6px; }
-.ws-d-stats b { color: #f0e0a0; }
+.ws-d-name { font-family: var(--font-head); font-weight: bold; font-size: 18px; color: var(--gold); letter-spacing: 2px; }
+.ws-d-role { font-size: 11px; color: var(--parch2); letter-spacing: 2px; margin-bottom: 8px; }
+.ws-d-desc { color: var(--parch2); margin-bottom: 8px; }
+.ws-d-stats { color: #c9c0aa; margin-bottom: 6px; }
+.ws-d-stats b { color: var(--gold); }
 .ws-d-pack { margin-bottom: 8px; }
 .ws-d-bill, .ws-d-req { margin: 6px 0; font-weight: bold; }
 .ws-ok { color: #60c890; }
@@ -1111,129 +1075,125 @@ body.looking #crosshair { opacity: 0.4; }
 .ws-d-status.feat { color: #c090ff; }
 #ws-build { margin-top: 10px; width: 100%; }
 #ws-build:disabled { opacity: 0.45; cursor: default; }
-@media (max-width: 800px) { #ws-body { flex-direction: column; } #ws-detail { width: 100%; max-height: 40vh; } }
+@media (max-width: 800px) { #ws-body { flex-direction: column; } #ws-side, #ws-detail { width: 100%; max-height: 40vh; } }
 
 /* ---------------- pilot sheet ---------------- */
 
-#pilot-screen { justify-content: flex-start; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
+#pilot-screen { justify-content: flex-start; }
 #pilot-body { display: flex; gap: 16px; width: min(96vw, 1100px); flex-wrap: wrap; overflow-y: auto; max-height: calc(100vh - 90px); }
 .pl-col { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 12px; }
-.pl-block { background: rgba(2, 4, 12, 0.9); border: 2px solid #8090b8; box-shadow: 0 0 0 2px #000; padding: 10px 14px; font-size: 12px; line-height: 1.6; }
-.pl-h { font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px; letter-spacing: 2px; color: #f0d888; margin-bottom: 4px; }
-.pl-row b { color: #fff; }
-.pl-hot { color: #ffd050 !important; }
+.pl-block { background: var(--plate-bg); border: 1px solid var(--seam); box-shadow: var(--plate-shadow); padding: 10px 14px; font-size: 12px; line-height: 1.6; color: var(--parch2); }
+.pl-h { font-family: var(--font-head); font-weight: bold; font-size: 14px; letter-spacing: 3px; color: var(--brass); margin-bottom: 4px; border-bottom: 1px solid var(--seam); }
+.pl-row b { color: var(--parchment); }
+.pl-hot { color: var(--gold) !important; }
 .pl-pre { white-space: pre-line; }
+.pl-attrs { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.pl-attr { font-family: var(--font-head); font-weight: bold; font-size: 11px; letter-spacing: 1px; }
+.pl-attrs i { color: var(--dim); font-size: 10px; }
 .pl-frames { display: flex; flex-wrap: wrap; gap: 4px; max-height: 32vh; overflow-y: auto; }
-.pl-frame { border: 1px solid #3a4456; padding: 2px 6px; font-size: 11px; color: #d0d8f0; }
-.pl-frame i { color: #8898c8; font-style: normal; }
+.pl-frame { border: 1px solid var(--seam); padding: 2px 6px; font-size: 11px; color: var(--parch2); }
+.pl-frame i { color: var(--dim); font-style: normal; }
 .pl-links { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------------- quest journal ---------------- */
+
+#journal-screen { justify-content: flex-start; gap: 10px; }
+#journal-body { display: flex; gap: 16px; width: min(96vw, 1100px); flex-wrap: wrap; overflow-y: auto; max-height: calc(100vh - 150px); }
+.jn-col { flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 12px; }
+.jn-block { padding: 10px 14px; font-size: 12px; line-height: 1.5; color: var(--parch2); }
+.jn-block.jn-main { border-color: var(--bronze); }
+.jn-h { font-family: var(--font-head); font-weight: bold; font-size: 13px; letter-spacing: 3px; color: var(--brass); margin-bottom: 6px; border-bottom: 1px solid var(--seam); padding-bottom: 3px; }
+.jn-h::before { content: '✎ '; color: var(--bronze2); }
+.jn-task { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; border-bottom: 1px dotted #2c2620; }
+.jn-task.done { color: #60c890; }
+.jn-tick { color: var(--bronze); min-width: 14px; }
+.jn-text { flex: 1; }
+.jn-right { color: var(--dim); font-size: 11px; white-space: nowrap; margin-left: auto; }
+.jn-sub { margin-top: 6px; font-family: var(--font-head); font-weight: bold; color: var(--parchment); letter-spacing: 1px; display: flex; gap: 8px; align-items: baseline; }
+.jn-empty { color: var(--dim); font-style: italic; }
 
 /* ---------------- controls ---------------- */
 
-#controls-screen { justify-content: flex-start; gap: 10px; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
+#controls-screen { justify-content: flex-start; gap: 10px; }
 #controls-body { display: flex; gap: 18px; width: min(96vw, 1000px); flex: 1; min-height: 0; }
 #controls-list { flex: 1; overflow-y: auto; max-height: calc(100vh - 150px); padding-right: 6px; }
 #controls-settings { width: 300px; font-size: 12px; display: flex; flex-direction: column; gap: 8px; }
-.ct-group { font-family: "Times New Roman", serif; font-weight: bold; letter-spacing: 2px; color: #f0d888; margin: 10px 0 4px; font-size: 14px; }
-.ct-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid #1c2236; font-size: 12px; }
-.ct-name { color: #d0d8f0; }
+.ct-group { font-family: var(--font-head); font-weight: bold; letter-spacing: 2px; color: var(--brass); margin: 10px 0 4px; font-size: 14px; border-bottom: 1px solid var(--seam); }
+.ct-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid #2c2620; font-size: 12px; }
+.ct-name { color: var(--parch2); }
 .ct-key {
-  min-width: 96px; text-align: center; padding: 3px 8px; border: 1px solid #8090b8; background: #0a0e20;
-  font-family: "Times New Roman", serif; font-weight: bold; color: #f0e0b0; cursor: pointer; letter-spacing: 1px;
+  min-width: 96px; text-align: center; padding: 3px 8px; border: 1px solid var(--bronze2); background: linear-gradient(#26211a, #15120e);
+  font-family: var(--font-head); font-weight: bold; color: var(--parchment); cursor: pointer; letter-spacing: 1px;
+  box-shadow: inset 0 1px 0 rgba(255,224,170,0.15), 0 2px 0 #000;
 }
-.ct-key:hover { border-color: #f0d060; color: #fff; }
-.ct-key.waiting { border-color: #ffd050; color: #ffd050; animation: ct-blink 0.8s infinite; }
+.ct-key:hover { border-color: var(--brass); color: #fff; }
+.ct-key.waiting { border-color: var(--gold); color: var(--gold); animation: ct-blink 0.8s infinite; }
 .ct-key.unbound { color: #ff8080; }
 .ct-key.fixed { cursor: default; opacity: 0.7; }
 @keyframes ct-blink { 50% { opacity: 0.4; } }
-.ct-set { display: flex; align-items: center; gap: 8px; color: #d0d8f0; cursor: pointer; }
-.ct-set input[type=range] { flex: 1; }
-.ct-set select { background: #0a0e20; color: #f0e0b0; border: 1px solid #8090b8; font-family: inherit; }
-.ct-note { font-size: 11px; color: #8898c8; line-height: 1.5; }
+.ct-set { display: flex; align-items: center; gap: 8px; color: var(--parch2); cursor: pointer; }
+.ct-set input[type=range] { flex: 1; accent-color: var(--brass); }
+.ct-set input[type=checkbox] { accent-color: var(--brass); }
+.ct-set select { background: #0f0d0a; color: var(--parchment); border: 1px solid var(--seam); font-family: inherit; }
+.ct-note { font-size: 11px; color: var(--dim); line-height: 1.5; }
 @media (max-width: 760px) { #controls-body { flex-direction: column; } #controls-settings { width: 100%; } }
 
 /* ---------------- help ---------------- */
 
-#help-screen { justify-content: flex-start; background: radial-gradient(ellipse at center, rgba(6,10,40,0.96), rgba(0,0,4,0.98)); }
-#help-body { display: flex; gap: 20px; width: min(96vw, 1100px); overflow-y: auto; max-height: calc(100vh - 90px); font-size: 12px; line-height: 1.55; color: #c8d0e8; flex-wrap: wrap; }
+#help-screen { justify-content: flex-start; }
+#help-body { display: flex; gap: 20px; width: min(96vw, 1100px); overflow-y: auto; max-height: calc(100vh - 90px); font-size: 12px; line-height: 1.55; color: var(--parch2); flex-wrap: wrap; }
 .hp-col { flex: 1; min-width: 300px; }
-.hp-h { font-family: "Times New Roman", serif; font-weight: bold; font-size: 15px; letter-spacing: 2px; color: #f0d888; margin: 10px 0 4px; }
+.hp-h { font-family: var(--font-head); font-weight: bold; font-size: 14px; letter-spacing: 3px; color: var(--brass); margin: 10px 0 4px; border-bottom: 1px solid var(--seam); }
 #help-body ul { padding-left: 18px; margin: 0 0 6px; }
 #help-body ul ul { margin-top: 2px; }
-#help-body b { color: #fff; }
+#help-body b { color: var(--parchment); }
 
 /* ---------------- confirm ---------------- */
 
-#confirm-screen { background: rgba(2, 3, 10, 0.7); z-index: 40; padding-top: 0; }
+#confirm-screen { background: rgba(4, 3, 2, 0.75); z-index: 40; padding-top: 0; }
+#confirm-screen::before { display: none; }
 #confirm-box {
-  background: rgba(6, 10, 30, 0.98); border: 2px solid #c8b060; box-shadow: 0 0 0 2px #000, 0 0 30px #000;
+  background: var(--plate-bg); border: 1px solid var(--bronze); box-shadow: var(--plate-shadow), 0 0 40px #000;
   padding: 22px 28px; max-width: 520px; text-align: center; display: flex; flex-direction: column; gap: 14px; align-items: center;
 }
 #confirm-title { font-size: clamp(22px, 3vw, 32px); letter-spacing: 4px; }
-#confirm-text { font-size: 13px; color: #c0c8e0; line-height: 1.5; }
-#select-screen { padding-top: 70px; }
-#select-mode { margin-top: 2px; }
-
-/* legibility: every meta screen sits on a dark backdrop, even over a live world */
-#skills-screen, #map-screen, #hub-screen, #hangar-screen, #broker-screen, #collection-screen,
-#trials-screen, #season-screen, #factions-screen, #save-screen, #weekly-screen, #stage-screen, #preset-screen {
-  background: radial-gradient(ellipse at center, rgba(6, 10, 40, 0.94), rgba(0, 0, 4, 0.97));
-}
-#select-panel { top: 11%; max-height: 50vh; overflow-y: auto; }
-#select-rack { bottom: 3vh; }
-.coop-btn { top: 68px !important; }
+#confirm-text { font-size: 13px; color: var(--parch2); line-height: 1.5; }
 
 /* ---------------- daily board / diaries ---------------- */
-#broker-daily, #pilot-daily { width: min(92vw, 720px); background: rgba(2, 4, 12, 0.85); border: 1px solid #3a4456; padding: 8px 12px; font-size: 12px; }
-.dl-task { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid #1c2236; }
-.dl-task.ready { color: #ffd050; }
+#broker-daily, #pilot-daily { width: min(92vw, 720px); background: rgba(14, 11, 8, 0.85); border: 1px solid var(--seam); padding: 8px 12px; font-size: 12px; }
+#pilot-daily { width: auto; background: var(--plate-bg); box-shadow: var(--plate-shadow); }
+.dl-task { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid #2c2620; }
+.dl-task.ready { color: var(--gold); }
 .dl-task.claimed { opacity: 0.55; }
 .dl-desc { flex: 1; }
-.dl-prog { color: #8898c8; min-width: 56px; text-align: right; }
+.dl-prog { color: var(--dim); min-width: 56px; text-align: right; }
 .dl-reward { color: #9ae8c0; min-width: 130px; }
-.dl-claim { padding: 2px 10px; }
-.mp-diary { font-size: 11px; color: #c8d0e8; margin-top: 3px; }
-.mp-diary b { color: #ffd050; }
-.mp-diary-tasks { color: #8898c8; margin-top: 2px; line-height: 1.5; }
-.mp-diary-tasks span { margin-right: 8px; }
-.dt-done { color: #60c890; }
-.vec-btn { border-color: #80d8ff; }
+.dl-claim { padding: 2px 10px; margin: 0; }
 
-/* ---------------- objective (Zero Hour), title extras, backups ---------------- */
+/* ---------------- objective (Zero Hour) ---------------- */
 #objective {
   position: absolute; top: 96px; left: 50%; transform: translateX(-50%);
   min-width: 320px; max-width: 620px; padding: 8px 16px;
-  background: rgba(6, 12, 30, 0.9); border: 2px solid #ffd050; box-shadow: 0 0 0 2px #000, 0 0 18px rgba(255, 208, 80, 0.3);
+  background: rgba(20, 15, 9, 0.92); border: 1px solid var(--gold); box-shadow: 0 0 0 2px #000, 0 0 18px rgba(255, 208, 80, 0.3);
   text-align: center; pointer-events: none; z-index: 6;
 }
-#objective-title { font-family: "Times New Roman", serif; font-weight: bold; font-size: 13px; letter-spacing: 3px; color: #ffd050; }
-#objective-text { font-size: 13px; color: #f0f0f6; margin-top: 3px; line-height: 1.4; }
-#title-version { position: absolute; bottom: 8px; right: 48px; font-size: 10px; color: #506090; z-index: 1; }
-#title-version a { color: #8098d0; }
-.screen-sub.wide { max-width: 760px; line-height: 1.5; color: #b8c4e8; }
-#backup-nudge { color: #ffd050; }
-#save-backups { width: min(92vw, 640px); font-size: 12px; }
-.bk-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid #1c2236; }
-.bk-row span { flex: 1; color: #c0c8e0; }
-
-/* ---------------- workshop viewer, hunts ---------------- */
-#ws-side { width: 320px; display: flex; flex-direction: column; gap: 8px; }
-#ws-view { width: 300px; height: 220px; border: 2px solid #d8d8d8; box-shadow: 0 0 0 2px #000; background: #0a1030; image-rendering: pixelated; }
-#ws-side #ws-detail { width: 100%; max-height: calc(100vh - 470px); }
-.mp-hunt { font-size: 11px; color: #ffb060; margin-top: 2px; }
-.mp-hunt b { color: #fff; }
-.mp-hunt.slain { color: #60c890; }
-.hb-slot.sig { border-color: #c090ff; }
-.hb-slot.sig.ready { border-color: #e0b0ff; box-shadow: 0 0 8px rgba(200, 144, 255, 0.5); }
-.log-cell.hunt .lc-name { color: #ffb060; }
+#objective-title { font-family: var(--font-head); font-weight: bold; font-size: 13px; letter-spacing: 3px; color: var(--gold); }
+#objective-text { font-size: 13px; color: var(--parchment); margin-top: 3px; line-height: 1.4; }
 
 /* ---------------- difficulty bands ---------------- */
-.band-btn { border-color: #d09060; }
-#band-desc { max-width: 620px; }
 .band-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.band-chip { padding: 3px 10px; border: 1px solid #3a4456; font-size: 11px; color: #c0c8e0; cursor: pointer; }
+.band-chip { padding: 3px 10px; border: 1px solid var(--seam); font-size: 11px; color: var(--parch2); cursor: pointer; }
 .band-chip.on { border-width: 2px; color: #fff; }
 .band-chip.locked { opacity: 0.5; cursor: default; }
+
+/* ---------------- narrow screens ---------------- */
+@media (max-width: 900px) {
+  .title-frame { flex-direction: column; align-items: stretch; padding: 4vh 5vw 12vh; overflow-y: auto; }
+  .title-right { flex: none; justify-content: stretch; }
+  #title-salvage, #title-memorial { position: static; }
+  #attr-body { flex-direction: column; }
+  #attr-col { flex: none; max-height: none; }
+}
 
 </style>
 </head>
@@ -1268,7 +1228,7 @@ body.looking #crosshair { opacity: 0.4; }
         <div id="contract-line"></div>
       </div>
       <div id="hud-center">
-        <div id="wave-label">Wave 1/20</div>
+        <div id="wave-label">Wave 1/16</div>
         <div id="wave-timer">30.0</div>
         <div id="target-panel" class="hidden">
           <div id="target-name">???</div>
@@ -1311,35 +1271,46 @@ body.looking #crosshair { opacity: 0.4; }
 
   <!-- ===================== TITLE ===================== -->
   <div id="title-screen" class="screen">
-    <div class="title-grid"></div>
-    <h1 class="game-title">STAALREUS</h1>
-    <div class="title-sub">STEEL GIANT · A MECH ARENA SURVIVOR</div>
-    <div class="title-menu">
-      <button id="btn-play-first" class="menu-btn hidden">PLAY — ZERO HOUR</button>
-      <div id="first-desc" class="menu-desc hidden">Your first sortie: ten guided minutes that teach the controls, the vehicle, and the workshop.</div>
-      <button id="btn-continue" class="menu-btn small continue-btn hidden">CONTINUE RUN</button>
-      <button id="btn-expedition" class="menu-btn">THE SHATTERED REACH</button>
-      <div id="exp-desc" class="menu-desc"></div>
-      <div class="title-row">
-        <button id="btn-band" class="menu-btn tiny band-btn">BAND: BRONZE</button>
-        <button id="btn-new-exp" class="menu-btn tiny hidden">NEW EXPEDITION (delete saved pilot)</button>
+    <div class="title-bg"><div class="title-gear"></div><div class="title-gear small"></div><div class="title-horizon"></div></div>
+    <div class="title-frame">
+      <div class="title-left">
+        <div class="title-crest">⚙</div>
+        <h1 class="game-title">STAALREUS</h1>
+        <div class="title-sub">STEEL GIANTS OF THE SHATTERED REACH</div>
+        <div class="title-rule"></div>
+        <div class="title-menu">
+          <button id="btn-play-first" class="menu-btn primary hidden">BEGIN — ZERO HOUR</button>
+          <div id="first-desc" class="menu-desc hidden">Your first sortie: ten guided minutes that teach the controls, the vehicle, and the workshop.</div>
+          <button id="btn-continue" class="menu-btn small continue-btn hidden">CONTINUE RUN</button>
+          <button id="btn-expedition" class="menu-btn primary">THE SHATTERED REACH</button>
+          <div id="exp-desc" class="menu-desc"></div>
+          <div class="title-row">
+            <button id="btn-band" class="menu-btn tiny band-btn">BAND: BRONZE</button>
+            <button id="btn-new-exp" class="menu-btn tiny hidden">NEW EXPEDITION (delete saved pilot)</button>
+          </div>
+          <div id="band-desc" class="menu-desc"></div>
+          <div class="title-modes">
+            <div class="title-choice"><button id="btn-start" class="menu-btn small">THE GAUNTLET</button><div class="menu-desc">sixteen assaults · a revenant at the end · recover its frame</div></div>
+            <div class="title-choice"><button id="btn-arena" class="menu-btn small">ARENA</button><div class="menu-desc">endless assaults · farm alloy and runes</div></div>
+            <div class="title-choice"><button id="btn-weekly" class="menu-btn small">WEEKLY</button><div class="menu-desc">one fixed challenge for everyone</div></div>
+          </div>
+          <div class="title-row title-doors">
+            <button id="btn-hub" class="menu-btn small">HANGAR</button>
+            <button id="btn-title-pilot" class="menu-btn small">PILOT</button>
+            <button id="btn-title-journal" class="menu-btn small">JOURNAL</button>
+            <button id="btn-title-controls" class="menu-btn small">CONTROLS</button>
+            <button id="btn-title-help" class="menu-btn small">HOW TO PLAY</button>
+          </div>
+          <div class="title-row">
+            <button id="btn-tutorial" class="menu-btn tiny">REPLAY ZERO HOUR</button>
+            <button id="btn-profile" class="menu-btn tiny profile-btn">PROFILE: STANDARD</button>
+          </div>
+          <div id="backup-nudge" class="menu-desc hidden"></div>
+        </div>
       </div>
-      <div id="band-desc" class="menu-desc"></div>
-      <div class="title-row">
-        <div class="title-choice"><button id="btn-start" class="menu-btn small">CLASSIC</button><div class="menu-desc">20 waves · beat the boss to earn a frame</div></div>
-        <div class="title-choice"><button id="btn-arena" class="menu-btn small">ARENA</button><div class="menu-desc">endless waves · farm alloy</div></div>
-        <div class="title-choice"><button id="btn-weekly" class="menu-btn small">WEEKLY</button><div class="menu-desc">one fixed challenge for everyone</div></div>
+      <div class="title-right">
+        <div id="title-chronicle" class="chronicle"></div>
       </div>
-      <div class="title-row">
-        <button id="btn-hub" class="menu-btn small">HANGAR</button>
-        <button id="btn-title-pilot" class="menu-btn small">PILOT</button>
-        <button id="btn-title-controls" class="menu-btn small">CONTROLS</button>
-        <button id="btn-title-help" class="menu-btn small">HOW TO PLAY</button>
-        <button id="btn-tutorial" class="menu-btn tiny">REPLAY ZERO HOUR</button>
-        <button id="btn-profile" class="menu-btn tiny profile-btn">PROFILE: STANDARD</button>
-      </div>
-      <div id="backup-nudge" class="menu-desc hidden"></div>
-      <div class="menu-desc">HANGAR: build frames, train your pilot, devotions, contracts, collection · PILOT: your character sheet &amp; inventory</div>
     </div>
     <div id="title-salvage"></div>
     <div id="title-memorial"></div>
@@ -1386,16 +1357,26 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== STAGE SELECT ===================== -->
   <div id="stage-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-stage-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;&nbsp;SELECT</h2><span class="esc-hint">ESC closes</span></div>
-    <div class="screen-sub wide">Pick a stage. CLASSIC ends on a wave-20 boss that pays a frame or blueprint data and opens the next stage. ARENA never ends.</div>
+    <div class="screen-sub wide">Pick a stage. THE GAUNTLET is sixteen assaults: a warden, an overrun, and a REVENANT frame at the end — bring it down to recover the frame (or its blueprint data) and open the next stage. ARENA never ends.</div>
     <div id="stage-list"></div>
   </div>
 
-  <!-- ===================== HANGAR / DEVOTIONS ===================== -->
+  <!-- ===================== ATTRIBUTES & ARTS ===================== -->
   <div id="hangar-screen" class="screen hidden">
-    <div class="screen-head"><button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">DEVOTIONS</h2><span class="esc-hint">ESC closes</span></div>
-    <div class="screen-sub wide">Spend SALVAGE on permanent paths. Each rank is a small stat you keep forever; the ACTIVE path also grows every level-up in a run. Why: this is the cheapest permanent power in the game.</div>
-    <div id="hangar-salvage"></div>
-    <div id="devotion-list"></div>
+    <div class="screen-head"><button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">ATTRIBUTES&nbsp;&amp;&nbsp;ARTS</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Six attributes grow on their own every pilot level — a tenth of your lineage's starting spread — and every level also pays ONE FREE POINT to place. Combat Arts deepen by reading RUNES: each rank hits harder but recharges slower; REACTOR pulls the recharge back.</div>
+    <div id="attr-head"></div>
+    <div id="attr-body">
+      <div id="attr-col">
+        <div id="attr-list"></div>
+        <div id="attr-derived"></div>
+        <button id="btn-attr-reset" class="menu-btn tiny">RECALIBRATE</button>
+      </div>
+      <div id="arts-col">
+        <div class="bk-label">COMBAT ARTS — READ RUNES TO DEEPEN THEM</div>
+        <div id="arts-list"></div>
+      </div>
+    </div>
   </div>
 
   <!-- ===================== HANGAR HUB ===================== -->
@@ -1482,13 +1463,13 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== STAGE TRIALS ===================== -->
   <div id="trials-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-trials-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;TRIALS</h2><span class="esc-hint">ESC closes</span></div>
-    <div class="screen-sub wide">Per-stage challenges for CLASSIC runs. Why: each tier is a permanent perk on that stage (more salvage, XP, damage, gem drops).</div>
+    <div class="screen-sub wide">Per-stage challenges for GAUNTLET runs. Why: each tier is a permanent perk on that stage (more salvage, XP, damage, gem drops).</div>
     <div id="trials-body"></div>
   </div>
 
   <!-- ===================== WAVE REWARD ===================== -->
   <div id="reward-screen" class="screen hidden">
-    <h2 id="reward-heading" class="reward-title">WAVE&nbsp;REWARD</h2>
+    <h2 id="reward-heading" class="reward-title">FIELD&nbsp;SALVAGE</h2>
     <div id="reward-sub">Choose one upgrade</div>
     <div id="reward-cards"></div>
   </div>
@@ -1537,6 +1518,13 @@ body.looking #crosshair { opacity: 0.4; }
     <div id="pilot-body"></div>
   </div>
 
+  <!-- ===================== QUEST JOURNAL ===================== -->
+  <div id="journal-screen" class="screen hidden">
+    <div class="screen-head"><button id="btn-journal-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">QUEST&nbsp;JOURNAL</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Every open task in one ledger: your contract, today's board, the diaries, gauntlet trials, season tasks, and the feats that still guard a frame.</div>
+    <div id="journal-body"></div>
+  </div>
+
   <!-- ===================== CONTROLS ===================== -->
   <div id="controls-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-controls-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">CONTROLS</h2><span class="esc-hint">ESC closes</span></div>
@@ -1554,7 +1542,7 @@ body.looking #crosshair { opacity: 0.4; }
         <label class="ct-set">Music volume <input type="range" id="set-music" min="0" max="100" step="5"> <span id="set-music-val"></span></label>
         <label class="ct-set">Effects volume <input type="range" id="set-sfx" min="0" max="100" step="5"> <span id="set-sfx-val"></span></label>
         <div class="ct-group">DEFAULT SCHEME</div>
-        <div class="ct-note">W/S walk · A/D turn · Q/E strafe · hold RIGHT MOUSE to look · WHEEL zoom · LEFT CLICK attack · 1–4 abilities · Z/X/C wards · SPACE boost · SHIFT special · T transform · F interact · V camera · K training · M map · P pilot</div>
+        <div class="ct-note">W/S walk · A/D turn · Q/E strafe · hold RIGHT MOUSE to look · WHEEL zoom · LEFT CLICK attack · 1–4 abilities · Z/X/C wards · SPACE boost · SHIFT special · T transform · F interact · V camera · K training · M map · P pilot · J journal</div>
         <button id="btn-controls-reset" class="menu-btn tiny">RESET TO DEFAULTS</button>
       </div>
     </div>
@@ -2050,8 +2038,13 @@ GH.gems = (function () {
 
 </script>
 <script>
-// STAALREUS — stage definitions (6 arenas, 20 waves each)
-// Beating a stage's wave-20 CORRUPTED shell unlocks that shell + the next stage.
+// STAALREUS — stage definitions (6 arenas; the GAUNTLET runs GH.WAVES assaults each)
+// Bringing down a stage's REVENANT frame on the last assault recovers that
+// frame's hulk (or blueprint data) and opens the next stage.
+GH.WAVES = 16;        // assaults in a GAUNTLET run
+GH.WAVE_HUNT = 8;     // the warden / hunt assault
+GH.WAVE_OVERRUN = 12; // the spike
+GH.WAVE_CARAPACE = 14;
 GH.stages = [
   {
     id: 'wreck', hazard: null, name: 'TIDE WRECKAGE', sub: 'Stage 1', biome: 'dune coast — sand seas, a drowned fleet, the beach camp',
@@ -2288,9 +2281,9 @@ GH.extraZones = [
 ];
 GH.allStages = function () { return GH.stages.concat(GH.extraZones); };
 
-// Wave plan for a stage: timers, spawn rates, set-piece waves.
-// Wave 10: warden midboss. Wave 16: OVERRUN spike. Wave 18: carapace midboss.
-// Wave 20: CORRUPTED shell boss (the next unlockable frame).
+// Assault plan for a stage: timers, spawn rates, set-piece waves.
+// Wave 8: warden / hunt. Wave 12: OVERRUN spike. Wave 14: carapace midboss.
+// Wave 16: the REVENANT frame (the next recoverable frame), then the clear.
 GH.wavePlan = function (stage, wave, arena) {
   var plan = {
     duration: 22 + wave * 0.9,
@@ -2306,7 +2299,7 @@ GH.wavePlan = function (stage, wave, arena) {
   // gentler first minutes on the opening stage for new pilots
   if (stage.id === 'wreck' && wave <= 2) plan.rate *= 0.7;
   if (arena) {
-    // endless: scale forever, corrupt shells appear as roaming bosses every 10
+    // endless: scale forever, a warden or hunt every ten
     plan.hpMult = (1 + (wave - 1) * 0.24) * 1.4;
     plan.dmgMult = 1 + (wave - 1) * 0.07;
     plan.types = stage.roster(Math.min(wave, 12));
@@ -2314,10 +2307,12 @@ GH.wavePlan = function (stage, wave, arena) {
     if (wave >= 14) plan.rate *= 1.25;
     return plan;
   }
-  if (wave === 10) plan.midboss = 'warden';
-  if (wave === 16) { plan.overrun = true; plan.rate *= 2.4; plan.duration = 26; }
-  if (wave === 18) plan.midboss = 'carapace';
-  if (wave === 20) { plan.boss = stage.unlocks; plan.rate *= 0.5; }
+  // a shorter ladder climbs a little steeper so the revenant lands as hard
+  plan.hpMult *= 1 + (wave - 1) * 0.03;
+  if (wave === GH.WAVE_HUNT) plan.midboss = 'warden';
+  if (wave === GH.WAVE_OVERRUN) { plan.overrun = true; plan.rate *= 2.4; plan.duration = 26; }
+  if (wave === GH.WAVE_CARAPACE) plan.midboss = 'carapace';
+  if (wave === GH.WAVES) { plan.boss = stage.unlocks; plan.rate *= 0.5; }
   return plan;
 };
 
@@ -6375,9 +6370,10 @@ GH.factions = (function () {
 </script>
 <script>
 // STAALREUS — playable frame definitions.
-// Archetypes mirror the classic survivor-mech lineup: a block-healing paladin
-// starter, a dodge-fed light striker, an element-cycling wizard, a dagger
-// rogue, a wounded-fury reaper, plus gunner / railgun / artillery frames.
+// Eight lineages, each a distinct verb set in the action-RPG tradition: a
+// block-healing paladin starter, a dodge-fed light striker, an element-
+// cycling battlemage, a dagger rogue, a wounded-fury reaper, plus gunner /
+// railgun / artillery frames.
 // stats.speed is in UI units (game speed = speed * 0.42).
 // vehicle forms: what each frame folds into, and how it drives
 GH.VECTORS = {
@@ -6597,6 +6593,7 @@ GH.controls = (function () {
     { id: 'skills', name: 'Pilot training (skill tree)', def: 'KeyK', group: 'MENUS' },
     { id: 'map', name: 'World map', def: 'KeyM', group: 'MENUS' },
     { id: 'pilot', name: 'Pilot sheet (character)', def: 'KeyP', group: 'MENUS' },
+    { id: 'journal', name: 'Quest journal', def: 'KeyJ', group: 'MENUS' },
     { id: 'pause', name: 'Pause (ESC always works)', def: 'Backquote', group: 'MENUS' },
     { id: 'crt', name: 'Toggle CRT filter', def: 'KeyH', group: 'MENUS' }
   ];
@@ -6684,7 +6681,7 @@ GH.controls = (function () {
       'LEFT-CLICK attack / target · ' + L('target') + ' cycle target · ' +
       L('ability1') + '–' + L('ability4') + ' abilities · ' + L('ward1') + ' ' + L('ward2') + ' ' + L('ward3') + ' wards · ' +
       L('boost') + ' boost / drift · ' + L('special') + ' special / nitro · ' + L('transform') + ' transform · ' +
-      L('interact') + ' interact · ' + L('camera') + ' camera · ' + L('skills') + ' training · ' + L('map') + ' map · ESC menu';
+      L('interact') + ' interact · ' + L('camera') + ' camera · ' + L('skills') + ' training · ' + L('map') + ' map · ' + L('journal') + ' journal · ESC menu';
   };
 
   C.load();
@@ -6694,15 +6691,15 @@ GH.controls = (function () {
 </script>
 <script>
 // STAALREUS — persistent meta progression (localStorage)
-// Pilot profiles (Standard / Iron Frame / Iron Core), salvage bank, shell &
-// stage unlocks, devotions, contracts, collection log, stage trials, records.
+// Pilot profiles (Standard / Iron Frame / Iron Core), salvage bank, frame &
+// stage unlocks, attributes, art runes, contracts, collection log, trials.
 GH.meta = (function () {
   var M = {};
   M.VERSION = '0.9.0';
 
   M.PROFILES = {
     standard: { key: 'hf_meta_v2', name: 'STANDARD', desc: 'Full hangar support.' },
-    iron: { key: 'hf_meta_iron_v1', name: 'IRON FRAME', desc: 'No devotions, no loadout kits. Self-reliant.' },
+    iron: { key: 'hf_meta_iron_v1', name: 'IRON FRAME', desc: 'No loadout kits, no bought perks. Self-reliant.' },
     hardcore: { key: 'hf_meta_hc_v1', name: 'IRON CORE', desc: 'Iron rules — and one death wipes the profile.' }
   };
   M.profile = 'standard';
@@ -6715,7 +6712,7 @@ GH.meta = (function () {
       mats: { alloy: 0, cores: 0 },
       // one-off feats (relic prerequisites): harrow, ...
       feats: {},
-      // a CLASSIC / ARENA / WEEKLY run left mid-way with EXIT RUN
+      // a GAUNTLET / ARENA / WEEKLY run left mid-way with EXIT RUN
       suspended: null,
       // vehicle designs: chosen per lineage, and the second designs bought
       vectorPick: {},
@@ -6736,8 +6733,16 @@ GH.meta = (function () {
       lastExport: null,
       saveVersion: 2,
       stages: 1,
+      // legacy stat lines — converted into attribute points on load
       devotion: { sol: 0, pyre: 0, keen: 0, verd: 0, ruin: 0 },
-      activeDevotion: 'sol',
+      // six attributes: spent free points, unspent points, and the flag
+      // that says the old lines were already converted
+      attr: {},
+      attrPts: 0,
+      attrMigrated: false,
+      // Combat Art ranks (runes read) and runes waiting to be read
+      arts: {},
+      runeStock: 0,
       bestWave: {},
       bestArena: 0,
       victories: {},
@@ -6832,6 +6837,7 @@ GH.meta = (function () {
         }
       }
     } catch (e) { /* storage unavailable — session-only meta */ }
+    if (GH.attrs) GH.attrs.migrate();
   };
 
   M.save = function () {
@@ -6953,38 +6959,6 @@ GH.meta = (function () {
 
   M.unlockStage = function (n) {
     if (n > M.data.stages) { M.data.stages = n; M.save(); }
-  };
-
-  M.devotionCost = function (path) {
-    return 25 + M.data.devotion[path] * 25;
-  };
-
-  M.buyDevotion = function (path) {
-    if (M.isIron()) return false;
-    var cost = M.devotionCost(path);
-    if (M.data.devotion[path] >= 5 || M.data.salvage < cost) return false;
-    M.data.salvage -= cost;
-    M.data.devotion[path]++;
-    M.save();
-    return true;
-  };
-
-  M.devotionBonus = function () {
-    if (M.isIron()) {
-      return { maxHP: 0, regen: 0, damageMult: 0, atkSpdMult: 0, crit: 0, magnet: 0, xpGain: 0, critMult: 0, boostRegen: 0 };
-    }
-    var d = M.data.devotion;
-    return {
-      maxHP: d.sol * 8,
-      regen: d.sol >= 4 ? 0.5 : 0,
-      damageMult: d.pyre * 0.03,
-      atkSpdMult: d.keen * 0.02,
-      crit: d.keen * 1,
-      magnet: d.verd * 0.08,
-      xpGain: d.verd * 0.04,
-      critMult: d.ruin * 0.06,
-      boostRegen: d.ruin >= 3 ? 0.15 : 0
-    };
   };
 
   // ---------------------------------------------------------------
@@ -7234,8 +7208,9 @@ GH.rollRewards = function (player, wave, count) {
 </script>
 <script>
 // STAALREUS — enemy definitions.
-// Corrupt shell bosses are dark-mirror versions of unlockable frames:
-// beating one on wave 20 unlocks that frame and the next stage.
+// REVENANT bosses are recoverable frames still driven by the pilots who
+// died in them: bring one down on the last assault to recover the frame
+// and open the next stage.
 GH.enemyDefs = {
   husk: {
     name: 'Husk',
@@ -7463,18 +7438,18 @@ GH.enemyDefs = {
     behavior: 'boss', slamInterval: 5, summonInterval: 9, summonCount: 4
   },
 
-  // ---- corrupt shell bosses (wave 20) — one per unlockable frame ----
-  fang:  { name: 'CORRUPTED FANG', boss: true, corrupt: true,
+  // ---- revenant frames (the final assault) — one per recoverable frame ----
+  fang:  { name: 'REVENANT FANG', boss: true, corrupt: true,
     hp: 2200, speed: 3.6, damage: 24, radius: 1.15, xp: 60, mass: 10, behavior: 'corrupt' },
-  hexen: { name: 'CORRUPTED HEXEN', boss: true, corrupt: true,
+  hexen: { name: 'REVENANT HEXEN', boss: true, corrupt: true,
     hp: 2600, speed: 2.6, damage: 26, radius: 1.15, xp: 70, mass: 10, behavior: 'corrupt' },
-  viper: { name: 'CORRUPTED VIPER', boss: true, corrupt: true,
+  viper: { name: 'REVENANT VIPER', boss: true, corrupt: true,
     hp: 3000, speed: 3.4, damage: 26, radius: 1.15, xp: 80, mass: 10, behavior: 'corrupt' },
-  morrow:{ name: 'CORRUPTED MORROW', boss: true, corrupt: true,
+  morrow:{ name: 'REVENANT MORROW', boss: true, corrupt: true,
     hp: 3600, speed: 2.9, damage: 30, radius: 1.2, xp: 90, mass: 12, behavior: 'corrupt' },
-  strix: { name: 'CORRUPTED STRIX', boss: true, corrupt: true,
+  strix: { name: 'REVENANT STRIX', boss: true, corrupt: true,
     hp: 4200, speed: 3.2, damage: 32, radius: 1.15, xp: 100, mass: 10, behavior: 'corrupt' },
-  titan: { name: 'CORRUPTED TITAN', boss: true, corrupt: true,
+  titan: { name: 'REVENANT TITAN', boss: true, corrupt: true,
     hp: 5600, speed: 2.2, damage: 38, radius: 1.5, xp: 140, mass: 20, behavior: 'corrupt' }
 };
 
@@ -7534,7 +7509,7 @@ GH.enemyBuilders = {
   }
 };
 
-// corrupt bosses reuse the mech builder in corrupt colors at boss scale
+// revenants reuse the mech builder in dead-pilot colours at boss scale
 GH.buildCorrupt = function (mechId) {
   var def = GH.mechById(mechId);
   var cfg = {};
@@ -7550,7 +7525,7 @@ GH.buildCorrupt = function (mechId) {
 // STAALREUS — the HUNT roster: fifty named bosses, four or five per
 // territory, each built from a mechanics library so every one fights
 // differently. One hunt roams each territory per day (a skull totem
-// marks it); ARENA and CLASSIC midboss waves also draw from the pool.
+// marks it); ARENA and GAUNTLET midboss waves also draw from the pool.
 //
 // Mechanics (game.js huntAI implements these):
 //   slam       telegraphed ring at your feet          ring     radial shot burst
@@ -7759,7 +7734,7 @@ GH.bosses = (function () {
     return null; // every hunt in this zone is down for today
   };
 
-  // a random hunt for arena / classic midboss waves, capped by tier
+  // a random hunt for arena / gauntlet midboss waves, capped by tier
   B.pickFor = function (zone, maxTier) {
     var pool = B.LIST.filter(function (b) { return (!zone || b.zone === zone) && b.tier <= maxTier; });
     if (!pool.length) pool = B.LIST.filter(function (b) { return b.tier <= maxTier; });
@@ -7924,7 +7899,7 @@ GH.progress = (function () {
     { id: 'IV', name: 'TIER IV', perk: 'Bosses here drop two gems',
       tasks: [
         { id: 'clear', desc: 'Clear the stage (Classic)' },
-        { id: 'nobound', desc: 'Slay the corrupted frame before it goes UNBOUND' }
+        { id: 'nobound', desc: 'Slay the revenant before it goes UNBOUND' }
       ] }
   ];
 
@@ -8154,7 +8129,7 @@ GH.progress = (function () {
 
   P.seasonTasks = [
     { id: 'w10', pts: 10, desc: 'Reach wave 10 in any run' },
-    { id: 'w15', pts: 15, desc: 'Reach wave 15 in any run' },
+    { id: 'w15', pts: 15, desc: 'Reach wave 14 in any run' },
     { id: 'clear1', pts: 25, desc: 'Clear any stage' },
     { id: 'clear3', pts: 40, desc: 'Clear three different stages' },
     { id: 'frames3', pts: 40, desc: 'Win with three different frames' },
@@ -8163,8 +8138,8 @@ GH.progress = (function () {
     { id: 'res1', pts: 15, desc: 'Complete a Resonance' },
     { id: 'res5', pts: 30, desc: 'Complete five Resonances this season' },
     { id: 'carapace', pts: 15, desc: 'Destroy a Grave Carapace' },
-    { id: 'corrupt', pts: 25, desc: 'Destroy a corrupted frame' },
-    { id: 'unbound', pts: 20, desc: 'Slay a corrupted frame while it is UNBOUND' },
+    { id: 'corrupt', pts: 25, desc: 'Destroy a revenant frame' },
+    { id: 'unbound', pts: 20, desc: 'Slay a revenant while it is UNBOUND' },
     { id: 'arena25', pts: 30, desc: 'Reach wave 25 in the Arena' },
     { id: 'contracts3', pts: 25, desc: 'Fill three Broker contracts this season' },
     { id: 'sparks500', pts: 15, desc: 'Gather 500 sparks this season' },
@@ -8469,7 +8444,9 @@ GH.skills = (function () {
     GH.meta.data.pilotXP = (GH.meta.data.pilotXP || 0) + amount;
     var after = S.pilotLevel(GH.meta.data.pilotXP);
     if (after > before) {
+      // every pilot level pays one skill point and one attribute point
       GH.meta.data.skillPoints += after - before;
+      GH.meta.data.attrPts = (GH.meta.data.attrPts || 0) + (after - before);
       GH.meta.save();
     }
     return after - before;
@@ -8548,6 +8525,188 @@ GH.skills = (function () {
 
 </script>
 <script>
+// STAALREUS — pilot attributes and Combat Art runes.
+//
+// The character layer under every frame, in the tradition of the old
+// German action-RPGs: six ATTRIBUTES that grow on their own each pilot
+// level (a tenth of the lineage's starting spread) plus ONE FREE POINT per
+// level to steer, so a lineage keeps its identity and a point is never a
+// trap. COMBAT ARTS are learned deeper by reading RUNES: every rank makes
+// the art hit harder but lengthens its recharge, and only REACTOR shortens
+// it again. Cooldown is the cost; the attribute is the pressure valve.
+GH.attrs = (function () {
+  var A = {};
+
+  A.LIST = [
+    { id: 'might', name: 'MIGHT', glyph: '⚔', css: '#ff9a6a',
+      desc: 'Weapon damage +1% per point. +0.4 max hull per point.' },
+    { id: 'reactor', name: 'REACTOR', glyph: '✦', css: '#c9a6ff',
+      desc: 'Combat Art damage +1.2% per point. Art recharge 0.5% faster per point.' },
+    { id: 'hull', name: 'HULL', glyph: '⛨', css: '#e8d8a8',
+      desc: '+2 max hull per point. +0.15 armor per point.' },
+    { id: 'servo', name: 'SERVO', glyph: '↯', css: '#8fd8ff',
+      desc: 'Attack speed +0.5%, block +0.25% and crit +0.2% per point.' },
+    { id: 'coolant', name: 'COOLANT', glyph: '❄', css: '#9ae8c0',
+      desc: 'Hull regen +0.04/s per point. Boost regen +0.6% per point.' },
+    { id: 'uplink', name: 'UPLINK', glyph: '◎', css: '#ffd870',
+      desc: 'Spark magnet +1% and XP +0.5% per point. Loot find 10 × √points %.' }
+  ];
+  A.IDS = A.LIST.map(function (a) { return a.id; });
+  A.byId = function (id) {
+    for (var i = 0; i < A.LIST.length; i++) if (A.LIST[i].id === id) return A.LIST[i];
+    return null;
+  };
+
+  // starting spreads per lineage (sum 30): the dominant term of a build
+  A.SPREADS = {
+    aegis:  { might: 5, reactor: 3, hull: 8, servo: 4, coolant: 5, uplink: 5 },
+    vulcan: { might: 7, reactor: 3, hull: 5, servo: 7, coolant: 4, uplink: 4 },
+    fang:   { might: 6, reactor: 2, hull: 3, servo: 9, coolant: 5, uplink: 5 },
+    hexen:  { might: 2, reactor: 10, hull: 4, servo: 4, coolant: 6, uplink: 4 },
+    viper:  { might: 6, reactor: 3, hull: 3, servo: 8, coolant: 4, uplink: 6 },
+    morrow: { might: 7, reactor: 6, hull: 5, servo: 3, coolant: 5, uplink: 4 },
+    strix:  { might: 7, reactor: 5, hull: 3, servo: 7, coolant: 4, uplink: 4 },
+    titan:  { might: 8, reactor: 4, hull: 9, servo: 1, coolant: 5, uplink: 3 }
+  };
+  A.GROWTH = 0.10; // of the starting spread, per pilot level
+
+  A.spreadFor = function (def) {
+    if (!def) return A.SPREADS.aegis;
+    var key = def.kind === 'relic' ? def.relicBase : (def.lineage || def.id);
+    return A.SPREADS[key] || A.SPREADS.aegis;
+  };
+
+  function data() { return GH.meta.data; }
+  A.spent = function (id) { return (data().attr && data().attr[id]) || 0; };
+  A.spentTotal = function () {
+    var n = 0;
+    A.IDS.forEach(function (id) { n += A.spent(id); });
+    return n;
+  };
+  A.free = function () { return data().attrPts || 0; };
+
+  // auto-grown value for a lineage at the current pilot level
+  A.auto = function (id, def) {
+    var lvl = GH.skills.pilotProgress().lvl;
+    return A.spreadFor(def)[id] * (1 + A.GROWTH * lvl);
+  };
+  A.total = function (id, def) { return A.auto(id, def) + A.spent(id); };
+
+  A.spend = function (id) {
+    if (A.free() < 1 || !A.byId(id)) return false;
+    if (!data().attr) data().attr = {};
+    data().attr[id] = A.spent(id) + 1;
+    data().attrPts = A.free() - 1;
+    GH.meta.save();
+    return true;
+  };
+
+  A.RESET_COST = 150;
+  A.reset = function () {
+    var spent = A.spentTotal();
+    if (spent === 0 || data().salvage < A.RESET_COST) return false;
+    data().salvage -= A.RESET_COST;
+    data().attr = {};
+    data().attrPts = A.free() + spent;
+    GH.meta.save();
+    return true;
+  };
+
+  // the stat block a frame spawns with (consumed by makePlayer)
+  A.bonus = function (def) {
+    var t = function (id) { return A.total(id, def); };
+    var might = t('might'), reactor = t('reactor'), hull = t('hull'),
+      servo = t('servo'), coolant = t('coolant'), uplink = t('uplink');
+    return {
+      damageMult: might * 0.01,
+      maxHP: might * 0.4 + hull * 2,
+      armor: hull * 0.15,
+      atkSpdMult: servo * 0.005,
+      block: servo * 0.25,
+      crit: servo * 0.2,
+      regen: coolant * 0.04,
+      boostRegen: coolant * 0.006,
+      magnet: uplink * 0.01,
+      xpGain: uplink * 0.005,
+      lootFind: 10 * Math.sqrt(Math.max(0, uplink)),
+      artMult: 1 + reactor * 0.012,
+      artCd: 1 / (1 + reactor * 0.005)
+    };
+  };
+
+  // ---------------------------------------------------------------
+  // COMBAT ART RUNES
+  // ---------------------------------------------------------------
+  A.ART_SLOTS = [1, 2, 3, 4, 'sig'];
+  A.MAX_RANK = 10;
+  A.POWER_PER_RANK = 0.12;   // damage
+  A.CD_PER_RANK = 1.08;      // recharge, compounding — the rune's price
+
+  A.artRank = function (slot) {
+    var arts = data().arts || {};
+    return arts[slot === 5 ? 'sig' : slot] || 0;
+  };
+  A.runeStock = function () { return data().runeStock || 0; };
+  A.addRunes = function (n) {
+    data().runeStock = A.runeStock() + n;
+    GH.meta.save();
+  };
+  A.readRune = function (slot) {
+    var key = slot === 5 ? 'sig' : slot;
+    if (A.runeStock() < 1 || A.artRank(key) >= A.MAX_RANK) return false;
+    if (!data().arts) data().arts = {};
+    data().arts[key] = A.artRank(key) + 1;
+    data().runeStock = A.runeStock() - 1;
+    GH.meta.save();
+    return true;
+  };
+  // damage and recharge multipliers for an art at its current rank
+  A.artPower = function (slot) { return 1 + A.artRank(slot) * A.POWER_PER_RANK; };
+  A.artRecharge = function (slot) { return Math.pow(A.CD_PER_RANK, A.artRank(slot)); };
+  A.artLabel = function (slot, def) {
+    if (slot === 5 || slot === 'sig') return GH.skills.signatureFor(def || GH.mechs[0]);
+    return GH.skills.ABILITIES[slot];
+  };
+
+  // a rune on the ground: a violet tablet ringed in brass
+  A.buildRuneMesh = function () {
+    var g = new THREE.Group();
+    var tab = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.5, 0.1),
+      new THREE.MeshLambertMaterial({ color: 0x6a4ab0, emissive: 0x30186a, emissiveIntensity: 0.9 }));
+    tab.rotation.y = 0.5;
+    g.add(tab);
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.03, 4, 10),
+      new THREE.MeshLambertMaterial({ color: 0xe2b25c, emissive: 0x604010 }));
+    ring.rotation.x = Math.PI / 2;
+    g.add(ring);
+    return g;
+  };
+
+  // ---------------------------------------------------------------
+  // Save migration: profiles that predate attributes convert their old
+  // salvage-bought stat lines into spent points and receive the free
+  // points every pilot level would have paid.
+  // ---------------------------------------------------------------
+  A.migrate = function () {
+    var d = data();
+    if (d.attrMigrated) return;
+    if (!d.attr) d.attr = {};
+    var old = d.devotion || {};
+    var map = { sol: 'hull', pyre: 'might', keen: 'servo', verd: 'uplink', ruin: 'reactor' };
+    for (var k in map) if (old[k]) d.attr[map[k]] = (d.attr[map[k]] || 0) + old[k] * 2;
+    var lvl = GH.skills ? GH.skills.pilotProgress().lvl : 0;
+    d.attrPts = lvl + (d.attrPts || 0);
+    if (!d.arts) d.arts = {};
+    if (d.runeStock === undefined) d.runeStock = 0;
+    d.attrMigrated = true;
+    GH.meta.save();
+  };
+
+  return A;
+})();
+
+</script>
+<script>
 // STAALREUS — the full 135-frame roster.
 // 8 base frames (mechs.js) + 120 lineage variants (8 lineages × 5 packs ×
 // 3 marks) + 7 RELIC frames. Two starters are free, four base frames are
@@ -8562,10 +8721,10 @@ GH.roster = (function () {
   // Feat frames: earned by doing something, not by spending
   // ---------------------------------------------------------------
   R.FEATS = {
-    fang: { stage: 'wreck', desc: 'Clear TIDE WRECKAGE in CLASSIC — bring down CORRUPTED FANG on wave 20 (or its lair in the Reach).' },
-    hexen: { stage: 'glacier', desc: 'Clear GLACIER HOLLOW in CLASSIC — bring down CORRUPTED HEXEN on wave 20 (or its lair in the Reach).' },
-    viper: { stage: 'cloister', desc: 'Clear VERDANT CLOISTER in CLASSIC — bring down CORRUPTED VIPER on wave 20 (or its lair in the Reach).' },
-    morrow: { stage: 'ember', desc: 'Clear EMBER FURNACE in CLASSIC — bring down CORRUPTED MORROW on wave 20 (or its lair in the Reach).' }
+    fang: { stage: 'wreck', desc: 'Run the TIDE WRECKAGE gauntlet — bring down REVENANT FANG on the final assault (or in its lair in the Reach).' },
+    hexen: { stage: 'glacier', desc: 'Run the GLACIER HOLLOW gauntlet — bring down REVENANT HEXEN on the final assault (or in its lair in the Reach).' },
+    viper: { stage: 'cloister', desc: 'Run the VERDANT CLOISTER gauntlet — bring down REVENANT VIPER on the final assault (or in its lair in the Reach).' },
+    morrow: { stage: 'ember', desc: 'Run the EMBER CORE gauntlet — bring down REVENANT MORROW on the final assault (or in its lair in the Reach).' }
   };
 
   // ---------------------------------------------------------------
@@ -8633,7 +8792,7 @@ GH.roster = (function () {
       stats: { maxHP: 150, speed: 19, armor: 6, block: 14, crit: 12, lifesteal: 3 },
       weapon: { damage: 1.3, interval: 0.85, range: 1.2, knockback: 1.4 },
       desc: 'A white relic that eats its pilot slowly and gives back everything. The finest blade in the hangar.',
-      feat: { kind: 'stages', n: 6, desc: 'Clear all six CLASSIC stages.' } },
+      feat: { kind: 'stages', n: 6, desc: 'Clear all six GAUNTLET stages.' } },
     { id: 'relic_ark', name: 'ARK HULL', icon: '⛫', base: 'titan', vector: 'tank', prop: 'mortar',
       role: 'Relic frame · walking fortress', model: { body: 0x3a3a48, accent: 0xff6020, dark: 0x181820, trim: 0x707080 },
       stats: { maxHP: 215, speed: 12, armor: 10, block: 7, crit: 4, lifesteal: 0 },
@@ -8857,8 +9016,9 @@ GH.roster = (function () {
   // where materials come from — shown in the workshop and the help screen
   R.SOURCES = [
     'ALLOY drops from any hostile (about one kill in eight), always from elites, and in piles from bosses, nests, dungeon caches and cleared stages.',
-    'FRAME CORES come from bosses: wave-20 corrupted frames, wardens, THE HARROW, dungeon reward caches, and every CLASSIC stage clear.',
-    'SALVAGE is the coin you already bank at the end of every run and at the survivor camp.',
+    'FRAME CORES come from bosses: revenant frames, wardens, THE HARROW, dungeon reward caches, and every GAUNTLET stage clear.',
+    'SALVAGE is the coin you already bank at the end of every run and at the outpost.',
+    'ART RUNES drop from every boss and sometimes from elites; read one in the hangar to deepen a Combat Art (more power, longer recharge).',
     'Each pack climbs MK.II → CUSTOM → PROTOTYPE: build the earlier mark first. RELIC frames need a feat plus a heavy bill of cores.'
   ];
 
@@ -9129,7 +9289,7 @@ GH.worldlife = (function () {
     { id: 'nests', need: 1, desc: 'Break a nest', reward: { alloy: 40, cores: 1 } },
     { id: 'caches', need: 1, desc: 'Open a dungeon reward cache', reward: { cores: 1 } },
     { id: 'races', need: 1, desc: 'Finish a race or duel', reward: { alloy: 50 } },
-    { id: 'wave10', need: 1, desc: 'Reach wave 10 in CLASSIC or ARENA', reward: { alloy: 40 } },
+    { id: 'wave10', need: 1, desc: 'Reach wave 10 in the GAUNTLET or ARENA', reward: { alloy: 40 } },
     { id: 'build', need: 1, desc: 'Build a frame or a vehicle in the workshop', reward: { cores: 1 } },
     { id: 'alloy', need: 60, desc: 'Pick up 60 alloy', reward: { salvage: 150 } },
     { id: 'signals', need: 2, desc: 'Recover 2 cache signals', reward: { alloy: 45 } },
@@ -9268,7 +9428,7 @@ GH.worldlife = (function () {
     if (u.hunts && have.hunts < u.hunts) missing.push('slay ' + u.hunts + ' hunts (' + have.hunts + ')');
     if (u.diaries && have.diaries < u.diaries) missing.push('complete ' + u.diaries + ' diary tiers (' + have.diaries + ')');
     if (u.pilot && have.pilot < u.pilot) missing.push('reach pilot level ' + u.pilot + ' (' + have.pilot + ')');
-    if (u.stages && have.stages < u.stages) missing.push('clear ' + u.stages + ' CLASSIC stage' + (u.stages > 1 ? 's' : '') + ' (' + have.stages + ')');
+    if (u.stages && have.stages < u.stages) missing.push('clear ' + u.stages + ' GAUNTLET stage' + (u.stages > 1 ? 's' : '') + ' (' + have.stages + ')');
     return { band: b, unlocked: missing.length === 0, missing: missing };
   };
   L.setBand = function (id) {
@@ -9745,7 +9905,7 @@ GH.dungeons = (function () {
     raceway: { name: 'RACEWAY', desc: 'a combat race — drift, nitro, three laps of live fire', size: 300 },
     halls: { name: 'CIPHER HALLS', desc: 'beams, plates, the jammer — think your way through', size: 200 },
     convoy: { name: 'CONVOY', desc: 'ESCORT the hauler through the ambush line', size: 260 },
-    crucible: { name: 'CRUCIBLE', desc: 'a boss rush — corrupt frames back to back', size: 180 },
+    crucible: { name: 'CRUCIBLE', desc: 'a boss rush — revenant frames back to back', size: 180 },
     heist: { name: 'HEIST', desc: 'seize the relic, then outrun the alarm', size: 240 }
   };
 
@@ -11110,7 +11270,7 @@ GH.world = (function () {
       gt.mesh = mesh;
     });
 
-    // the hub: survivor camp + race sites (wreck territory only)
+    // the hub: the outpost + race sites (wreck territory only)
     if (zoneId === 'wreck') {
       var camp = new THREE.Group();
       camp.position.set(W.CAMP.x, gy(W.CAMP.x, W.CAMP.z), W.CAMP.z);
@@ -11167,7 +11327,7 @@ GH.world = (function () {
     if (zoneId === 'wreck') {
       list.push(
         { kind: 'broker', x: W.CAMP.x - 5, z: W.CAMP.z - 3, label: 'TALK TO THE BROKER' },
-        { kind: 'shrine', x: W.CAMP.x + 5, z: W.CAMP.z - 3, label: 'PRAY AT THE SHRINE (DEVOTIONS)' },
+        { kind: 'shrine', x: W.CAMP.x + 5, z: W.CAMP.z - 3, label: 'KNEEL AT THE SHRINE (ATTRIBUTES & ARTS)' },
         { kind: 'memorial', x: W.CAMP.x, z: W.CAMP.z - 7, label: 'READ THE MEMORIAL (COLLECTION LOG)' },
         { kind: 'console', x: W.CAMP.x - 5, z: W.CAMP.z + 4, label: 'RUN SIM MISSIONS' },
         { kind: 'duel', x: W.CAMP.x + 6, z: W.CAMP.z + 5, label: 'ENTER THE TRACE DUEL' },
@@ -11937,7 +12097,7 @@ GH.game = (function () {
   // =================================================================
   function makePlayer(mechDef) {
     var s = mechDef.stats;
-    var dev = GH.meta.devotionBonus();
+    var dev = GH.attrs.bonus(mechDef); // six attributes: auto-grown + spent points
     var skl = GH.skills.bonuses(); // the pilot's trained tree
     var p = {
       def: mechDef,
@@ -11946,9 +12106,9 @@ GH.game = (function () {
       x: 0, z: 0, facing: 0, moveX: 0, moveZ: 0,
       stats: {
         maxHP: s.maxHP + dev.maxHP + skl.maxHP, speed: s.speed * 0.42,
-        armor: s.armor + skl.armor,
-        block: s.block + skl.block, crit: s.crit + dev.crit + skl.crit,
-        critMult: 1.6 + dev.critMult,
+        armor: s.armor + skl.armor + dev.armor,
+        block: s.block + skl.block + dev.block, crit: s.crit + dev.crit + skl.crit,
+        critMult: 1.6,
         lifesteal: s.lifesteal,
         damageMult: 1 + dev.damageMult + skl.damageMult,
         atkSpdMult: 1 + dev.atkSpdMult + skl.atkSpdMult, flatDamage: 0,
@@ -11956,7 +12116,10 @@ GH.game = (function () {
         bonusProj: skl.cleave ? 1 : 0,
         boostRegen: 0.35 + dev.boostRegen + skl.boostRegen, boostCost: 0.34,
         elemMult: mechDef.elemMult || (mechDef.id === 'hexen' ? 1.15 : 1),
-        energyMax: skl.energyMax, energyRegen: skl.energyRegen
+        energyMax: skl.energyMax, energyRegen: skl.energyRegen,
+        // UPLINK: loot find (% more alloy, coin and rune drops); REACTOR:
+        // Combat Art power and recharge
+        lootFind: dev.lootFind, artMult: dev.artMult, artCd: dev.artCd
       },
       skillBon: skl,
       energy: skl.energyMax,
@@ -12092,13 +12255,6 @@ GH.game = (function () {
       else if (k === 'magnet') s.magnet *= 1 + v / 100;
     };
     for (var k in g) apply(k, g[k]);
-    // active devotion path grants a small extra each level
-    var d = GH.meta.data.activeDevotion;
-    if (d === 'sol') apply('maxHP', 2);
-    else if (d === 'pyre') apply('damage', 0.5);
-    else if (d === 'keen') apply('atkSpd', 1);
-    else if (d === 'verd') apply('magnet', 1.5);
-    else if (d === 'ruin') apply('crit', 0.5);
   }
 
   // =================================================================
@@ -12458,8 +12614,14 @@ GH.game = (function () {
       spawnPickup('coin', e.x, e.z);
       spawnPickup('spark1', e.x + 0.5, e.z);
       spawnPickup('alloy', e.x - 0.5, e.z + 0.4);
-    } else if (!e.def.boss && !e.nestId && Math.random() < 0.12) {
+    } else if (!e.def.boss && !e.nestId && Math.random() < 0.12 * (1 + player.stats.lootFind / 100)) {
       spawnPickup('alloy', e.x + GH.rand(-0.5, 0.5), e.z + GH.rand(-0.5, 0.5));
+    }
+    // ART RUNES: every boss carries one (revenants two); elites sometimes
+    if (e.def.boss) {
+      for (var rn = 0; rn < (e.def.corrupt ? 2 : 1); rn++) spawnPickup('rune', e.x + rn * 1.4 - 0.7, e.z + 1.4);
+    } else if (e.elite && Math.random() < 0.08 * (1 + player.stats.lootFind / 100)) {
+      spawnPickup('rune', e.x, e.z + 0.8);
     }
     if (e.def.boss) {
       // wardens and other mid-bosses drop a core; true bosses drop two
@@ -12481,7 +12643,7 @@ GH.game = (function () {
       if (bossRef === e) { bossRef = null; GH.music.setBoss(false); }
       GH.audio.explode();
     } else {
-      var coinChance = 0.10 + (artOn('harvest_coil') ? 0.12 : 0);
+      var coinChance = (0.10 + (artOn('harvest_coil') ? 0.12 : 0)) * (1 + player.stats.lootFind / 200);
       if (Math.random() < coinChance) spawnPickup('coin', e.x, e.z);
       if (Math.random() < 0.045) spawnPickup('heart', e.x, e.z);
     }
@@ -12981,7 +13143,7 @@ GH.game = (function () {
     }
   }
 
-  // ---- corrupt shell boss AI: archetype attacks every few seconds ----
+  // ---- revenant boss AI: archetype attacks every few seconds ----
   function corruptAI(e, dt, dist, nx, nz) {
     var out = { mx: nx, mz: nz };
     // phase 2 at half hull: UNBOUND — faster cycle + radial bursts
@@ -12998,7 +13160,7 @@ GH.game = (function () {
       e.mesh.add(aura);
       e.abilityT = Math.min(e.abilityT, 1.2);
     }
-    // TERMINAL phase for the last two frames' corrupt doubles
+    // TERMINAL phase for the last two frames' revenants
     if (!e.phase3 && e.phase2 && e.hp < e.maxHp * 0.25 &&
       (e.id === 'strix' || e.id === 'titan')) {
       e.phase3 = true;
@@ -13563,14 +13725,16 @@ GH.game = (function () {
       return;
     }
     var inst = player.weapons[0];
-    var dmg = weaponDamage(inst);
+    // runes read into this art raise its power; REACTOR and the tree pull
+    // the recharge back down
+    var dmg = weaponDamage(inst) * player.stats.artMult * GH.attrs.artPower(slot);
     var range = slot === 1 ? attackRange(inst) : 20;
     if (needsTarget && GH.dist2(player.x, player.z, target.x, target.z) > range * range) {
       announce('OUT OF RANGE', 16);
       return;
     }
     player.energy -= ab.cost;
-    player.abilityCds[slot] = ab.cd * bon.cdMult;
+    player.abilityCds[slot] = ab.cd * bon.cdMult * player.stats.artCd * GH.attrs.artRecharge(slot);
     tutorialEvent('ability', 1);
 
     if (slot === 1) {          // RUPTURE — focused strike
@@ -13631,12 +13795,12 @@ GH.game = (function () {
     if (player.energy < sg.cost) { announce('LOW ENERGY', 16); GH.audio.hit(); return; }
     var key = player.def.kind === 'relic' ? player.def.relicBase : (player.def.lineage || player.def.id);
     var inst = player.weapons[0];
-    var dmg = weaponDamage(inst) * player.sigPower;
+    var dmg = weaponDamage(inst) * player.sigPower * player.stats.artMult * GH.attrs.artPower(5);
     var needsTarget = key === 'fang' || key === 'viper';
     if (needsTarget && (!target || target.dead)) { announce('NO TARGET — CLICK A HOSTILE', 16); return; }
     if (needsTarget && GH.dist2(player.x, player.z, target.x, target.z) > 18 * 18) { announce('OUT OF RANGE', 16); return; }
     player.energy -= sg.cost;
-    player.abilityCds[5] = sg.cd * player.skillBon.cdMult;
+    player.abilityCds[5] = sg.cd * player.skillBon.cdMult * player.stats.artCd * GH.attrs.artRecharge(5);
     announce(sg.name, 22);
     tutorialEvent('ability', 1);
     var i, e, a;
@@ -14310,6 +14474,7 @@ GH.game = (function () {
     else if (type === 'cache') mesh = GH.models.buildCache();
     else if (type === 'alloy') mesh = GH.models.buildAlloy();
     else if (type === 'core') mesh = GH.models.buildCore();
+    else if (type === 'rune') mesh = GH.attrs.buildRuneMesh();
     else mesh = GH.models.buildCoin();
     mesh.position.set(x, 0.5 + gy(x, z), z);
     scene.add(mesh);
@@ -14358,12 +14523,17 @@ GH.game = (function () {
       lifeEvent('alloy', alN);
     }
     else if (pk.type === 'core') { grantMats(0, 1, silent); }
+    else if (pk.type === 'rune') {
+      // banked at once, like materials; read in the hangar's ATTRIBUTES & ARTS
+      GH.attrs.addRunes(1); runesRun++;
+      if (!silent) { queueAnnounce('ART RUNE RECOVERED — ' + GH.attrs.runeStock() + ' HELD · READ IT IN THE HANGAR', 22); GH.audio.levelup(); }
+    }
     else { coinsRun++; if (!silent) GH.audio.coin(); }
   }
 
   // workshop materials bank the moment they're picked up (a death never
   // takes them back); cores are rare enough to announce
-  var alloyRun = 0, coresRun = 0;
+  var alloyRun = 0, coresRun = 0, runesRun = 0;
   function grantMats(alloy, cores, silent) {
     var m = GH.meta.data.mats;
     if (alloy > 0) { m.alloy += alloy; alloyRun += alloy; if (!silent) GH.audio.coin(); }
@@ -14380,7 +14550,7 @@ GH.game = (function () {
   function frameReward(shellId) {
     var def = GH.mechById(shellId);
     if (def.kind === 'feat' || GH.roster.STARTERS.indexOf(shellId) !== -1) {
-      if (GH.meta.unlockShell(shellId)) return '<b>' + def.name + ' FRAME RECOVERED</b> — new frame unlocked!\n';
+      if (GH.meta.unlockShell(shellId)) return '<b>' + def.name + ' HULK RECOVERED</b> — the hangar has rebuilt it: a new frame is yours.\n';
       return '';
     }
     grantMats(80, 3, true);
@@ -14624,8 +14794,8 @@ GH.game = (function () {
     waveNum = n;
     if (n === 10) lifeEvent('wave10', 1);
     wavePlan = GH.wavePlan(stage, n, G.mode !== 'classic');
-    // ARENA every ten waves and CLASSIC wave 10 draw a HUNT from this stage's pool
-    if (wavePlan.midboss && (G.mode !== 'classic' || n === 10) && Math.random() < 0.7) {
+    // ARENA every ten waves and the GAUNTLET's hunt assault draw a HUNT from this stage's pool
+    if (wavePlan.midboss && (G.mode !== 'classic' || n === GH.WAVE_HUNT) && Math.random() < 0.7) {
       var hb2 = GH.bosses.pickFor(stage.id, G.mode === 'classic' ? 2 : Math.min(4, 1 + Math.floor(n / 10)));
       if (hb2) wavePlan.midboss = hb2.id;
     }
@@ -14682,7 +14852,7 @@ GH.game = (function () {
 
     GH.meta.save(); // persist run tracking each wave, not only at run end
 
-    if (G.mode === 'classic' && waveNum >= 20) {
+    if (G.mode === 'classic' && waveNum >= GH.WAVES) {
       gameOver(true);
       return;
     }
@@ -15660,7 +15830,7 @@ GH.game = (function () {
 
   // =================================================================
   // THE SHATTERED REACH — expedition mode. One persistent continent:
-  // territory nests spawn until broken, lairs guard shells, the camp
+  // territory nests spawn until broken, lairs guard frames, the camp
   // is home, and what you destroy stays destroyed.
   // =================================================================
   var expActive = false;
@@ -15888,7 +16058,7 @@ GH.game = (function () {
   }
 
   function restoreCharacter(saved) {
-    // stats are re-derived, never copied: base frame + devotions + the
+    // stats are re-derived, never copied: base frame + attributes + the
     // CURRENT skill tree + mastery + per-level growth. That way training
     // or respeccing at camp reaches a live character immediately.
     var savedDef = saved.mechId ? GH.mechById(saved.mechId) : GH.mechs[saved.mech];
@@ -16881,7 +17051,7 @@ GH.game = (function () {
     }
   }
 
-  // ---------------- CRUCIBLE: corrupt frames, one by one ----------------
+  // ---------------- CRUCIBLE: revenant frames, one by one ----------------
   var CRUCIBLE_ROSTER = ['fang', 'hexen', 'viper', 'morrow', 'strix', 'titan'];
   function updateCrucible(dt, lay) {
     var ds = dungeonState;
@@ -16981,7 +17151,7 @@ GH.game = (function () {
 
   // =================================================================
   // ZERO HOUR — the guided first ten minutes. A scripted ladder on top
-  // of the survivor camp: walk, look, fight, cast, ward, transform, drive,
+  // of the outpost: walk, look, fight, cast, ward, transform, drive,
   // drift, mine, chase a signal, drop a warden, build a frame. Each step
   // has one sentence, one check, and a beacon where it matters.
   // =================================================================
@@ -17098,7 +17268,8 @@ GH.game = (function () {
       grantMats(100, 2, true);
       GH.meta.data.salvage += 200;
       GH.meta.data.skillPoints += 1;
-      queueAnnounce('ZERO HOUR COMPLETE — +100 ALLOY · +2 CORES · +200 SALVAGE · +1 SKILL POINT', 26);
+      GH.meta.data.attrPts = (GH.meta.data.attrPts || 0) + 1;
+      queueAnnounce('ZERO HOUR COMPLETE — +100 ALLOY · +2 CORES · +200 SALVAGE · +1 SKILL POINT · +1 ATTRIBUTE POINT', 26);
       GH.audio.win();
     }
     GH.meta.data.tutorial = { done: true, when: new Date().toISOString().slice(0, 10), skipped: !!skipped };
@@ -17390,7 +17561,7 @@ GH.game = (function () {
       }
     }
 
-    // the dungeon lair: crossing the threshold wakes the corrupted frame
+    // the dungeon lair: crossing the threshold wakes the revenant
     // (tier-2 rematches wake regardless of the surface scar)
     var lair = worldH.layout.lair;
     if (lair && (lair.rematch || !w.lairsDown[lair.zone]) && !lair.woke &&
@@ -18753,7 +18924,7 @@ GH.game = (function () {
   function updateHUDStatic() {
     el['wave-label'].textContent =
       expActive ? 'THE REACH' :
-      G.mode === 'arena' ? 'Wave ' + waveNum : 'Wave ' + waveNum + '/20';
+      G.mode === 'arena' ? 'Wave ' + waveNum : 'Wave ' + waveNum + '/' + GH.WAVES;
     var s = player.stats;
     var vals = {
       block: Math.round(s.block) + '%', armor: Math.round(s.armor),
@@ -19080,7 +19251,7 @@ GH.game = (function () {
     if (trialTier >= 2) player.stats.xpGain += 0.10;
     if (trialTier >= 3) player.stats.damageMult += 0.05;
     kills = 0; coinsRun = 0; runTime = 0; hitCount = 0; sparksRun = 0;
-    alloyRun = 0; coresRun = 0;
+    alloyRun = 0; coresRun = 0; runesRun = 0;
     elitesSpawned = 0;
     if (resume) {
       kills = resume.kills || 0; coinsRun = resume.coinsRun || 0; runTime = resume.runTime || 0;
@@ -19126,7 +19297,7 @@ GH.game = (function () {
     var sv = GH.meta.data.suspended;
     if (!sv) return '';
     var def = sv.char && sv.char.mechId ? GH.mechById(sv.char.mechId) : GH.mechs[sv.char ? sv.char.mech : 0];
-    return (sv.mode === 'arena' ? 'ARENA' : sv.mode === 'weekly' ? 'WEEKLY' : 'CLASSIC') + ' · ' +
+    return (sv.mode === 'arena' ? 'ARENA' : sv.mode === 'weekly' ? 'WEEKLY' : 'GAUNTLET') + ' · ' +
       GH.stages[sv.stage].name + ' · WAVE ' + sv.wave + ' · ' + (def ? def.name : '?');
   };
   G.resumeRun = function () {
@@ -19217,7 +19388,7 @@ GH.game = (function () {
       }
       coinsRun = 0;
       if (player.speederOn) toggleSpeeder(); // wake up back in frame form
-      // dragged back to the survivor camp — wherever you fell
+      // dragged back to the outpost — wherever you fell
       if (curZone !== 'wreck') loadZone('wreck', null);
       player.x = GH.world.CAMP.x;
       player.z = GH.world.CAMP.z + 4;
@@ -19264,7 +19435,7 @@ GH.game = (function () {
     // workshop materials for the run: alloy by depth, cores for a clear
     var endAlloy = Math.round(waveNum * 1.5 + kills / 10) + (won ? 30 : 0);
     grantMats(endAlloy, won ? 2 : 0, true);
-    var matsMsg = 'Workshop: <b>+' + (alloyRun) + ' alloy</b>' + (coresRun ? ' · <b>+' + coresRun + ' frame cores</b>' : '') + '\n';
+    var matsMsg = 'Workshop: <b>+' + (alloyRun) + ' alloy</b>' + (coresRun ? ' · <b>+' + coresRun + ' frame cores</b>' : '') + (runesRun ? ' · <b>+' + runesRun + ' art rune' + (runesRun > 1 ? 's' : '') + '</b>' : '') + '\n';
     if (won && G.mode === 'classic') awardTrial('clear');
 
     // pilot mastery XP: kills + depth, with a victory bonus
@@ -19277,7 +19448,7 @@ GH.game = (function () {
     // season task evaluation from this run
     var s6 = GH.progress.seasonCheck();
     if (waveNum >= 10) seasonTaskNotify('w10');
-    if (waveNum >= 15) seasonTaskNotify('w15');
+    if (waveNum >= 14) seasonTaskNotify('w15');
     if (G.mode === 'arena' && waveNum >= 25) seasonTaskNotify('arena25');
     if (won && G.mode === 'classic') {
       seasonTaskNotify('clear1');
@@ -19308,7 +19479,7 @@ GH.game = (function () {
     }
     meta.save();
 
-    document.getElementById('end-title').innerHTML = won ? 'ARENA&nbsp;CLEARED' : 'FRAME&nbsp;DESTROYED';
+    document.getElementById('end-title').innerHTML = won ? 'GAUNTLET&nbsp;CLEARED' : 'FRAME&nbsp;DESTROYED';
     document.getElementById('end-stats').innerHTML = unlockMsg + masteryMsg + matsMsg +
       stage.name + (G.mode === 'arena' ? ' · ARENA' : (G.mode === 'weekly' ? ' · WEEKLY' : '')) +
       ' — reached <b>Wave ' + waveNum + '</b> as <b>' + player.def.name + '</b>' +
@@ -20070,6 +20241,7 @@ GH.crt = (function () {
         else if (a === 'skills' && (playing || GH.game.state === 'title')) openSkills(playing);
         else if (a === 'map' && (playing || GH.game.state === 'title')) openWorldMap(playing);
         else if (a === 'pilot' && (playing || GH.game.state === 'title')) openPilot(playing, 'title');
+        else if (a === 'journal' && (playing || GH.game.state === 'title')) openJournal(playing);
         else if (a === 'pause') onEscape();
         else if (a === 'crt') {
           GH.controls.settings.crt = !GH.controls.settings.crt;
@@ -20252,7 +20424,7 @@ GH.crt = (function () {
     'weekly-screen', 'preset-screen', 'broker-screen', 'collection-screen',
     'trials-screen', 'season-screen', 'hub-screen', 'save-screen', 'factions-screen',
     'reward-screen', 'pause-screen', 'end-screen', 'skills-screen', 'map-screen',
-    'workshop-screen', 'pilot-screen', 'controls-screen', 'help-screen'];
+    'workshop-screen', 'pilot-screen', 'controls-screen', 'help-screen', 'journal-screen'];
   var curScreen = null;
   var backHandlers = {};
 
@@ -20343,6 +20515,7 @@ GH.crt = (function () {
     cont.classList.toggle('hidden', !has);
     if (has) cont.textContent = 'CONTINUE RUN — ' + GH.game.suspendedLabel();
     document.getElementById('title-foot').textContent = GH.controls.summary();
+    renderChronicle();
     var memEl = document.getElementById('title-memorial');
     var mem = GH.meta.memorial();
     if (GH.meta.isHardcore() && mem.length) {
@@ -20403,7 +20576,7 @@ GH.crt = (function () {
     document.getElementById('select-mode').textContent =
       mode === 'expedition' ? 'THE SHATTERED REACH — pick the frame your pilot will fly' :
       mode === 'arena' ? 'ARENA — ENDLESS — pick a frame, then a stage' :
-      'CLASSIC — 20 WAVES — pick a frame, then a stage';
+      'THE GAUNTLET — ' + GH.WAVES + ' ASSAULTS — pick a frame, then a stage';
     GH.game.onSelectChange = renderSelectExtras;
     GH.game.onOpenWorkshop = function () { workshopReturn = 'select'; openWorkshop(); };
     GH.game.enterSelect();
@@ -20521,7 +20694,7 @@ GH.crt = (function () {
       var tier = GH.progress.trialTier(st.id);
       var tierBadge = tier ? '<span class="sc-trial">TRIAL ' + ['I', 'II', 'III', 'IV'][tier - 1] + '</span>' : '';
       var rewardLine = GH.meta.data.shells[st.unlocks] ? ''
-        : (reward.kind === 'feat' ? '<br>— defeat to unlock the frame' : '<br>— defeat for blueprint data + 3 cores');
+        : (reward.kind === 'feat' ? '<br>— bring it down to recover the frame' : '<br>— bring it down for blueprint data + 3 cores');
       div.innerHTML =
         '<div class="sc-band" style="background:linear-gradient(' +
         st.sky[0] + ',' + st.sky[1] + ')"></div>' +
@@ -20529,7 +20702,7 @@ GH.crt = (function () {
         '<div class="sc-name">' + st.name + '</div>' +
         '<div class="sc-info">' + (unlocked
           ? (arena ? 'Endless waves.<br>How deep can you go?'
-            : 'Wave 20 boss:<br>CORRUPTED ' + reward.name + rewardLine)
+            : 'Final assault (' + GH.WAVES + '):<br>REVENANT ' + reward.name + rewardLine)
           : 'Clear the previous stage<br>to unlock') + '</div>' +
         '<div class="sc-best">' + (won ? '★ CLEARED · ' : '') +
         (best ? 'best wave ' + best : '') + ' ' + tierBadge + '</div>';
@@ -20720,9 +20893,12 @@ GH.crt = (function () {
         sub: 'permanent stage perks', open: openTrials },
       { id: 'hub-log', glyph: '📖', name: 'COLLECTION LOG',
         sub: comp.pct + '% complete', open: openCollection },
-      { id: 'hub-devotions', glyph: '☀', name: 'DEVOTIONS',
-        sub: GH.meta.isIron() ? 'sealed on iron profiles' : GH.meta.data.salvage + ' salvage to spend',
+      { id: 'hub-attrs', glyph: '⚖', name: 'ATTRIBUTES & ARTS',
+        sub: (GH.attrs.free() > 0 ? '<b class="pl-hot">' + GH.attrs.free() + ' ATTRIBUTE POINT' + (GH.attrs.free() > 1 ? 'S' : '') + ' READY</b> · ' : 'six attributes · ') +
+          (GH.attrs.runeStock() > 0 ? '<b class="pl-hot">' + GH.attrs.runeStock() + ' RUNE' + (GH.attrs.runeStock() > 1 ? 'S' : '') + ' TO READ</b>' : 'combat art runes'),
         open: openHangar },
+      { id: 'hub-journal', glyph: '✎', name: 'QUEST JOURNAL',
+        sub: 'every open task in one ledger', open: function () { openJournal(false); } },
       { id: 'hub-save', glyph: '⛃', name: 'SAVE CODE',
         sub: 'back up or restore progress', open: openSave },
       { id: 'hub-factions', glyph: '⚑', name: 'THE HOUSES',
@@ -21189,47 +21365,234 @@ GH.crt = (function () {
     show('hangar-screen');
   }
 
-  var DEVOTIONS = [
-    { id: 'sol', glyph: '☀', name: 'Sol', css: '#fff2c8', desc: '+8 max health per rank. Rank 4: +0.5 HP/s regen.' },
-    { id: 'pyre', glyph: '🔥', name: 'Pyre', css: '#ff9070', desc: '+3% damage per rank.' },
-    { id: 'keen', glyph: '👁', name: 'Keen', css: '#90d0ff', desc: '+2% attack speed and +1% crit per rank.' },
-    { id: 'verd', glyph: '🌿', name: 'Verd', css: '#90f0a0', desc: '+8% magnet and +4% XP per rank.' },
-    { id: 'ruin', glyph: '☠', name: 'Ruin', css: '#d0a0ff', desc: '+6% crit damage per rank. Rank 3: faster boost.' }
-  ];
+  // ----------------------------------------------------------------
+  // ATTRIBUTES & ARTS — the character under the frame. Six attributes
+  // grow on their own each pilot level and take one free point per
+  // level; runes read into Combat Arts trade recharge for power.
+  function chronicleFrame() {
+    var exp = GH.meta.data.world.exp;
+    if (exp && exp.mechId && GH.mechById(exp.mechId)) return GH.mechById(exp.mechId);
+    var idx = GH.game.getSelectedMech ? GH.game.getSelectedMech() : 0;
+    return GH.mechs[idx] || GH.mechs[0];
+  }
 
   function renderHangar() {
-    document.getElementById('hangar-salvage').innerHTML =
-      'SALVAGE: <span style="color:#fff">' + GH.meta.data.salvage + '</span>' +
-      (GH.meta.isIron() ? ' — <span style="color:#ff8080">IRON RULES: DEVOTIONS SEALED</span>' : '');
-    var wrap = document.getElementById('devotion-list');
+    var A = GH.attrs, def = chronicleFrame(), pp = GH.skills.pilotProgress();
+    document.getElementById('attr-head').innerHTML =
+      'PILOT LEVEL <b>' + pp.lvl + '</b> · FREE POINTS <b class="' + (A.free() ? 'pl-hot' : '') + '">' + A.free() + '</b>' +
+      ' · RUNES HELD <b class="' + (A.runeStock() ? 'pl-hot' : '') + '">' + A.runeStock() + '</b>' +
+      ' · SALVAGE <b>' + GH.meta.data.salvage + '</b>' +
+      ' · auto-growth shown for <b>' + def.name + '</b> (' + (def.lineage || def.id).toUpperCase() + ' lineage)';
+    var wrap = document.getElementById('attr-list');
     wrap.innerHTML = '';
-    DEVOTIONS.forEach(function (d) {
-      var rank = GH.meta.data.devotion[d.id];
-      var active = GH.meta.data.activeDevotion === d.id;
-      var cost = GH.meta.devotionCost(d.id);
-      var div = document.createElement('div');
-      div.className = 'devotion-card' + (active ? ' active' : '');
-      var pips = '';
-      for (var i = 0; i < 5; i++) pips += '<span class="dv-pip' + (i < rank ? ' on' : '') + '"></span>';
-      div.innerHTML =
-        '<div class="dv-glyph">' + d.glyph + '</div>' +
-        '<div class="dv-name" style="color:' + d.css + '">DEVOTION TO ' + d.name.toUpperCase() + '</div>' +
-        '<div class="dv-desc">' + d.desc + '</div>' +
-        '<div class="dv-pips">' + pips + '</div>' +
-        '<button class="dv-buy" ' + (rank >= 5 || GH.meta.data.salvage < cost ? 'disabled' : '') + '>' +
-        (rank >= 5 ? 'MAXED' : 'RANK UP · ' + cost) + '</button>' +
-        '<button class="dv-activate">' + (active ? '◆ ACTIVE PATH' : 'set active') + '</button>';
-      div.querySelector('.dv-buy').onclick = function () {
-        if (GH.meta.buyDevotion(d.id)) { GH.audio.levelup(); renderHangar(); }
+    var maxTotal = 1;
+    A.LIST.forEach(function (a) { maxTotal = Math.max(maxTotal, A.total(a.id, def)); });
+    A.LIST.forEach(function (a) {
+      var auto = A.auto(a.id, def), spent = A.spent(a.id), total = auto + spent;
+      var row = document.createElement('div');
+      row.className = 'attr-row';
+      row.innerHTML =
+        '<div class="attr-glyph" style="color:' + a.css + '">' + a.glyph + '</div>' +
+        '<div class="attr-main"><div class="attr-name" style="color:' + a.css + '">' + a.name +
+        ' <span class="attr-total">' + Math.round(total) + '</span></div>' +
+        '<div class="attr-bar"><span class="attr-fill" style="width:' + Math.round(total / maxTotal * 100) + '%;background:' + a.css + '"></span></div>' +
+        '<div class="attr-desc">' + a.desc + '</div>' +
+        '<div class="attr-sub">lineage ' + auto.toFixed(1) + ' · placed <b>' + spent + '</b></div></div>' +
+        '<button class="attr-plus" ' + (A.free() ? '' : 'disabled') + ' title="place one free point">+</button>';
+      row.querySelector('.attr-plus').onclick = function () {
+        if (A.spend(a.id)) { GH.audio.levelup(); renderHangar(); if (GH.game.refreshPilot) GH.game.refreshPilot(); }
+        else GH.audio.hit();
       };
-      div.querySelector('.dv-activate').onclick = function () {
-        GH.meta.data.activeDevotion = d.id;
-        GH.meta.save();
-        GH.audio.card();
-        renderHangar();
-      };
-      wrap.appendChild(div);
+      wrap.appendChild(row);
     });
+    // what those numbers do, as one derived block
+    var b = A.bonus(def);
+    var pct = function (v) { return (v >= 0 ? '+' : '') + Math.round(v * 100) + '%'; };
+    document.getElementById('attr-derived').innerHTML =
+      '<div class="bk-label">DERIVED FROM YOUR ATTRIBUTES</div>' +
+      '<span>weapon damage <b>' + pct(b.damageMult) + '</b></span>' +
+      '<span>max hull <b>+' + Math.round(b.maxHP) + '</b></span>' +
+      '<span>armor <b>+' + b.armor.toFixed(1) + '</b></span>' +
+      '<span>attack speed <b>' + pct(b.atkSpdMult) + '</b></span>' +
+      '<span>block <b>+' + b.block.toFixed(1) + '%</b></span>' +
+      '<span>crit <b>+' + b.crit.toFixed(1) + '%</b></span>' +
+      '<span>hull regen <b>' + b.regen.toFixed(2) + '/s</b></span>' +
+      '<span>boost regen <b>' + pct(b.boostRegen) + '</b></span>' +
+      '<span>magnet <b>' + pct(b.magnet) + '</b></span>' +
+      '<span>XP <b>' + pct(b.xpGain) + '</b></span>' +
+      '<span>loot find <b>+' + Math.round(b.lootFind) + '%</b></span>' +
+      '<span>art power <b>×' + b.artMult.toFixed(2) + '</b></span>' +
+      '<span>art recharge <b>×' + b.artCd.toFixed(2) + '</b></span>';
+    document.getElementById('btn-attr-reset').textContent = 'RECALIBRATE · ' + A.RESET_COST + ' SALVAGE';
+    document.getElementById('btn-attr-reset').disabled = A.spentTotal() === 0;
+
+    // combat arts and runes
+    var arts = document.getElementById('arts-list');
+    arts.innerHTML = '';
+    var skl = GH.skills.bonuses();
+    A.ART_SLOTS.forEach(function (slot) {
+      var ab = A.artLabel(slot, def), rank = A.artRank(slot);
+      var locked = slot !== 'sig' && !skl.slots[slot];
+      var cd = ab.cd * skl.cdMult * b.artCd * A.artRecharge(slot);
+      var card = document.createElement('div');
+      card.className = 'art-card' + (rank >= A.MAX_RANK ? ' maxed' : '') + (locked ? ' locked' : '');
+      var pips = '';
+      for (var i = 0; i < A.MAX_RANK; i++) pips += '<span class="sk-pip' + (i < rank ? ' on' : '') + '"></span>';
+      card.innerHTML =
+        '<div class="art-glyph">' + ab.glyph + '</div>' +
+        '<div class="art-name">' + ab.name + (slot === 'sig' ? ' <i>signature · ' + def.name + '</i>' : ' <i>slot ' + slot + '</i>') + '</div>' +
+        '<div class="art-desc">' + ab.desc + '</div>' +
+        '<div class="art-stats">rank <b>' + rank + '</b>/' + A.MAX_RANK + ' · power <b>×' + (A.artPower(slot) * b.artMult).toFixed(2) + '</b> · recharge <b>' + cd.toFixed(1) + ' s</b> (base ' + ab.cd + ')' + (locked ? ' · <span class="ws-short">not yet trained (PILOT TRAINING)</span>' : '') + '</div>' +
+        '<div class="sk-pips">' + pips + '</div>' +
+        '<button class="dv-buy art-read" ' + (A.runeStock() > 0 && rank < A.MAX_RANK ? '' : 'disabled') + '>' +
+        (rank >= A.MAX_RANK ? 'MASTERED' : 'READ A RUNE · +12% power · +8% recharge') + '</button>';
+      card.querySelector('.art-read').onclick = function () {
+        if (A.readRune(slot)) { GH.audio.levelup(); renderHangar(); }
+        else GH.audio.hit();
+      };
+      arts.appendChild(card);
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // PILOT CHRONICLE — the title screen's standing record of who you are
+  function renderChronicle() {
+    var el = document.getElementById('title-chronicle');
+    if (!el) return;
+    var A = GH.attrs, d = GH.meta.data, def = chronicleFrame(), pp = GH.skills.pilotProgress();
+    var prof = GH.meta.PROFILES[GH.meta.profile];
+    var comp = GH.progress.completion();
+    var s = GH.progress.seasonCheck();
+    var b = d.broker.active;
+    var band = GH.worldlife.band();
+    var maxT = 1;
+    A.LIST.forEach(function (a) { maxT = Math.max(maxT, A.total(a.id, def)); });
+    var attrs = A.LIST.map(function (a) {
+      var t = A.total(a.id, def);
+      return '<div class="ch-attr"><span class="ch-attr-n" style="color:' + a.css + '">' + a.glyph + ' ' + a.name + '</span>' +
+        '<span class="ch-attr-bar"><span style="width:' + Math.round(t / maxT * 100) + '%;background:' + a.css + '"></span></span>' +
+        '<span class="ch-attr-v">' + Math.round(t) + '</span></div>';
+    }).join('');
+    var exp = d.world.exp;
+    el.innerHTML =
+      '<div class="ch-head">PILOT CHRONICLE</div>' +
+      '<div class="ch-row"><b>' + prof.name + '</b> · ' + (exp && exp.mechId ? 'flying <b>' + def.name + '</b>' : 'last frame <b>' + def.name + '</b>') + '</div>' +
+      '<div class="ch-row">PILOT LEVEL <b class="ch-big">' + pp.lvl + '</b><span class="ch-xp"><span style="width:' + Math.round(pp.into / pp.need * 100) + '%"></span></span></div>' +
+      (A.free() || d.skillPoints || A.runeStock() ? '<div class="ch-row ch-hot">' +
+        (A.free() ? A.free() + ' attribute point' + (A.free() > 1 ? 's' : '') + ' to place' : '') +
+        (d.skillPoints ? (A.free() ? ' · ' : '') + d.skillPoints + ' skill point' + (d.skillPoints > 1 ? 's' : '') : '') +
+        (A.runeStock() ? ((A.free() || d.skillPoints) ? ' · ' : '') + A.runeStock() + ' rune' + (A.runeStock() > 1 ? 's' : '') + ' to read' : '') + '</div>' : '') +
+      '<div class="ch-attrs">' + attrs + '</div>' +
+      '<div class="ch-grid">' +
+      '<span>$ salvage <b>' + d.salvage + '</b></span><span>⬡ alloy <b>' + d.mats.alloy + '</b></span>' +
+      '<span>◈ cores <b>' + d.mats.cores + '</b></span><span>✦ runes <b>' + A.runeStock() + '</b></span>' +
+      '<span>frames <b>' + GH.roster.owned() + '/' + GH.roster.TOTAL + '</b></span><span>log <b>' + comp.pct + '%</b></span>' +
+      '<span>season <b>' + s.pts + ' pts</b></span><span>band <b style="color:' + band.css + '">' + band.name + '</b></span>' +
+      '</div>' +
+      '<div class="ch-row ch-quest">' + (b ? '✎ ' + GH.progress.contractLabel(b) + ' <b>' + b.have + '/' + b.need + '</b>' : '✎ no contract — the BROKER has work') + '</div>' +
+      (exp ? '<div class="ch-row">saved in the Reach at <b>' + (exp.zone ? GH.world.stageFor(exp.zone).name : 'the outpost') + '</b> · Lv ' + exp.level + '</div>' : '');
+  }
+
+  // ----------------------------------------------------------------
+  // QUEST JOURNAL — every open task, one ledger (J in the field, the
+  // hub, the pilot sheet, or the title)
+  var journalFrom = 'hub';
+  function openJournal(fromPlay) {
+    GH.audio.card();
+    if (fromPlay) expEntry = 'journal';
+    journalFrom = GH.game.state === 'title' ? 'title' : 'hub';
+    if (GH.game.state !== 'play' || fromPlay) GH.game.state = 'hangar';
+    renderJournal();
+    show('journal-screen');
+  }
+
+  function renderJournal() {
+    var d = GH.meta.data;
+    var box = function (title, body, cls) { return '<div class="jn-block' + (cls ? ' ' + cls : '') + '"><div class="jn-h">' + title + '</div>' + body + '</div>'; };
+    var line = function (done, text, right) {
+      return '<div class="jn-task' + (done ? ' done' : '') + '"><span class="jn-tick">' + (done ? '☑' : '☐') + '</span><span class="jn-text">' + text + '</span>' + (right ? '<span class="jn-right">' + right + '</span>' : '') + '</div>';
+    };
+    var left = '', right = '';
+
+    // the guided first sortie, if it is running
+    if (GH.game.tutorialActive && GH.game.tutorialActive()) {
+      var ot = document.getElementById('objective-text');
+      left += box('ZERO HOUR — CURRENT OBJECTIVE', '<div class="jn-task"><span class="jn-tick">➤</span><span class="jn-text">' + (ot ? ot.textContent : '') + '</span></div>', 'jn-main');
+    }
+    // contract
+    var c = d.broker.active;
+    left += box('BROKER CONTRACT', c
+      ? line(false, GH.progress.contractLabel(c), c.have + '/' + c.need + ' · ' + c.salvage + ' salvage + ' + c.pts + ' pts')
+      : '<div class="jn-empty">No contract taken. The BROKER always has one.</div>', 'jn-main');
+    // daily board
+    var dl = GH.worldlife.daily();
+    var dhtml = '';
+    dl.tasks.forEach(function (t) {
+      var rw = [];
+      if (t.reward.alloy) rw.push('+' + t.reward.alloy + ' alloy');
+      if (t.reward.cores) rw.push('+' + t.reward.cores + ' core');
+      if (t.reward.salvage) rw.push('+' + t.reward.salvage + ' salvage');
+      dhtml += line(t.claimed, t.desc + (t.done && !t.claimed ? ' <b class="pl-hot">— CLAIM AT THE BROKER</b>' : ''), t.have + '/' + t.need + ' · ' + rw.join(', '));
+    });
+    left += box('DAILY BOARD — ' + dl.day + ' · streak ' + dl.streak, dhtml);
+    // this territory's diary (or the nearest unfinished ones)
+    var here = GH.game.debugInfo ? GH.game.debugInfo().zone : null;
+    var zones = GH.world.ZONES.slice();
+    if (here) zones.sort(function (a, b2) { return (a.id === here ? -1 : 0) - (b2.id === here ? -1 : 0); });
+    var dcount = 0, dhtml2 = '';
+    zones.forEach(function (zn) {
+      if (dcount >= 3) return;
+      var dp = GH.worldlife.diaryProgress(zn.id);
+      var next = null;
+      dp.tiers.forEach(function (t) { if (!next && !t.done) next = t; });
+      if (!next) return;
+      dcount++;
+      dhtml2 += '<div class="jn-sub">' + GH.world.stageFor(zn.id).name + (zn.id === here ? ' <b>(here)</b>' : '') + ' — ' + next.name +
+        ' <span class="jn-right">+' + next.reward.alloy + ' alloy' + (next.reward.cores ? ', +' + next.reward.cores + ' cores' : '') + (next.perk ? ', ' + next.perk.label : '') + '</span></div>';
+      next.tasks.forEach(function (t) { dhtml2 += line(t.done, t.desc, t.have + '/' + t.need); });
+    });
+    left += box('ZONE DIARIES', dhtml2 || '<div class="jn-empty">Every diary tier is complete.</div>');
+
+    // stage trials: the next tier per unlocked stage
+    var thtml = '';
+    GH.stages.forEach(function (st, si) {
+      if ((si + 1) > d.stages) return;
+      var tier = GH.progress.trialTier(st.id);
+      if (tier >= GH.progress.trialTiers.length) return;
+      var tr = GH.progress.trialTiers[tier];
+      thtml += '<div class="jn-sub">' + st.name + ' — ' + tr.name + ' <span class="jn-right">' + tr.perk + '</span></div>';
+      tr.tasks.forEach(function (task) { thtml += line(GH.progress.trialDone(st.id, task.id), task.desc); });
+    });
+    right += box('GAUNTLET TRIALS', thtml || '<div class="jn-empty">Every trial tier is complete.</div>');
+    // season tasks left
+    var s = GH.progress.seasonCheck();
+    var shtml = '', sn = 0;
+    GH.progress.seasonTasks.forEach(function (t) {
+      if (s.done[t.id] || sn >= 8) return;
+      sn++;
+      shtml += line(false, t.desc, '+' + t.pts + ' pts');
+    });
+    right += box('SEASON OF THE ' + GH.progress.seasonName(s.id) + ' — ' + s.pts + ' PTS', shtml || '<div class="jn-empty">Every season task is done.</div>');
+    // feats: frames still to earn
+    var fhtml = '';
+    Object.keys(GH.roster.FEATS).forEach(function (id) {
+      if (d.shells[id]) return;
+      fhtml += line(false, '<b>' + GH.mechById(id).name + '</b> — ' + GH.roster.FEATS[id].desc);
+    });
+    GH.roster.relics.forEach(function (m) {
+      if (d.shells[m.id]) return;
+      var rc = GH.roster.recipes[m.id];
+      var fp = GH.roster.featProgress(rc.feat);
+      fhtml += line(fp.done, '<b>' + m.name + '</b> (relic) — ' + rc.feat.desc, fp.have + '/' + fp.need);
+    });
+    right += box('FEATS — FRAMES STILL TO EARN', fhtml || '<div class="jn-empty">Every feat frame is yours.</div>');
+    // next band
+    var nb = nextBand();
+    var ns = GH.worldlife.bandStatus(nb.id);
+    if (nb.id !== GH.worldlife.band().id && !ns.unlocked) {
+      right += box('NEXT REACH BAND — ' + nb.name, ns.missing.map(function (m) { return line(false, m); }).join(''));
+    }
+    document.getElementById('journal-body').innerHTML = '<div class="jn-col">' + left + '</div><div class="jn-col">' + right + '</div>';
   }
 
   // ----------------------------------------------------------------
@@ -21598,11 +21961,11 @@ GH.crt = (function () {
         var r = new THREE.WebGLRenderer({ canvas: cv, antialias: false });
         r.setPixelRatio(1); r.setSize(cv.width, cv.height, false);
         var sc = new THREE.Scene();
-        sc.background = new THREE.Color(0x0a1030);
+        sc.background = new THREE.Color(0x1a1410);
         sc.add(new THREE.HemisphereLight(0xdfe8ff, 0x303848, 1.0));
         var sun = new THREE.DirectionalLight(0xfff0d0, 0.9); sun.position.set(3, 6, 4); sc.add(sun);
         var cam = new THREE.PerspectiveCamera(38, cv.width / cv.height, 0.1, 60);
-        var floor = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.2, 24), new THREE.MeshLambertMaterial({ color: 0x1a2450 }));
+        var floor = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.2, 24), new THREE.MeshLambertMaterial({ color: 0x4a3620 }));
         floor.position.y = -0.1; sc.add(floor);
         wsView = { r: r, sc: sc, cam: cam, group: null, t: 0 };
       }
@@ -21690,7 +22053,10 @@ GH.crt = (function () {
     var prof = GH.meta.PROFILES[GH.meta.profile];
     var f = GH.factions.state();
     var art = d.world.equipped ? GH.progress.artifactById(d.world.equipped) : null;
-    var devName = { sol: 'Sol', pyre: 'Pyre', keen: 'Keen', verd: 'Verd', ruin: 'Ruin' }[d.activeDevotion] || '—';
+    var frameDef = chronicleFrame();
+    var attrLine = GH.attrs.LIST.map(function (a) {
+      return '<span class="pl-attr" style="color:' + a.css + '" title="' + a.desc + '">' + a.glyph + ' ' + a.name + ' <b>' + Math.round(GH.attrs.total(a.id, frameDef)) + '</b></span>';
+    }).join(' ');
     var live = GH.game.state === 'hangar' && expEntry === 'pilot' && GH.game.debugInfo().hp > 0
       ? GH.game.pauseInfo() : null;
     var frames = [];
@@ -21700,7 +22066,9 @@ GH.crt = (function () {
       '<div class="pl-block"><div class="pl-h">PILOT</div>' +
       '<div class="pl-row">Profile <b>' + prof.name + '</b> — ' + prof.desc + '</div>' +
       '<div class="pl-row">Pilot level <b>' + pp.lvl + '</b> · ' + Math.floor(pp.into) + '/' + Math.ceil(pp.need) + ' XP to next</div>' +
-      '<div class="pl-row">Skill points ready <b class="' + (d.skillPoints ? 'pl-hot' : '') + '">' + d.skillPoints + '</b> · trained ranks <b>' + GH.skills.spentTotal() + '</b></div>' +
+      '<div class="pl-row">Skill points ready <b class="' + (d.skillPoints ? 'pl-hot' : '') + '">' + d.skillPoints + '</b> · trained ranks <b>' + GH.skills.spentTotal() + '</b> · attribute points ready <b class="' + (GH.attrs.free() ? 'pl-hot' : '') + '">' + GH.attrs.free() + '</b></div>' +
+      '<div class="pl-row pl-attrs">' + attrLine + ' <i>(as ' + frameDef.name + ')</i></div>' +
+      '<div class="pl-row">Combat Arts ' + GH.attrs.ART_SLOTS.map(function (sl) { var ab = GH.attrs.artLabel(sl, frameDef); return ab.glyph + ' <b>' + GH.attrs.artRank(sl) + '</b>'; }).join(' · ') + ' · runes to read <b class="' + (GH.attrs.runeStock() ? 'pl-hot' : '') + '">' + GH.attrs.runeStock() + '</b></div>' +
       '<div class="pl-row">Mastery total <b>' + GH.progress.masteryTotal() + '</b> · runs <b>' + d.collection.totalRuns + '</b> · wins <b>' + d.collection.totalWins + '</b> · kills <b>' + d.collection.totalKills + '</b></div>' +
       '</div>' +
       '<div class="pl-block"><div class="pl-h">INVENTORY</div>' +
@@ -21708,7 +22076,7 @@ GH.crt = (function () {
       '<div class="pl-row">⬡ Alloy <b>' + d.mats.alloy + '</b> · ◈ Frame cores <b>' + d.mats.cores + '</b></div>' +
       '<div class="pl-row">Artifact equipped <b>' + (art ? art.name : 'none') + '</b> (' + Object.keys(d.world.artifacts).length + '/' + GH.progress.artifacts.length + ' found — equip in COLLECTION LOG)</div>' +
       '<div class="pl-row">Cosmetics owned <b>' + Object.keys(d.style.owned).length + '</b> — set on the frame select screen</div>' +
-      '<div class="pl-row">Active devotion <b>' + devName + '</b> · broker points <b>' + d.broker.points + '</b></div>' +
+      '<div class="pl-row">Broker points <b>' + d.broker.points + '</b></div>' +
       '<div class="pl-row">House: <b>' + factionsSub() + '</b></div>' +
       '<div class="pl-row">Reach band <b style="color:' + GH.worldlife.band().css + '">' + GH.worldlife.band().name + '</b> · <span class="band-row">' + GH.worldlife.BANDS.map(function (bb) {
         var st = GH.worldlife.bandStatus(bb.id);
@@ -21729,7 +22097,8 @@ GH.crt = (function () {
       '<button class="menu-btn tiny" data-go="skills">PILOT TRAINING</button>' +
       '<button class="menu-btn tiny" data-go="workshop">FRAME WORKSHOP</button>' +
       '<button class="menu-btn tiny" data-go="collection">COLLECTION LOG</button>' +
-      '<button class="menu-btn tiny" data-go="hangar">DEVOTIONS</button>' +
+      '<button class="menu-btn tiny" data-go="hangar">ATTRIBUTES &amp; ARTS</button>' +
+      '<button class="menu-btn tiny" data-go="journal">QUEST JOURNAL</button>' +
       '<button class="menu-btn tiny" data-go="controls">CONTROLS</button>' +
       '<button class="menu-btn tiny" data-go="help">HOW TO PLAY</button>' +
       '</div></div></div>';
@@ -21749,6 +22118,7 @@ GH.crt = (function () {
         else if (g === 'workshop') { workshopReturn = 'pilot'; openWorkshop(); }
         else if (g === 'collection') openCollection();
         else if (g === 'hangar') openHangar();
+        else if (g === 'journal') openJournal(false);
         else if (g === 'controls') openControls();
         else if (g === 'help') openHelp();
       };
@@ -21845,13 +22215,18 @@ GH.crt = (function () {
       '<li><b>' + L('interact') + '</b> uses gates, chests, camp stations. <b>ESC</b> pauses or closes any menu. Rebind everything under CONTROLS.</li></ul>' +
       '<div class="hp-h">GAME MODES</div>' +
       '<ul><li><b>THE SHATTERED REACH</b> — the open world. Your pilot, level and gear are saved automatically; EXIT keeps them, ABANDON deletes them.</li>' +
-      '<li><b>CLASSIC</b> — 20 waves on one stage; the wave-20 boss unlocks the next stage and pays a frame or blueprint data.</li>' +
+      '<li><b>THE GAUNTLET</b> — ' + GH.WAVES + ' assaults on one stage: a warden on the 8th, an OVERRUN on the 12th, and a REVENANT frame on the last. Bring it down to recover that frame (or its blueprint data) and open the next stage.</li>' +
       '<li><b>ARENA</b> — endless waves. <b>WEEKLY</b> — a fixed frame and modifiers shared by everyone that week.</li>' +
-      '<li>EXIT RUN from the pause menu parks a CLASSIC/ARENA run; CONTINUE RUN on the title resumes it at that wave.</li></ul>' +
+      '<li>EXIT RUN from the pause menu parks a GAUNTLET/ARENA run; CONTINUE RUN on the title resumes it at that wave.</li></ul>' +
+      '<div class="hp-h">YOUR PILOT (ATTRIBUTES, ARTS, RUNES)</div>' +
+      '<ul><li><b>Six attributes</b> — MIGHT, REACTOR, HULL, SERVO, COOLANT, UPLINK. They grow on their own every pilot level (a tenth of your lineage\'s starting spread), and every level also pays <b>one free point</b> to place where you like. RECALIBRATE in the hangar refunds them for salvage.</li>' +
+      '<li><b>Combat Arts</b> — your four abilities and your signature. <b>ART RUNES</b> drop from every boss and sometimes from elites; reading one into an art raises its rank: +12% power, but +8% recharge. REACTOR shortens recharges again, so a rune-heavy build wants REACTOR.</li>' +
+      '<li><b>UPLINK</b> raises loot find: more alloy, coin and rune drops.</li>' +
+      '<li><b>QUEST JOURNAL</b> (' + L('journal') + ') — every open contract, daily task, diary tier, trial, season task and feat in one ledger.</li></ul>' +
       '<div class="hp-h">WHERE THINGS ARE</div>' +
-      '<ul><li><b>HANGAR</b> — every progression screen: FRAME WORKSHOP (build frames), PILOT TRAINING (skill tree), DEVOTIONS, BROKER, COLLECTION LOG (artifacts), TRIALS, SEASON, HOUSES, SAVE CODE.</li>' +
+      '<ul><li><b>HANGAR</b> — every progression screen: FRAME WORKSHOP (build frames), PILOT TRAINING (skill tree), ATTRIBUTES &amp; ARTS, QUEST JOURNAL, BROKER, COLLECTION LOG (artifacts), TRIALS, SEASON, HOUSES, SAVE CODE.</li>' +
       '<li><b>PILOT</b> — your character sheet and inventory: materials, artifact, cosmetics, frames owned.</li>' +
-      '<li>In the Reach, the camp stations (console, shrine, memorial, broker) open the same screens without leaving the world.</li></ul>' +
+      '<li>In the Reach, the outpost stations (console, shrine, memorial, broker) open the same screens without leaving the world.</li></ul>' +
       '</div><div class="hp-col">' +
       '<div class="hp-h">UNLOCKING FRAMES (' + GH.roster.owned() + ' / ' + GH.roster.TOTAL + ')</div>' +
       '<ul><li><b>Starters</b>: AEGIS and VULCAN are yours from the first sortie.</li>' +
@@ -21865,12 +22240,12 @@ GH.crt = (function () {
       '<li><b>Daily task board</b> (BROKER or PILOT): three tasks a day, claim each, sweep all three for a bonus core and a growing streak.</li>' +
       '<li><b>Alloy veins</b>: grey crystal clusters in every territory. Press ' + L('interact') + ' to mine. Danger III–IV veins can hold a frame core. They regrow daily.</li>' +
       '<li><b>Cache signals</b>: every few minutes a treasure site pings and is marked gold on the minimap. Worth the detour.</li>' +
-      '<li><b>Hunts</b>: fifty named bosses, four or five per territory. One roams each territory per day at a skull totem (☠ on the minimap, listed on the WORLD MAP). Each has its own mechanics — WEAK POINT bosses take 2.5× from behind, SHIELDED ones drop their shield when their adds die, BURROWERS erupt under you. They pay cores and fill the BESTIARY in the COLLECTION LOG. ARENA and CLASSIC midboss waves draw from the same pool.</li>' +
+      '<li><b>Hunts</b>: fifty named bosses, four or five per territory. One roams each territory per day at a skull totem (☠ on the minimap, listed on the WORLD MAP). Each has its own mechanics — WEAK POINT bosses take 2.5× from behind, SHIELDED ones drop their shield when their adds die, BURROWERS erupt under you. They pay cores and fill the BESTIARY in the COLLECTION LOG. ARENA and GAUNTLET midboss waves draw from the same pool.</li>' +
       '<li>Higher DANGER zones pay more alloy per drop, richer veins, and richer signals — Albion rules: risk buys reward.</li>' +
-      '<li><b>Reach bands</b> (title screen or PILOT sheet): BRONZE → SILVER → GOLD → PLATINUM. Each band scales enemy hull and damage, spawns elites in the open world, and pays more alloy, salvage and cores per hunt. Bands unlock by slaying hunts, finishing diary tiers, pilot level and CLASSIC clears — never bought.</li></ul>' +
+      '<li><b>Reach bands</b> (title screen or PILOT sheet): BRONZE → SILVER → GOLD → PLATINUM. Each band scales enemy hull and damage, spawns elites in the open world, and pays more alloy, salvage and cores per hunt. Bands unlock by slaying hunts, finishing diary tiers, pilot level and GAUNTLET clears — never bought.</li></ul>' +
       '<div class="hp-h">TIPS</div>' +
-      '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run CLASSIC to wave 20 for cores.</li>' +
-      '<li>Sparks feed your persistent PILOT LEVEL — every level is a skill point for PILOT TRAINING.</li>' +
+      '<ul><li>Elites always drop alloy. Farm ARENA for alloy; run the GAUNTLET to its last assault for cores and runes.</li>' +
+      '<li>Sparks feed your persistent PILOT LEVEL — every level is a skill point for PILOT TRAINING and an attribute point for ATTRIBUTES &amp; ARTS.</li>' +
       '<li>Wards cut matched damage by 75%. Watch the colour of what is hitting you.</li>' +
       '<li>Your save lives in this browser. HANGAR → SAVE CODE exports it; paste it on another machine to restore.</li></ul>' +
       '</div>';
@@ -21912,6 +22287,7 @@ GH.crt = (function () {
     byId('btn-title-pilot').onclick = function () { openPilot(false, 'title'); };
     byId('btn-title-controls').onclick = openControls;
     byId('btn-title-help').onclick = openHelp;
+    byId('btn-title-journal').onclick = function () { openJournal(false); };
     byId('btn-profile').onclick = cycleProfile;
 
     back('hub-screen', 'btn-hub-back', metaBack('hub', toTitle));
@@ -21944,6 +22320,18 @@ GH.crt = (function () {
       else openHub();
     });
     back('save-screen', 'btn-save-back', openHub);
+    back('journal-screen', 'btn-journal-back', function () {
+      if (expEntry === 'journal') resumeExpedition();
+      else if (pilotReturn) { pilotReturn = false; openPilot(false); }
+      else if (journalFrom === 'title') toTitle();
+      else openHub();
+    });
+    byId('btn-attr-reset').onclick = function () {
+      confirmBox('RECALIBRATE ATTRIBUTES?', 'Every point you placed is refunded for ' + GH.attrs.RESET_COST + ' salvage. Auto-grown values are untouched.', 'RECALIBRATE', function () {
+        if (GH.attrs.reset()) { GH.audio.win(); renderHangar(); if (GH.game.refreshPilot) GH.game.refreshPilot(); }
+        else GH.audio.hit();
+      });
+    };
     back('workshop-screen', 'btn-ws-back', function () {
       if (expEntry === 'workshop') resumeExpedition();
       else if (workshopReturn === 'select') { workshopReturn = 'hub'; enterSelect(GH.game.mode); }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>STAALREUS — steel giants, a mech arena survivor</title>
+<title>STAALREUS — steel giants of the Shattered Reach</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -38,7 +38,7 @@
         <div id="contract-line"></div>
       </div>
       <div id="hud-center">
-        <div id="wave-label">Wave 1/20</div>
+        <div id="wave-label">Wave 1/16</div>
         <div id="wave-timer">30.0</div>
         <div id="target-panel" class="hidden">
           <div id="target-name">???</div>
@@ -81,35 +81,46 @@
 
   <!-- ===================== TITLE ===================== -->
   <div id="title-screen" class="screen">
-    <div class="title-grid"></div>
-    <h1 class="game-title">STAALREUS</h1>
-    <div class="title-sub">STEEL GIANT · A MECH ARENA SURVIVOR</div>
-    <div class="title-menu">
-      <button id="btn-play-first" class="menu-btn hidden">PLAY — ZERO HOUR</button>
-      <div id="first-desc" class="menu-desc hidden">Your first sortie: ten guided minutes that teach the controls, the vehicle, and the workshop.</div>
-      <button id="btn-continue" class="menu-btn small continue-btn hidden">CONTINUE RUN</button>
-      <button id="btn-expedition" class="menu-btn">THE SHATTERED REACH</button>
-      <div id="exp-desc" class="menu-desc"></div>
-      <div class="title-row">
-        <button id="btn-band" class="menu-btn tiny band-btn">BAND: BRONZE</button>
-        <button id="btn-new-exp" class="menu-btn tiny hidden">NEW EXPEDITION (delete saved pilot)</button>
+    <div class="title-bg"><div class="title-gear"></div><div class="title-gear small"></div><div class="title-horizon"></div></div>
+    <div class="title-frame">
+      <div class="title-left">
+        <div class="title-crest">⚙</div>
+        <h1 class="game-title">STAALREUS</h1>
+        <div class="title-sub">STEEL GIANTS OF THE SHATTERED REACH</div>
+        <div class="title-rule"></div>
+        <div class="title-menu">
+          <button id="btn-play-first" class="menu-btn primary hidden">BEGIN — ZERO HOUR</button>
+          <div id="first-desc" class="menu-desc hidden">Your first sortie: ten guided minutes that teach the controls, the vehicle, and the workshop.</div>
+          <button id="btn-continue" class="menu-btn small continue-btn hidden">CONTINUE RUN</button>
+          <button id="btn-expedition" class="menu-btn primary">THE SHATTERED REACH</button>
+          <div id="exp-desc" class="menu-desc"></div>
+          <div class="title-row">
+            <button id="btn-band" class="menu-btn tiny band-btn">BAND: BRONZE</button>
+            <button id="btn-new-exp" class="menu-btn tiny hidden">NEW EXPEDITION (delete saved pilot)</button>
+          </div>
+          <div id="band-desc" class="menu-desc"></div>
+          <div class="title-modes">
+            <div class="title-choice"><button id="btn-start" class="menu-btn small">THE GAUNTLET</button><div class="menu-desc">sixteen assaults · a revenant at the end · recover its frame</div></div>
+            <div class="title-choice"><button id="btn-arena" class="menu-btn small">ARENA</button><div class="menu-desc">endless assaults · farm alloy and runes</div></div>
+            <div class="title-choice"><button id="btn-weekly" class="menu-btn small">WEEKLY</button><div class="menu-desc">one fixed challenge for everyone</div></div>
+          </div>
+          <div class="title-row title-doors">
+            <button id="btn-hub" class="menu-btn small">HANGAR</button>
+            <button id="btn-title-pilot" class="menu-btn small">PILOT</button>
+            <button id="btn-title-journal" class="menu-btn small">JOURNAL</button>
+            <button id="btn-title-controls" class="menu-btn small">CONTROLS</button>
+            <button id="btn-title-help" class="menu-btn small">HOW TO PLAY</button>
+          </div>
+          <div class="title-row">
+            <button id="btn-tutorial" class="menu-btn tiny">REPLAY ZERO HOUR</button>
+            <button id="btn-profile" class="menu-btn tiny profile-btn">PROFILE: STANDARD</button>
+          </div>
+          <div id="backup-nudge" class="menu-desc hidden"></div>
+        </div>
       </div>
-      <div id="band-desc" class="menu-desc"></div>
-      <div class="title-row">
-        <div class="title-choice"><button id="btn-start" class="menu-btn small">CLASSIC</button><div class="menu-desc">20 waves · beat the boss to earn a frame</div></div>
-        <div class="title-choice"><button id="btn-arena" class="menu-btn small">ARENA</button><div class="menu-desc">endless waves · farm alloy</div></div>
-        <div class="title-choice"><button id="btn-weekly" class="menu-btn small">WEEKLY</button><div class="menu-desc">one fixed challenge for everyone</div></div>
+      <div class="title-right">
+        <div id="title-chronicle" class="chronicle"></div>
       </div>
-      <div class="title-row">
-        <button id="btn-hub" class="menu-btn small">HANGAR</button>
-        <button id="btn-title-pilot" class="menu-btn small">PILOT</button>
-        <button id="btn-title-controls" class="menu-btn small">CONTROLS</button>
-        <button id="btn-title-help" class="menu-btn small">HOW TO PLAY</button>
-        <button id="btn-tutorial" class="menu-btn tiny">REPLAY ZERO HOUR</button>
-        <button id="btn-profile" class="menu-btn tiny profile-btn">PROFILE: STANDARD</button>
-      </div>
-      <div id="backup-nudge" class="menu-desc hidden"></div>
-      <div class="menu-desc">HANGAR: build frames, train your pilot, devotions, contracts, collection · PILOT: your character sheet &amp; inventory</div>
     </div>
     <div id="title-salvage"></div>
     <div id="title-memorial"></div>
@@ -156,16 +167,26 @@
   <!-- ===================== STAGE SELECT ===================== -->
   <div id="stage-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-stage-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;&nbsp;SELECT</h2><span class="esc-hint">ESC closes</span></div>
-    <div class="screen-sub wide">Pick a stage. CLASSIC ends on a wave-20 boss that pays a frame or blueprint data and opens the next stage. ARENA never ends.</div>
+    <div class="screen-sub wide">Pick a stage. THE GAUNTLET is sixteen assaults: a warden, an overrun, and a REVENANT frame at the end — bring it down to recover the frame (or its blueprint data) and open the next stage. ARENA never ends.</div>
     <div id="stage-list"></div>
   </div>
 
-  <!-- ===================== HANGAR / DEVOTIONS ===================== -->
+  <!-- ===================== ATTRIBUTES & ARTS ===================== -->
   <div id="hangar-screen" class="screen hidden">
-    <div class="screen-head"><button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">DEVOTIONS</h2><span class="esc-hint">ESC closes</span></div>
-    <div class="screen-sub wide">Spend SALVAGE on permanent paths. Each rank is a small stat you keep forever; the ACTIVE path also grows every level-up in a run. Why: this is the cheapest permanent power in the game.</div>
-    <div id="hangar-salvage"></div>
-    <div id="devotion-list"></div>
+    <div class="screen-head"><button id="btn-hangar-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">ATTRIBUTES&nbsp;&amp;&nbsp;ARTS</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Six attributes grow on their own every pilot level — a tenth of your lineage's starting spread — and every level also pays ONE FREE POINT to place. Combat Arts deepen by reading RUNES: each rank hits harder but recharges slower; REACTOR pulls the recharge back.</div>
+    <div id="attr-head"></div>
+    <div id="attr-body">
+      <div id="attr-col">
+        <div id="attr-list"></div>
+        <div id="attr-derived"></div>
+        <button id="btn-attr-reset" class="menu-btn tiny">RECALIBRATE</button>
+      </div>
+      <div id="arts-col">
+        <div class="bk-label">COMBAT ARTS — READ RUNES TO DEEPEN THEM</div>
+        <div id="arts-list"></div>
+      </div>
+    </div>
   </div>
 
   <!-- ===================== HANGAR HUB ===================== -->
@@ -252,13 +273,13 @@
   <!-- ===================== STAGE TRIALS ===================== -->
   <div id="trials-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-trials-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">STAGE&nbsp;TRIALS</h2><span class="esc-hint">ESC closes</span></div>
-    <div class="screen-sub wide">Per-stage challenges for CLASSIC runs. Why: each tier is a permanent perk on that stage (more salvage, XP, damage, gem drops).</div>
+    <div class="screen-sub wide">Per-stage challenges for GAUNTLET runs. Why: each tier is a permanent perk on that stage (more salvage, XP, damage, gem drops).</div>
     <div id="trials-body"></div>
   </div>
 
   <!-- ===================== WAVE REWARD ===================== -->
   <div id="reward-screen" class="screen hidden">
-    <h2 id="reward-heading" class="reward-title">WAVE&nbsp;REWARD</h2>
+    <h2 id="reward-heading" class="reward-title">FIELD&nbsp;SALVAGE</h2>
     <div id="reward-sub">Choose one upgrade</div>
     <div id="reward-cards"></div>
   </div>
@@ -307,6 +328,13 @@
     <div id="pilot-body"></div>
   </div>
 
+  <!-- ===================== QUEST JOURNAL ===================== -->
+  <div id="journal-screen" class="screen hidden">
+    <div class="screen-head"><button id="btn-journal-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">QUEST&nbsp;JOURNAL</h2><span class="esc-hint">ESC closes</span></div>
+    <div class="screen-sub wide">Every open task in one ledger: your contract, today's board, the diaries, gauntlet trials, season tasks, and the feats that still guard a frame.</div>
+    <div id="journal-body"></div>
+  </div>
+
   <!-- ===================== CONTROLS ===================== -->
   <div id="controls-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-controls-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">CONTROLS</h2><span class="esc-hint">ESC closes</span></div>
@@ -324,7 +352,7 @@
         <label class="ct-set">Music volume <input type="range" id="set-music" min="0" max="100" step="5"> <span id="set-music-val"></span></label>
         <label class="ct-set">Effects volume <input type="range" id="set-sfx" min="0" max="100" step="5"> <span id="set-sfx-val"></span></label>
         <div class="ct-group">DEFAULT SCHEME</div>
-        <div class="ct-note">W/S walk · A/D turn · Q/E strafe · hold RIGHT MOUSE to look · WHEEL zoom · LEFT CLICK attack · 1–4 abilities · Z/X/C wards · SPACE boost · SHIFT special · T transform · F interact · V camera · K training · M map · P pilot</div>
+        <div class="ct-note">W/S walk · A/D turn · Q/E strafe · hold RIGHT MOUSE to look · WHEEL zoom · LEFT CLICK attack · 1–4 abilities · Z/X/C wards · SPACE boost · SHIFT special · T transform · F interact · V camera · K training · M map · P pilot · J journal</div>
         <button id="btn-controls-reset" class="menu-btn tiny">RESET TO DEFAULTS</button>
       </div>
     </div>
@@ -379,6 +407,7 @@
 <script src="js/bosses.js"></script>
 <script src="js/progress.js"></script>
 <script src="js/skills.js"></script>
+<script src="js/attrs.js"></script>
 <script src="js/roster.js"></script>
 <script src="js/vehicles.js"></script>
 <script src="js/worldlife.js"></script>

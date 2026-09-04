@@ -742,7 +742,7 @@ GH.world = (function () {
       gt.mesh = mesh;
     });
 
-    // the hub: survivor camp + race sites (wreck territory only)
+    // the hub: the outpost + race sites (wreck territory only)
     if (zoneId === 'wreck') {
       var camp = new THREE.Group();
       camp.position.set(W.CAMP.x, gy(W.CAMP.x, W.CAMP.z), W.CAMP.z);
@@ -799,7 +799,7 @@ GH.world = (function () {
     if (zoneId === 'wreck') {
       list.push(
         { kind: 'broker', x: W.CAMP.x - 5, z: W.CAMP.z - 3, label: 'TALK TO THE BROKER' },
-        { kind: 'shrine', x: W.CAMP.x + 5, z: W.CAMP.z - 3, label: 'PRAY AT THE SHRINE (DEVOTIONS)' },
+        { kind: 'shrine', x: W.CAMP.x + 5, z: W.CAMP.z - 3, label: 'KNEEL AT THE SHRINE (ATTRIBUTES & ARTS)' },
         { kind: 'memorial', x: W.CAMP.x, z: W.CAMP.z - 7, label: 'READ THE MEMORIAL (COLLECTION LOG)' },
         { kind: 'console', x: W.CAMP.x - 5, z: W.CAMP.z + 4, label: 'RUN SIM MISSIONS' },
         { kind: 'duel', x: W.CAMP.x + 6, z: W.CAMP.z + 5, label: 'ENTER THE TRACE DUEL' },

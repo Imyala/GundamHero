@@ -117,7 +117,7 @@ Campaign clear on a band unlocks the next. Hardcore/Iron profiles stay as-is (on
 
 ## 5. Meta layers kept from the codebase
 
-- **Devotions** (Vital Shell): one active permanent stat line, max rank 10, levelled by finishing sorties.
+- **Attributes and runes** (as built, `js/attrs.js`): six attributes with 10%/level auto-growth plus one free point per pilot level; Combat Art runes at +12% power / +8% recharge per rank, REACTOR shortens recharge.
 - **Frame mastery** (cap 50): +0.5% damage and +1 HP per level, cosmetic milestones at 10/25/40/50.
 - **Relic seasons**: monthly, 8 relics with downsides. Keep.
 - **Trials, Broker, Collection Log**: keep; the Collection Log can now reach 100% (doc 05 makes every weapon obtainable).
@@ -128,7 +128,7 @@ Campaign clear on a band unlocks the next. Hardcore/Iron profiles stay as-is (on
 |---|---|---|
 | 1–4 | one weapon, one Art, heat, transform | Mission 1 "Zero Hour" |
 | 5 | first Pilot point | a mission that needs the thing it unlocks (jump-jets) |
-| 10 | frame line choice, Frame tree opens | first Corrupted mirror |
+| 10 | frame line choice, Frame tree opens | first Revenant mirror |
 | 15 | sockets open | first gem drop |
 | 20 | secondary stats appear on gear tooltips | hangar unlock "Advanced Readout" |
 | 30 | Combo Console, Trace duels | hub race unlock |

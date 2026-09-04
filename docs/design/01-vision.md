@@ -47,7 +47,7 @@ Vector form draws walls and the Frame form fights on the map you drew.
 Sacred: attributes auto-grow (identity stays), one free point nudges, Combat Arts cost recharge time,
 sockets are commitments, item tiers Common → Set. WoW: three-layer trees (pilot / frame / weapon
 lines), 5-point tier gates, capstones, choice nodes, free loadout swaps in the hangar, rating DR.
-Vital Shell (which this repo's arena mode already mirrors): devotions as one active permanent stat line.
+Attributes (as built): six Sacred-style attributes with automatic growth plus one free point per level, and Combat Art runes.
 
 ## Tone and look
 
@@ -65,7 +65,7 @@ HUD vocabulary from Gun Metal: radar disc, blocky cyan panels, form badge with a
 | 2–6 | Lock-on, missile salvo (hold to paint, release), repair beacon in Frame form only |
 | 6–15 | Heat, boost fuel, stagger window, per-form weapon slots |
 | 15–40 | First race: throttle, brake, handbrake drift, nitro from drifting |
-| 40–90 | First skill point, first socket, first Corrupted mirror boss, first frame unlock |
+| 40–90 | First skill point, first socket, first Revenant mirror boss, first frame unlock |
 | 90+ | Weapon lines, frame tree gates, parts and rarity, difficulty bands, Trace duels, ascension tiers |
 
 Nothing on the right of the table is required to finish the campaign on Bronze.

@@ -1,13 +1,13 @@
 // STAALREUS — persistent meta progression (localStorage)
-// Pilot profiles (Standard / Iron Frame / Iron Core), salvage bank, shell &
-// stage unlocks, devotions, contracts, collection log, stage trials, records.
+// Pilot profiles (Standard / Iron Frame / Iron Core), salvage bank, frame &
+// stage unlocks, attributes, art runes, contracts, collection log, trials.
 GH.meta = (function () {
   var M = {};
   M.VERSION = '0.9.0';
 
   M.PROFILES = {
     standard: { key: 'hf_meta_v2', name: 'STANDARD', desc: 'Full hangar support.' },
-    iron: { key: 'hf_meta_iron_v1', name: 'IRON FRAME', desc: 'No devotions, no loadout kits. Self-reliant.' },
+    iron: { key: 'hf_meta_iron_v1', name: 'IRON FRAME', desc: 'No loadout kits, no bought perks. Self-reliant.' },
     hardcore: { key: 'hf_meta_hc_v1', name: 'IRON CORE', desc: 'Iron rules — and one death wipes the profile.' }
   };
   M.profile = 'standard';
@@ -20,7 +20,7 @@ GH.meta = (function () {
       mats: { alloy: 0, cores: 0 },
       // one-off feats (relic prerequisites): harrow, ...
       feats: {},
-      // a CLASSIC / ARENA / WEEKLY run left mid-way with EXIT RUN
+      // a GAUNTLET / ARENA / WEEKLY run left mid-way with EXIT RUN
       suspended: null,
       // vehicle designs: chosen per lineage, and the second designs bought
       vectorPick: {},
@@ -41,8 +41,16 @@ GH.meta = (function () {
       lastExport: null,
       saveVersion: 2,
       stages: 1,
+      // legacy stat lines — converted into attribute points on load
       devotion: { sol: 0, pyre: 0, keen: 0, verd: 0, ruin: 0 },
-      activeDevotion: 'sol',
+      // six attributes: spent free points, unspent points, and the flag
+      // that says the old lines were already converted
+      attr: {},
+      attrPts: 0,
+      attrMigrated: false,
+      // Combat Art ranks (runes read) and runes waiting to be read
+      arts: {},
+      runeStock: 0,
       bestWave: {},
       bestArena: 0,
       victories: {},
@@ -137,6 +145,7 @@ GH.meta = (function () {
         }
       }
     } catch (e) { /* storage unavailable — session-only meta */ }
+    if (GH.attrs) GH.attrs.migrate();
   };
 
   M.save = function () {
@@ -258,38 +267,6 @@ GH.meta = (function () {
 
   M.unlockStage = function (n) {
     if (n > M.data.stages) { M.data.stages = n; M.save(); }
-  };
-
-  M.devotionCost = function (path) {
-    return 25 + M.data.devotion[path] * 25;
-  };
-
-  M.buyDevotion = function (path) {
-    if (M.isIron()) return false;
-    var cost = M.devotionCost(path);
-    if (M.data.devotion[path] >= 5 || M.data.salvage < cost) return false;
-    M.data.salvage -= cost;
-    M.data.devotion[path]++;
-    M.save();
-    return true;
-  };
-
-  M.devotionBonus = function () {
-    if (M.isIron()) {
-      return { maxHP: 0, regen: 0, damageMult: 0, atkSpdMult: 0, crit: 0, magnet: 0, xpGain: 0, critMult: 0, boostRegen: 0 };
-    }
-    var d = M.data.devotion;
-    return {
-      maxHP: d.sol * 8,
-      regen: d.sol >= 4 ? 0.5 : 0,
-      damageMult: d.pyre * 0.03,
-      atkSpdMult: d.keen * 0.02,
-      crit: d.keen * 1,
-      magnet: d.verd * 0.08,
-      xpGain: d.verd * 0.04,
-      critMult: d.ruin * 0.06,
-      boostRegen: d.ruin >= 3 ? 0.15 : 0
-    };
   };
 
   // ---------------------------------------------------------------

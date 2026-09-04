@@ -76,7 +76,7 @@ Sources, in the order a player meets them:
 
 1. **Mission reward**: every campaign mission awards exactly one new weapon *or* frame (20 missions → ~14 weapons, 6 frames).
 2. **Drops**: enemies drop weapons of their family at rarity by band; aces drop their Signature.
-3. **Corrupted mirror bosses**: drop the mirrored frame's signature weapon and unlock the frame (codebase rule).
+3. **Revenant mirror bosses**: drop the mirrored frame's signature weapon and unlock the frame (codebase rule).
 4. **Blueprints**: 5 fragments from a dungeon archetype craft that archetype's weapon (Labyrinth → bits, Raceway → torpedoes, Halls → field, Crucible → mega cannon).
 5. **Capture** (Spike-Dock, doc 06/07): steal an enemy's weapon arm mid-fight; keeps it if you finish the mission.
 6. **Races**: podium = Vector part; drift/drag records = tuning parts.

@@ -145,7 +145,7 @@ GH.progress = (function () {
     { id: 'IV', name: 'TIER IV', perk: 'Bosses here drop two gems',
       tasks: [
         { id: 'clear', desc: 'Clear the stage (Classic)' },
-        { id: 'nobound', desc: 'Slay the corrupted frame before it goes UNBOUND' }
+        { id: 'nobound', desc: 'Slay the revenant before it goes UNBOUND' }
       ] }
   ];
 
@@ -375,7 +375,7 @@ GH.progress = (function () {
 
   P.seasonTasks = [
     { id: 'w10', pts: 10, desc: 'Reach wave 10 in any run' },
-    { id: 'w15', pts: 15, desc: 'Reach wave 15 in any run' },
+    { id: 'w15', pts: 15, desc: 'Reach wave 14 in any run' },
     { id: 'clear1', pts: 25, desc: 'Clear any stage' },
     { id: 'clear3', pts: 40, desc: 'Clear three different stages' },
     { id: 'frames3', pts: 40, desc: 'Win with three different frames' },
@@ -384,8 +384,8 @@ GH.progress = (function () {
     { id: 'res1', pts: 15, desc: 'Complete a Resonance' },
     { id: 'res5', pts: 30, desc: 'Complete five Resonances this season' },
     { id: 'carapace', pts: 15, desc: 'Destroy a Grave Carapace' },
-    { id: 'corrupt', pts: 25, desc: 'Destroy a corrupted frame' },
-    { id: 'unbound', pts: 20, desc: 'Slay a corrupted frame while it is UNBOUND' },
+    { id: 'corrupt', pts: 25, desc: 'Destroy a revenant frame' },
+    { id: 'unbound', pts: 20, desc: 'Slay a revenant while it is UNBOUND' },
     { id: 'arena25', pts: 30, desc: 'Reach wave 25 in the Arena' },
     { id: 'contracts3', pts: 25, desc: 'Fill three Broker contracts this season' },
     { id: 'sparks500', pts: 15, desc: 'Gather 500 sparks this season' },

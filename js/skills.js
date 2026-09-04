@@ -120,7 +120,9 @@ GH.skills = (function () {
     GH.meta.data.pilotXP = (GH.meta.data.pilotXP || 0) + amount;
     var after = S.pilotLevel(GH.meta.data.pilotXP);
     if (after > before) {
+      // every pilot level pays one skill point and one attribute point
       GH.meta.data.skillPoints += after - before;
+      GH.meta.data.attrPts = (GH.meta.data.attrPts || 0) + (after - before);
       GH.meta.save();
     }
     return after - before;

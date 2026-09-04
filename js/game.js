@@ -304,7 +304,7 @@ GH.game = (function () {
   // =================================================================
   function makePlayer(mechDef) {
     var s = mechDef.stats;
-    var dev = GH.meta.devotionBonus();
+    var dev = GH.attrs.bonus(mechDef); // six attributes: auto-grown + spent points
     var skl = GH.skills.bonuses(); // the pilot's trained tree
     var p = {
       def: mechDef,
@@ -313,9 +313,9 @@ GH.game = (function () {
       x: 0, z: 0, facing: 0, moveX: 0, moveZ: 0,
       stats: {
         maxHP: s.maxHP + dev.maxHP + skl.maxHP, speed: s.speed * 0.42,
-        armor: s.armor + skl.armor,
-        block: s.block + skl.block, crit: s.crit + dev.crit + skl.crit,
-        critMult: 1.6 + dev.critMult,
+        armor: s.armor + skl.armor + dev.armor,
+        block: s.block + skl.block + dev.block, crit: s.crit + dev.crit + skl.crit,
+        critMult: 1.6,
         lifesteal: s.lifesteal,
         damageMult: 1 + dev.damageMult + skl.damageMult,
         atkSpdMult: 1 + dev.atkSpdMult + skl.atkSpdMult, flatDamage: 0,
@@ -323,7 +323,10 @@ GH.game = (function () {
         bonusProj: skl.cleave ? 1 : 0,
         boostRegen: 0.35 + dev.boostRegen + skl.boostRegen, boostCost: 0.34,
         elemMult: mechDef.elemMult || (mechDef.id === 'hexen' ? 1.15 : 1),
-        energyMax: skl.energyMax, energyRegen: skl.energyRegen
+        energyMax: skl.energyMax, energyRegen: skl.energyRegen,
+        // UPLINK: loot find (% more alloy, coin and rune drops); REACTOR:
+        // Combat Art power and recharge
+        lootFind: dev.lootFind, artMult: dev.artMult, artCd: dev.artCd
       },
       skillBon: skl,
       energy: skl.energyMax,
@@ -459,13 +462,6 @@ GH.game = (function () {
       else if (k === 'magnet') s.magnet *= 1 + v / 100;
     };
     for (var k in g) apply(k, g[k]);
-    // active devotion path grants a small extra each level
-    var d = GH.meta.data.activeDevotion;
-    if (d === 'sol') apply('maxHP', 2);
-    else if (d === 'pyre') apply('damage', 0.5);
-    else if (d === 'keen') apply('atkSpd', 1);
-    else if (d === 'verd') apply('magnet', 1.5);
-    else if (d === 'ruin') apply('crit', 0.5);
   }
 
   // =================================================================
@@ -825,8 +821,14 @@ GH.game = (function () {
       spawnPickup('coin', e.x, e.z);
       spawnPickup('spark1', e.x + 0.5, e.z);
       spawnPickup('alloy', e.x - 0.5, e.z + 0.4);
-    } else if (!e.def.boss && !e.nestId && Math.random() < 0.12) {
+    } else if (!e.def.boss && !e.nestId && Math.random() < 0.12 * (1 + player.stats.lootFind / 100)) {
       spawnPickup('alloy', e.x + GH.rand(-0.5, 0.5), e.z + GH.rand(-0.5, 0.5));
+    }
+    // ART RUNES: every boss carries one (revenants two); elites sometimes
+    if (e.def.boss) {
+      for (var rn = 0; rn < (e.def.corrupt ? 2 : 1); rn++) spawnPickup('rune', e.x + rn * 1.4 - 0.7, e.z + 1.4);
+    } else if (e.elite && Math.random() < 0.08 * (1 + player.stats.lootFind / 100)) {
+      spawnPickup('rune', e.x, e.z + 0.8);
     }
     if (e.def.boss) {
       // wardens and other mid-bosses drop a core; true bosses drop two
@@ -848,7 +850,7 @@ GH.game = (function () {
       if (bossRef === e) { bossRef = null; GH.music.setBoss(false); }
       GH.audio.explode();
     } else {
-      var coinChance = 0.10 + (artOn('harvest_coil') ? 0.12 : 0);
+      var coinChance = (0.10 + (artOn('harvest_coil') ? 0.12 : 0)) * (1 + player.stats.lootFind / 200);
       if (Math.random() < coinChance) spawnPickup('coin', e.x, e.z);
       if (Math.random() < 0.045) spawnPickup('heart', e.x, e.z);
     }
@@ -1348,7 +1350,7 @@ GH.game = (function () {
     }
   }
 
-  // ---- corrupt shell boss AI: archetype attacks every few seconds ----
+  // ---- revenant boss AI: archetype attacks every few seconds ----
   function corruptAI(e, dt, dist, nx, nz) {
     var out = { mx: nx, mz: nz };
     // phase 2 at half hull: UNBOUND — faster cycle + radial bursts
@@ -1365,7 +1367,7 @@ GH.game = (function () {
       e.mesh.add(aura);
       e.abilityT = Math.min(e.abilityT, 1.2);
     }
-    // TERMINAL phase for the last two frames' corrupt doubles
+    // TERMINAL phase for the last two frames' revenants
     if (!e.phase3 && e.phase2 && e.hp < e.maxHp * 0.25 &&
       (e.id === 'strix' || e.id === 'titan')) {
       e.phase3 = true;
@@ -1930,14 +1932,16 @@ GH.game = (function () {
       return;
     }
     var inst = player.weapons[0];
-    var dmg = weaponDamage(inst);
+    // runes read into this art raise its power; REACTOR and the tree pull
+    // the recharge back down
+    var dmg = weaponDamage(inst) * player.stats.artMult * GH.attrs.artPower(slot);
     var range = slot === 1 ? attackRange(inst) : 20;
     if (needsTarget && GH.dist2(player.x, player.z, target.x, target.z) > range * range) {
       announce('OUT OF RANGE', 16);
       return;
     }
     player.energy -= ab.cost;
-    player.abilityCds[slot] = ab.cd * bon.cdMult;
+    player.abilityCds[slot] = ab.cd * bon.cdMult * player.stats.artCd * GH.attrs.artRecharge(slot);
     tutorialEvent('ability', 1);
 
     if (slot === 1) {          // RUPTURE — focused strike
@@ -1998,12 +2002,12 @@ GH.game = (function () {
     if (player.energy < sg.cost) { announce('LOW ENERGY', 16); GH.audio.hit(); return; }
     var key = player.def.kind === 'relic' ? player.def.relicBase : (player.def.lineage || player.def.id);
     var inst = player.weapons[0];
-    var dmg = weaponDamage(inst) * player.sigPower;
+    var dmg = weaponDamage(inst) * player.sigPower * player.stats.artMult * GH.attrs.artPower(5);
     var needsTarget = key === 'fang' || key === 'viper';
     if (needsTarget && (!target || target.dead)) { announce('NO TARGET — CLICK A HOSTILE', 16); return; }
     if (needsTarget && GH.dist2(player.x, player.z, target.x, target.z) > 18 * 18) { announce('OUT OF RANGE', 16); return; }
     player.energy -= sg.cost;
-    player.abilityCds[5] = sg.cd * player.skillBon.cdMult;
+    player.abilityCds[5] = sg.cd * player.skillBon.cdMult * player.stats.artCd * GH.attrs.artRecharge(5);
     announce(sg.name, 22);
     tutorialEvent('ability', 1);
     var i, e, a;
@@ -2677,6 +2681,7 @@ GH.game = (function () {
     else if (type === 'cache') mesh = GH.models.buildCache();
     else if (type === 'alloy') mesh = GH.models.buildAlloy();
     else if (type === 'core') mesh = GH.models.buildCore();
+    else if (type === 'rune') mesh = GH.attrs.buildRuneMesh();
     else mesh = GH.models.buildCoin();
     mesh.position.set(x, 0.5 + gy(x, z), z);
     scene.add(mesh);
@@ -2725,12 +2730,17 @@ GH.game = (function () {
       lifeEvent('alloy', alN);
     }
     else if (pk.type === 'core') { grantMats(0, 1, silent); }
+    else if (pk.type === 'rune') {
+      // banked at once, like materials; read in the hangar's ATTRIBUTES & ARTS
+      GH.attrs.addRunes(1); runesRun++;
+      if (!silent) { queueAnnounce('ART RUNE RECOVERED — ' + GH.attrs.runeStock() + ' HELD · READ IT IN THE HANGAR', 22); GH.audio.levelup(); }
+    }
     else { coinsRun++; if (!silent) GH.audio.coin(); }
   }
 
   // workshop materials bank the moment they're picked up (a death never
   // takes them back); cores are rare enough to announce
-  var alloyRun = 0, coresRun = 0;
+  var alloyRun = 0, coresRun = 0, runesRun = 0;
   function grantMats(alloy, cores, silent) {
     var m = GH.meta.data.mats;
     if (alloy > 0) { m.alloy += alloy; alloyRun += alloy; if (!silent) GH.audio.coin(); }
@@ -2747,7 +2757,7 @@ GH.game = (function () {
   function frameReward(shellId) {
     var def = GH.mechById(shellId);
     if (def.kind === 'feat' || GH.roster.STARTERS.indexOf(shellId) !== -1) {
-      if (GH.meta.unlockShell(shellId)) return '<b>' + def.name + ' FRAME RECOVERED</b> — new frame unlocked!\n';
+      if (GH.meta.unlockShell(shellId)) return '<b>' + def.name + ' HULK RECOVERED</b> — the hangar has rebuilt it: a new frame is yours.\n';
       return '';
     }
     grantMats(80, 3, true);
@@ -2991,8 +3001,8 @@ GH.game = (function () {
     waveNum = n;
     if (n === 10) lifeEvent('wave10', 1);
     wavePlan = GH.wavePlan(stage, n, G.mode !== 'classic');
-    // ARENA every ten waves and CLASSIC wave 10 draw a HUNT from this stage's pool
-    if (wavePlan.midboss && (G.mode !== 'classic' || n === 10) && Math.random() < 0.7) {
+    // ARENA every ten waves and the GAUNTLET's hunt assault draw a HUNT from this stage's pool
+    if (wavePlan.midboss && (G.mode !== 'classic' || n === GH.WAVE_HUNT) && Math.random() < 0.7) {
       var hb2 = GH.bosses.pickFor(stage.id, G.mode === 'classic' ? 2 : Math.min(4, 1 + Math.floor(n / 10)));
       if (hb2) wavePlan.midboss = hb2.id;
     }
@@ -3049,7 +3059,7 @@ GH.game = (function () {
 
     GH.meta.save(); // persist run tracking each wave, not only at run end
 
-    if (G.mode === 'classic' && waveNum >= 20) {
+    if (G.mode === 'classic' && waveNum >= GH.WAVES) {
       gameOver(true);
       return;
     }
@@ -4027,7 +4037,7 @@ GH.game = (function () {
 
   // =================================================================
   // THE SHATTERED REACH — expedition mode. One persistent continent:
-  // territory nests spawn until broken, lairs guard shells, the camp
+  // territory nests spawn until broken, lairs guard frames, the camp
   // is home, and what you destroy stays destroyed.
   // =================================================================
   var expActive = false;
@@ -4255,7 +4265,7 @@ GH.game = (function () {
   }
 
   function restoreCharacter(saved) {
-    // stats are re-derived, never copied: base frame + devotions + the
+    // stats are re-derived, never copied: base frame + attributes + the
     // CURRENT skill tree + mastery + per-level growth. That way training
     // or respeccing at camp reaches a live character immediately.
     var savedDef = saved.mechId ? GH.mechById(saved.mechId) : GH.mechs[saved.mech];
@@ -5248,7 +5258,7 @@ GH.game = (function () {
     }
   }
 
-  // ---------------- CRUCIBLE: corrupt frames, one by one ----------------
+  // ---------------- CRUCIBLE: revenant frames, one by one ----------------
   var CRUCIBLE_ROSTER = ['fang', 'hexen', 'viper', 'morrow', 'strix', 'titan'];
   function updateCrucible(dt, lay) {
     var ds = dungeonState;
@@ -5348,7 +5358,7 @@ GH.game = (function () {
 
   // =================================================================
   // ZERO HOUR — the guided first ten minutes. A scripted ladder on top
-  // of the survivor camp: walk, look, fight, cast, ward, transform, drive,
+  // of the outpost: walk, look, fight, cast, ward, transform, drive,
   // drift, mine, chase a signal, drop a warden, build a frame. Each step
   // has one sentence, one check, and a beacon where it matters.
   // =================================================================
@@ -5465,7 +5475,8 @@ GH.game = (function () {
       grantMats(100, 2, true);
       GH.meta.data.salvage += 200;
       GH.meta.data.skillPoints += 1;
-      queueAnnounce('ZERO HOUR COMPLETE — +100 ALLOY · +2 CORES · +200 SALVAGE · +1 SKILL POINT', 26);
+      GH.meta.data.attrPts = (GH.meta.data.attrPts || 0) + 1;
+      queueAnnounce('ZERO HOUR COMPLETE — +100 ALLOY · +2 CORES · +200 SALVAGE · +1 SKILL POINT · +1 ATTRIBUTE POINT', 26);
       GH.audio.win();
     }
     GH.meta.data.tutorial = { done: true, when: new Date().toISOString().slice(0, 10), skipped: !!skipped };
@@ -5757,7 +5768,7 @@ GH.game = (function () {
       }
     }
 
-    // the dungeon lair: crossing the threshold wakes the corrupted frame
+    // the dungeon lair: crossing the threshold wakes the revenant
     // (tier-2 rematches wake regardless of the surface scar)
     var lair = worldH.layout.lair;
     if (lair && (lair.rematch || !w.lairsDown[lair.zone]) && !lair.woke &&
@@ -7120,7 +7131,7 @@ GH.game = (function () {
   function updateHUDStatic() {
     el['wave-label'].textContent =
       expActive ? 'THE REACH' :
-      G.mode === 'arena' ? 'Wave ' + waveNum : 'Wave ' + waveNum + '/20';
+      G.mode === 'arena' ? 'Wave ' + waveNum : 'Wave ' + waveNum + '/' + GH.WAVES;
     var s = player.stats;
     var vals = {
       block: Math.round(s.block) + '%', armor: Math.round(s.armor),
@@ -7447,7 +7458,7 @@ GH.game = (function () {
     if (trialTier >= 2) player.stats.xpGain += 0.10;
     if (trialTier >= 3) player.stats.damageMult += 0.05;
     kills = 0; coinsRun = 0; runTime = 0; hitCount = 0; sparksRun = 0;
-    alloyRun = 0; coresRun = 0;
+    alloyRun = 0; coresRun = 0; runesRun = 0;
     elitesSpawned = 0;
     if (resume) {
       kills = resume.kills || 0; coinsRun = resume.coinsRun || 0; runTime = resume.runTime || 0;
@@ -7493,7 +7504,7 @@ GH.game = (function () {
     var sv = GH.meta.data.suspended;
     if (!sv) return '';
     var def = sv.char && sv.char.mechId ? GH.mechById(sv.char.mechId) : GH.mechs[sv.char ? sv.char.mech : 0];
-    return (sv.mode === 'arena' ? 'ARENA' : sv.mode === 'weekly' ? 'WEEKLY' : 'CLASSIC') + ' · ' +
+    return (sv.mode === 'arena' ? 'ARENA' : sv.mode === 'weekly' ? 'WEEKLY' : 'GAUNTLET') + ' · ' +
       GH.stages[sv.stage].name + ' · WAVE ' + sv.wave + ' · ' + (def ? def.name : '?');
   };
   G.resumeRun = function () {
@@ -7584,7 +7595,7 @@ GH.game = (function () {
       }
       coinsRun = 0;
       if (player.speederOn) toggleSpeeder(); // wake up back in frame form
-      // dragged back to the survivor camp — wherever you fell
+      // dragged back to the outpost — wherever you fell
       if (curZone !== 'wreck') loadZone('wreck', null);
       player.x = GH.world.CAMP.x;
       player.z = GH.world.CAMP.z + 4;
@@ -7631,7 +7642,7 @@ GH.game = (function () {
     // workshop materials for the run: alloy by depth, cores for a clear
     var endAlloy = Math.round(waveNum * 1.5 + kills / 10) + (won ? 30 : 0);
     grantMats(endAlloy, won ? 2 : 0, true);
-    var matsMsg = 'Workshop: <b>+' + (alloyRun) + ' alloy</b>' + (coresRun ? ' · <b>+' + coresRun + ' frame cores</b>' : '') + '\n';
+    var matsMsg = 'Workshop: <b>+' + (alloyRun) + ' alloy</b>' + (coresRun ? ' · <b>+' + coresRun + ' frame cores</b>' : '') + (runesRun ? ' · <b>+' + runesRun + ' art rune' + (runesRun > 1 ? 's' : '') + '</b>' : '') + '\n';
     if (won && G.mode === 'classic') awardTrial('clear');
 
     // pilot mastery XP: kills + depth, with a victory bonus
@@ -7644,7 +7655,7 @@ GH.game = (function () {
     // season task evaluation from this run
     var s6 = GH.progress.seasonCheck();
     if (waveNum >= 10) seasonTaskNotify('w10');
-    if (waveNum >= 15) seasonTaskNotify('w15');
+    if (waveNum >= 14) seasonTaskNotify('w15');
     if (G.mode === 'arena' && waveNum >= 25) seasonTaskNotify('arena25');
     if (won && G.mode === 'classic') {
       seasonTaskNotify('clear1');
@@ -7675,7 +7686,7 @@ GH.game = (function () {
     }
     meta.save();
 
-    document.getElementById('end-title').innerHTML = won ? 'ARENA&nbsp;CLEARED' : 'FRAME&nbsp;DESTROYED';
+    document.getElementById('end-title').innerHTML = won ? 'GAUNTLET&nbsp;CLEARED' : 'FRAME&nbsp;DESTROYED';
     document.getElementById('end-stats').innerHTML = unlockMsg + masteryMsg + matsMsg +
       stage.name + (G.mode === 'arena' ? ' · ARENA' : (G.mode === 'weekly' ? ' · WEEKLY' : '')) +
       ' — reached <b>Wave ' + waveNum + '</b> as <b>' + player.def.name + '</b>' +

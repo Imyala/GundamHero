@@ -18,7 +18,7 @@ Three pillars, one hangar:
 |---|---|---|---|
 | **SORTIE** | Gun Metal missions over big destructible terrain: defend, escort, assault, dogfight, board a capital ship | Gun Metal (2002) | Armored Core VI (stagger, two-tier lock), Zone of the Enders 2 (multi-lock), Daemon X Machina (two fuels), Granvir (heat) |
 | **CIRCUIT** | Vector-form racing: circuit, sprint, drift, drag, outrun, plus Trace (light-cycle) duels | Need for Speed Underground 1 and 2 | Armagetron Advanced, Ridge Racer, Burnout |
-| **HANGAR** | Unlock and build: 24+ frames, 60+ weapons, six attributes, three-layer skill trees, gem sockets, rarity tiers | Sacred Gold, World of Warcraft | Diablo 2 synergies, Borderlands parts, Vital Shell devotions |
+| **HANGAR** | Unlock and build: 24+ frames, 60+ weapons, six attributes, three-layer skill trees, gem sockets, rarity tiers | Sacred Gold, World of Warcraft | Diablo 2 synergies, Borderlands parts |
 
 Design promise: **easy to jump in** (one form key, one attack key, one lock key, auto-growth stats)
 and **deep to master** (form-gated weapon sets, stagger windows, drift chains, three trees, socket commitments).
@@ -34,7 +34,7 @@ depth under the hood. Every mission hands you a new weapon or a new frame, never
 HANGAR  ──pick frame + 4 weapons──▶  SORTIE / CIRCUIT
   ▲                                       │
   │   salvage · parts · blueprints ·      │  complete objective, place in race,
-  │   pilot XP · frame mastery            │  beat a Corrupted mirror, capture a wreck
+  │   pilot XP · frame mastery            │  beat a Revenant mirror, capture a wreck
   └──────────────── unlock ◀──────────────┘
 ```
 
@@ -44,7 +44,7 @@ weekly challenge, relic seasons.
 
 ## 4. What changes from the current build (HERO FRAME)
 
-The codebase is a top-down arena survivor with a bolted-on open world. The research says the target
+The codebase began as a wave arena with a bolted-on open world. The research says the target
 is a **chase-camera transforming mech game on open terrain**. The five structural changes, in order:
 
 1. **Camera and control**: fixed top-down → third-person chase camera with mouse aim and a floating
